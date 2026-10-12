@@ -915,7 +915,7 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   Source: in-session-2026-10-12.
   Lanes: Security.
 
-- 📋 [RPSN-0128] **Point the outer rusty-psn folder at rusty-psn-source once Ants Terminal ships ANTS-5667.**
+- ✅ [RPSN-0128] **Point the outer rusty-psn folder at rusty-psn-source once Ants Terminal ships ANTS-5667.**
   The tab opens in /mnt/Games/Scripts/Linux/rusty-psn, one level above the
   repo, so the Roadmap button and MCP verbs find nothing there. Ants
   Terminal's fix (ANTS-5667) adds a key to the OUTER folder's
@@ -924,6 +924,11 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   that its name is final (its spec was under review on 2026-10-12). Then
   set it with project_settings, never by hand, from the outer folder.
   Workaround until then: open the tab in rusty-psn-source.
+  Resolved 2026-10-12: ants-terminal confirmed the key name (ANTS-5667,
+  commit 2a7df693). Set with project_settings from the outer folder:
+  .ants/project.json holds "repo_root": "rusty-psn-source" (outside this
+  repo, so untracked here). roadmap_query from the outer folder now
+  resolves to this ROADMAP.md.
   **Layman:** Let the terminal tab find this project's roadmap from the folder it opens in.
   Kind: chore.
   Source: ants-terminal session message 2026-10-12 (ANTS-5664, ANTS-5667).
