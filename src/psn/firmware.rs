@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::XmlVersion;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::Sender;
 
@@ -407,35 +408,35 @@ fn parse_xml_firmware(body: &str, console: FirmwareConsole, region: FirmwareRegi
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 match e.name().as_ref() {
                     // PS4/PS5: <system_pup label="13.50" ...>
-                    b"system_pup" => {
+                    "system_pup" => {
                         for attr in e.attributes().filter_map(|a| a.ok()) {
-                            if attr.key.as_ref() == b"label" {
-                                current_version = attr.unescape_value().unwrap_or_default().to_string();
+                            if attr.key.as_ref() == "label" {
+                                current_version = attr.normalized_value(XmlVersion::Implicit1_0).unwrap_or_default().to_string();
                             }
                         }
                     }
                     // PSVita: <version label="3.74" ...>
-                    b"version" => {
+                    "version" => {
                         for attr in e.attributes().filter_map(|a| a.ok()) {
-                            if attr.key.as_ref() == b"label" {
-                                current_version = attr.unescape_value().unwrap_or_default().to_string();
+                            if attr.key.as_ref() == "label" {
+                                current_version = attr.normalized_value(XmlVersion::Implicit1_0).unwrap_or_default().to_string();
                             }
                         }
                     }
                     // <update_data update_type="full">
-                    b"update_data" => {
+                    "update_data" => {
                         current_fw_type = FirmwareType::Full;
                     }
                     // PS4: <recovery_pup type="default">
-                    b"recovery_pup" => {
+                    "recovery_pup" => {
                         current_fw_type = FirmwareType::Recovery;
                     }
                     // PSVita: <recovery spkg_type="systemdata|preinst">
-                    b"recovery" => {
+                    "recovery" => {
                         current_fw_type = FirmwareType::Recovery;
                         for attr in e.attributes().filter_map(|a| a.ok()) {
-                            if attr.key.as_ref() == b"spkg_type" {
-                                let val = attr.unescape_value().unwrap_or_default();
+                            if attr.key.as_ref() == "spkg_type" {
+                                let val = attr.normalized_value(XmlVersion::Implicit1_0).unwrap_or_default();
                                 current_fw_type = match val.as_ref() {
                                     "systemdata" => FirmwareType::SystemData,
                                     "preinst" => FirmwareType::PreInstall,
@@ -445,12 +446,12 @@ fn parse_xml_firmware(body: &str, console: FirmwareConsole, region: FirmwareRegi
                         }
                     }
                     // <image size="503293952">URL</image>
-                    b"image" => {
+                    "image" => {
                         in_image = true;
                         image_size = None;
                         for attr in e.attributes().filter_map(|a| a.ok()) {
-                            if attr.key.as_ref() == b"size" {
-                                let val = attr.unescape_value().unwrap_or_default();
+                            if attr.key.as_ref() == "size" {
+                                let val = attr.normalized_value(XmlVersion::Implicit1_0).unwrap_or_default();
                                 image_size = val.parse::<u64>().ok();
                             }
                         }
@@ -460,26 +461,21 @@ fn parse_xml_firmware(body: &str, console: FirmwareConsole, region: FirmwareRegi
             }
             Ok(Event::Text(ref e)) => {
                 if in_image {
-                    match e.decode() {
-                        Ok(url_text) => {
-                            let url = url_text.trim().to_string();
-                            if !url.is_empty() {
-                                entries.push(FirmwareInfo {
-                                    console,
-                                    region,
-                                    version: current_version.clone(),
-                                    download_url: url,
-                                    size: image_size,
-                                    fw_type: current_fw_type,
-                                });
-                            }
-                        }
-                        Err(e) => return Err(FirmwareError::ParseFailed(format!("Encoding error: {e}"))),
+                    let url = e.xml10_content().trim().to_string();
+                    if !url.is_empty() {
+                        entries.push(FirmwareInfo {
+                            console,
+                            region,
+                            version: current_version.clone(),
+                            download_url: url,
+                            size: image_size,
+                            fw_type: current_fw_type,
+                        });
                     }
                 }
             }
             Ok(Event::End(ref e)) => {
-                if e.name().as_ref() == b"image" {
+                if e.name().as_ref() == "image" {
                     in_image = false;
                 }
             }

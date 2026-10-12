@@ -624,12 +624,6 @@ impl UpdatesApp {
                                 ToastLevel::Error,
                             ));
                         }
-                        UpdateError::XmlEncodingError(e) => {
-                            toasts.push((
-                                format!("Error parsing response from Sony, try again later ({e})."),
-                                ToastLevel::Error,
-                            ));
-                        }
                         UpdateError::ManifestParsing(e) => {
                             toasts.push((
                                 format!("Error parsing manifest response from Sony, try again later ({e})."),

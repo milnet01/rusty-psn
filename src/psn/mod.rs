@@ -95,7 +95,6 @@ pub enum UpdateError {
     UnhandledErrorResponse(String),
     Reqwest(reqwest::Error),
     XmlParsing(quick_xml::Error),
-    XmlEncodingError(quick_xml::encoding::EncodingError),
     ManifestParsing(serde_json::Error),
     Security(crate::security::SecurityError),
     ResponseTooLarge(u64),
@@ -198,7 +197,6 @@ impl UpdateInfo {
                     return Err(UpdateError::UnhandledErrorResponse(reason));
                 }
                 parser::ParseError::XmlParsing(reason) => return Err(UpdateError::XmlParsing(reason)),
-                parser::ParseError::XmlEncodingError(reason) => return Err(UpdateError::XmlEncodingError(reason)),
                 parser::ParseError::InvalidTitleId(id) => {
                     warn!("Sony's reply named an invalid title id: {id:?}");
                     return Err(UpdateError::InvalidSerial);
