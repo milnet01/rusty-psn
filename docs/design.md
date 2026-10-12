@@ -63,18 +63,18 @@ sets for a second reason to change.
 | S1 — every listed update downloads in full and matches Sony's checksum | PSN, with Files for hashing |
 | S2 — a dropped connection resumes and still ends verified | PSN |
 | S3 — a multi-part PS4 update ends up as one package | PSN |
-| S4 — downloads land only in the chosen folder, as Title / ID / files | Files, with Security for containment. Both apps still default to ID - Title; a roadmap item makes Title / ID the default, the layout `CLAUDE.md` rule 6 prefers |
+| S4 — downloads land only in the chosen folder, Title / ID / files by default | Files, with Security for containment. Both apps still default to ID - Title; a roadmap item makes Title / ID the default, the layout `CLAUDE.md` rule 6 prefers |
 | S5 — PS3, PS4 and PSVita IDs each return their updates | PSN |
 | S6 — a downloaded update installs into RPCS3 and shows the new version | RPCS3 |
-| S7 — a library scan marks every game correctly | RPCS3 |
+| S7 — a library scan marks every game correctly | RPCS3, with PSN for the latest version, joined in the window app |
 | S8 — RPCS3 is found without typing a path, and can be overridden | RPCS3, with the front ends for the setting |
 | S9 — both apps work on Linux, Windows and macOS | the whole |
 | S10 — a DLC zip the user has installs into RPCS3 and the game sees it | Content, with RPCS3 for the install |
 
 ## What every part does the same way
 
-- **Errors** — `STANDARDS.md` § 4.3 owns it: one hand-written error enum
-  per area, wrapped with `map_err`.
+- **Errors** — `STANDARDS.md` § 4.3 owns it: hand-written error enums,
+  wrapped with `map_err`.
 - **Logging** — `STANDARDS.md` § 4.6 owns it: the `log` macros, written to
   file by `flexi_logger`.
 - **State and persistence** — only the window app keeps settings, through
@@ -123,3 +123,4 @@ exception rather than a decision, and its roadmap item closes it.
 |------|------|-------|----|----|----|----|---------|
 | 1 | 2026-10-12 | 2 (both lanes held every question) | 3 | 2 | 0 | — | 5 verified, 5 fixed, 0 dismissed. Both lanes found Entry's `Args` used by the command line. Others: STANDARDS § 2.3 crate list disagrees with `Cargo.toml`; merged PS4 package skips path containment; a both-front-ends build exists; RPCS3's never-use-PSN rule needed "directly". The packet's import grep was lower-case only; corrected. Open questions resolved: the default folder layout is SerialTitle (a queue matter, not design); the window app does not use `Args`. |
 | 2 | 2026-10-12 | 2 (both lanes held every question) | 2 | 2 | 1 | — | 5 verified, 5 fixed, 0 dismissed. Both lanes found S4's Title / ID layout is not the default, and RPCS3 and Content writes had no stated boundary. Also: layout migration writes before the containment check (`migrate_directories` found while verifying); egui-only code sits in PSN and Files, not RPCS3; a fix inside egui-only `merge_parts` had two possible homes. Open question resolved: `config.rs` writes only in tests. |
+| 3 | 2026-10-12 | 2 (both lanes held every question) | 0 | 3 | 0 | — | 3 verified, 3 fixed, 0 dismissed. S4 narrowed in discovery to Title / ID by default, with the owner's agreement; S7 placed as RPCS3 with PSN, joined in the window app; the error summary no longer says one enum per area. Cap reached (3 for an ADR); these 3 fixes were read by no lane. Calm cap: 1 of 3 findings landed on text this run wrote (the S4 row). The gated span is the whole document, so the share of findings inside it carries no information. Final sweep: no stale wording found. Grouped and `super::` imports checked: all stay inside one part. |

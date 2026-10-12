@@ -6,7 +6,7 @@
 This is what everything is checked against for the life of the project.
 `~/.claude/workflow.md` § 3 owns what belongs here and how its gate passes.
 
-**Status:** agreed (2026-10-12). The owner confirmed the *never* item on its own, and agreed S10 the same day.
+**Status:** agreed (2026-10-12). The owner confirmed the *never* item on its own, and agreed S10 and the narrowed S4 the same day.
 
 ## The problem
 
@@ -30,7 +30,7 @@ one at a time, checking them and installing them.
 - **S3** — A PS4 update that Sony serves in several parts ends up as one
   complete package file.
 - **S4** — Downloads land only inside the folder the user chose, laid out as
-  Game Title / Game ID / files.
+  Game Title / Game ID / files by default. The other layouts stay selectable.
 - **S5** — A PS3, a PS4 and a PSVita game ID each return their update list,
   and S1 holds for each.
 - **S6** — An update downloaded for a PS3 game installs into RPCS3, and RPCS3
