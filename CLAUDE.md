@@ -47,11 +47,11 @@ These rules apply to ALL work on this project, in every conversation.
 - Follow existing naming conventions documented in STANDARDS.md
 - Prefer explicit error handling over `unwrap()` - every `unwrap()` must have a comment justifying why it cannot fail
 - New code must include tests where feasible
-- Do not introduce new technical debt without documenting it in TODO.md
+- Do not introduce new technical debt without documenting it in ROADMAP.md
 
 ### 5. Reference Documents
 - **STANDARDS.md** - Architecture, coding conventions, domain model, existing behavior
-- **TODO.md** - Feature roadmap with priorities and implementation details
+- **ROADMAP.md** - Feature roadmap with priorities and implementation details. Generated from the roadmap store: change it with `roadmap_log`, never by hand. IDs are `RPSN-NNNN`.
 - Both documents live in the project root alongside the source code
 
 ### 6. No Hardcoded Paths
