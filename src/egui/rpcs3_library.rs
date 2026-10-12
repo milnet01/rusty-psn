@@ -12,19 +12,7 @@ impl UpdatesApp {
             }
         };
 
-        // Resolve dev_hdd0 path from vfs.yml.
-        let vfs_path = config_dir.join("vfs.yml");
-        let dev_hdd0_path = if vfs_path.exists() {
-            match crate::rpcs3::config::parse_vfs_yml(&vfs_path, &config_dir) {
-                Ok(vfs) => vfs.dev_hdd0_path,
-                Err(e) => {
-                    warn!("Failed to parse vfs.yml: {e}, using default");
-                    config_dir.join("dev_hdd0")
-                }
-            }
-        } else {
-            config_dir.join("dev_hdd0")
-        };
+        let dev_hdd0_path = crate::rpcs3::config::resolve_dev_hdd0(&config_dir);
 
         let installation = crate::rpcs3::Rpcs3Installation {
             config_dir,

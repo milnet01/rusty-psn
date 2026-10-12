@@ -27,6 +27,22 @@ pub fn parse_games_yml(path: &Path) -> Result<HashMap<String, PathBuf>, String> 
     Ok(map.into_iter().map(|(k, v)| (k, PathBuf::from(v))).collect())
 }
 
+/// The dev_hdd0 folder for an RPCS3 config folder: the one its vfs.yml sets, or
+/// `config_dir/dev_hdd0` when there is no vfs.yml or it cannot be read.
+pub fn resolve_dev_hdd0(config_dir: &Path) -> PathBuf {
+    let vfs_path = config_dir.join("vfs.yml");
+    if !vfs_path.exists() {
+        return config_dir.join("dev_hdd0");
+    }
+    match parse_vfs_yml(&vfs_path, config_dir) {
+        Ok(vfs) => vfs.dev_hdd0_path,
+        Err(e) => {
+            warn!("Failed to parse vfs.yml, using the default dev_hdd0 path: {e}");
+            config_dir.join("dev_hdd0")
+        }
+    }
+}
+
 /// Parse RPCS3's vfs.yml file and resolve the dev_hdd0 path.
 ///
 /// `config_dir` is the directory containing vfs.yml — used to resolve `$(EmulatorDir)`
@@ -127,6 +143,24 @@ mod tests {
 
         let config = parse_vfs_yml(&vfs_path, dir.path()).unwrap();
         assert_eq!(config.dev_hdd0_path, PathBuf::from("/opt/rpcs3/dev_hdd0/"));
+    }
+
+    #[test]
+    fn resolve_dev_hdd0_follows_vfs_yml() {
+        // A dev_hdd0 moved in vfs.yml must be honoured, not assumed under the config folder (RPSN-0098).
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("vfs.yml"),
+            "\"$(EmulatorDir)\": \"/opt/rpcs3/\"\n\"/dev_hdd0/\": \"$(EmulatorDir)dev_hdd0/\"\n",
+        )
+        .unwrap();
+        assert_eq!(resolve_dev_hdd0(dir.path()), PathBuf::from("/opt/rpcs3/dev_hdd0/"));
+    }
+
+    #[test]
+    fn resolve_dev_hdd0_defaults_without_vfs_yml() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(resolve_dev_hdd0(dir.path()), dir.path().join("dev_hdd0"));
     }
 
     #[test]

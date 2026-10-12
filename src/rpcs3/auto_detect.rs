@@ -14,18 +14,7 @@ pub fn detect_rpcs3() -> Option<Rpcs3Installation> {
         if config_dir.join("games.yml").exists() {
             info!("Auto-detected RPCS3 config at: {}", config_dir.display());
 
-            let vfs_path = config_dir.join("vfs.yml");
-            let dev_hdd0_path = if vfs_path.exists() {
-                match super::config::parse_vfs_yml(&vfs_path, &config_dir) {
-                    Ok(vfs) => vfs.dev_hdd0_path,
-                    Err(e) => {
-                        info!("Failed to parse vfs.yml, using default dev_hdd0 path: {e}");
-                        config_dir.join("dev_hdd0")
-                    }
-                }
-            } else {
-                config_dir.join("dev_hdd0")
-            };
+            let dev_hdd0_path = super::config::resolve_dev_hdd0(&config_dir);
 
             let executable = detect_executable(&config_dir);
             if let Some(ref exe) = executable {

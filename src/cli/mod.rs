@@ -57,14 +57,7 @@ pub fn start_app(args: Args) {
     let titles: Vec<String> = if args.scan_rpcs3 {
         // Scan RPCS3 library for installed game serials.
         let installation = if let Some(config_dir) = &args.rpcs3_config_dir {
-            let vfs_path = config_dir.join("vfs.yml");
-            let dev_hdd0_path = if vfs_path.exists() {
-                crate::rpcs3::config::parse_vfs_yml(&vfs_path, config_dir)
-                    .map(|v| v.dev_hdd0_path)
-                    .unwrap_or_else(|_| config_dir.join("dev_hdd0"))
-            } else {
-                config_dir.join("dev_hdd0")
-            };
+            let dev_hdd0_path = crate::rpcs3::config::resolve_dev_hdd0(config_dir);
             crate::rpcs3::Rpcs3Installation {
                 config_dir: config_dir.clone(),
                 dev_hdd0_path,

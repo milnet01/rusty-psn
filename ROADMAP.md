@@ -991,10 +991,12 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: design-review-2026-10-12.
   Lanes: PSN, Command line.
 
-- 📋 [RPSN-0088] **Bring STANDARDS.md § 2.3's crate list in line with Cargo.toml.**
+- ✅ [RPSN-0088] **Bring STANDARDS.md § 2.3's crate list in line with Cargo.toml.**
   § 2.3 lists `sha1_smol` and `serde_yaml`; Cargo.toml uses `sha1` and
   `serde_yaml_ng`, and adds `zip` and `tempfile`. docs/design.md names
   Cargo.toml the authority. Replace the list with a pointer, or correct it.
+  Resolved (2026-10-12, 8c1d26c): the table is replaced by a pointer to
+  Cargo.toml and docs/dependency-holds.md.
   **Layman:** Fix an out-of-date list of the app's building blocks in the project notes.
   Kind: doc-fix.
   Source: design-review-2026-10-12.

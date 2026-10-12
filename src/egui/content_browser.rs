@@ -20,6 +20,8 @@ impl UpdatesApp {
                 }
 
                 let has_rpcs3 = self.settings.rpcs3_executable.is_some();
+                // A DLC licence goes under the config folder's dev_hdd0, so DLC also needs that folder set.
+                let has_dlc_target = has_rpcs3 && self.settings.rpcs3_config_dir.is_some();
 
                 // Toolbar
                 ui.horizontal(|ui| {
@@ -120,18 +122,19 @@ impl UpdatesApp {
                                                     egui::RichText::new("Installing...")
                                                         .color(egui::Rgba::from_rgb(1.0, 0.8, 0.0)),
                                                 );
-                                            } else if has_rpcs3 && ui.small_button("Install").clicked() {
+                                            } else if has_dlc_target && ui.small_button("Install").clicked() {
                                                 let exe =
                                                     self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
                                                 let zip = dlc_item.zip_path.clone();
                                                 let key = dlc_key.clone();
-                                                // Resolve exdata directory from RPCS3 config
-                                                let exdata = self
+                                                // The licence goes in the exdata folder under the dev_hdd0 that vfs.yml sets.
+                                                let config_dir = self
                                                     .settings
                                                     .rpcs3_config_dir
-                                                    .as_ref()
-                                                    .map(|d| d.join("dev_hdd0/home/00000001/exdata"))
-                                                    .unwrap_or_default();
+                                                    .clone()
+                                                    .expect("has_dlc_target checked it is set");
+                                                let exdata = crate::rpcs3::config::resolve_dev_hdd0(&config_dir)
+                                                    .join("home/00000001/exdata");
                                                 let rt = self
                                                     .v
                                                     .rt_handle
