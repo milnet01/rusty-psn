@@ -206,18 +206,53 @@ impl fmt::Display for RedirectError {
 
 impl std::error::Error for RedirectError {}
 
+/// The most redirects one request may follow: reqwest's own default limit, which a custom policy replaces.
+const MAX_REDIRECTS: usize = 10;
+
+/// Redirect error for a request that kept being redirected.
+#[derive(Debug)]
+pub struct TooManyRedirects;
+
+impl fmt::Display for TooManyRedirects {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Too many redirects (more than {MAX_REDIRECTS})")
+    }
+}
+
+impl std::error::Error for TooManyRedirects {}
+
+#[derive(Debug, PartialEq)]
+enum RedirectCheck {
+    Follow,
+    DisallowedHost,
+    TooMany,
+}
+
+/// Decides one redirect to `host`. `previous` counts the URLs already visited, the original request
+/// included, as reqwest's `Attempt::previous` does.
+fn check_redirect(host: Option<&str>, previous: usize) -> RedirectCheck {
+    if previous > MAX_REDIRECTS {
+        return RedirectCheck::TooMany;
+    }
+    match host {
+        Some(host) if is_allowed_sony_host(host) => RedirectCheck::Follow,
+        _ => RedirectCheck::DisallowedHost,
+    }
+}
+
 /// Build a custom reqwest redirect policy that validates each redirect URL
-/// stays within the allowed Sony domains.
+/// stays within the allowed Sony domains, and follows at most `MAX_REDIRECTS` of them.
 pub fn sony_redirect_policy() -> reqwest::redirect::Policy {
-    reqwest::redirect::Policy::custom(|attempt| {
-        let url_string = attempt.url().to_string();
-        if let Some(host) = attempt.url().host_str() {
-            if is_allowed_sony_host(host) {
-                return attempt.follow();
+    reqwest::redirect::Policy::custom(
+        |attempt| match check_redirect(attempt.url().host_str(), attempt.previous().len()) {
+            RedirectCheck::Follow => attempt.follow(),
+            RedirectCheck::TooMany => attempt.error(TooManyRedirects),
+            RedirectCheck::DisallowedHost => {
+                let url_string = attempt.url().to_string();
+                attempt.error(RedirectError(url_string))
             }
-        }
-        attempt.error(RedirectError(url_string))
-    })
+        },
+    )
 }
 
 /// Certificate check that skips verification for Sony hosts only.
@@ -289,6 +324,17 @@ pub fn sony_tls_config() -> Result<rustls::ClientConfig, rustls::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn redirects_stop_after_the_limit() {
+        // A custom policy drops reqwest's limit, so a redirect loop never ended (RPSN-0102).
+        let sony = Some("gs.ww.np.dl.playstation.net");
+        // The original request plus ten redirects: the tenth is still followed.
+        assert_eq!(check_redirect(sony, MAX_REDIRECTS), RedirectCheck::Follow);
+        assert_eq!(check_redirect(sony, MAX_REDIRECTS + 1), RedirectCheck::TooMany);
+        assert_eq!(check_redirect(Some("example.com"), 1), RedirectCheck::DisallowedHost);
+        assert_eq!(check_redirect(None, 1), RedirectCheck::DisallowedHost);
+    }
 
     #[test]
     fn valid_psn_download_urls() {

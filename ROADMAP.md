@@ -1168,8 +1168,13 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 1 MEDIUM.
   Lanes: Window app.
 
-- 📋 [RPSN-0102] **Cap redirects in the Sony redirect policy.**
+- ✅ [RPSN-0102] **Cap redirects in the Sony redirect policy.**
   src/security.rs:185 reqwest::redirect::Policy::custom replaces reqwest's default limit of 10 and never checks attempt.previous().len(). Remedy: error when previous().len() >= 10.
+  Resolved 2026-10-12: security::check_redirect decides each hop and
+  refuses with TooManyRedirects once previous() exceeds MAX_REDIRECTS
+  (10). That matches reqwest's own default (previous() includes the
+  original request), so ten redirects are followed, not the nine a
+  >= 10 check would allow. Test: redirects_stop_after_the_limit.
   **Layman:** A redirect loop on Sony's side could hang a download forever.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 2 MEDIUM.
