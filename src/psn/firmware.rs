@@ -1,4 +1,4 @@
-use log::info;
+use log::{error, info};
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -143,6 +143,14 @@ impl fmt::Display for FirmwareType {
     }
 }
 
+/// Firmware has no hash to check, so its stated size is the only sign the transfer finished.
+fn check_complete(received: u64, expected: Option<u64>) -> Result<(), DownloadError> {
+    match expected {
+        Some(expected) if received != expected => Err(DownloadError::Incomplete { received, expected }),
+        _ => Ok(()),
+    }
+}
+
 /// Information about an available firmware file.
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
@@ -234,6 +242,12 @@ impl FirmwareInfo {
         }
 
         file.sync_all().await.map_err(DownloadError::Tokio)?;
+
+        if let Err(e) = check_complete(downloaded, self.size) {
+            error!("Firmware download ended early: {} ({e:?})", output_path.display());
+            let _ = tx.send(DownloadStatus::DownloadFailure).await;
+            return Err(e);
+        }
 
         info!("Firmware download complete: {} ({} bytes)", output_path.display(), downloaded);
         let _ = tx.send(DownloadStatus::DownloadSuccess).await;
@@ -506,6 +520,21 @@ fn parse_xml_firmware(body: &str, console: FirmwareConsole, region: FirmwareRegi
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn short_firmware_download_fails() {
+        // A dropped connection used to leave a cut-off PUP reported as done (RPSN-0103).
+        assert!(matches!(
+            check_complete(100, Some(200)),
+            Err(DownloadError::Incomplete {
+                received: 100,
+                expected: 200
+            })
+        ));
+        assert!(check_complete(200, Some(200)).is_ok());
+        // Without a stated size there is nothing to compare against.
+        assert!(check_complete(100, None).is_ok());
+    }
 
     fn test_client() -> reqwest::Client {
         crate::psn::build_psn_client().expect("failed to build test client")

@@ -115,6 +115,20 @@ impl UpdatesApp {
                                     ToastLevel::Error,
                                 ));
                             }
+                            // Packages are checked by hash instead; only firmware reports this.
+                            DownloadError::Incomplete { received, expected } => {
+                                self.v.failed_downloads.push(FailedDownload {
+                                    title_id: download.title_id.clone(),
+                                    pkg_id: download.pkg_id.clone(),
+                                });
+                                toasts.push((
+                                    format!(
+                                        "Failed to download {} v{}: ended at {received} of {expected} bytes",
+                                        download.title_id, download.pkg_id
+                                    ),
+                                    ToastLevel::Error,
+                                ));
+                            }
                             DownloadError::Cancelled { file_path, abort } => {
                                 if *abort {
                                     info!("Aborted download {} {}, cleaning up", download.title_id, download.pkg_id);

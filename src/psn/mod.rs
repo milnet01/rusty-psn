@@ -94,6 +94,11 @@ pub enum DownloadError {
     // bool represents whether we received less data than expected.
     // Sony's servers like to drop out before the transfer is actually completed.
     HashMismatch(bool),
+    /// A file with no hash to check (firmware) ended before its stated size.
+    Incomplete {
+        received: u64,
+        expected: u64,
+    },
     Tokio(tokio::io::Error),
     Reqwest(reqwest::Error),
     Security(crate::security::SecurityError),

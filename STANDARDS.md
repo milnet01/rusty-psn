@@ -174,7 +174,7 @@ PackageInfo {
 
 - Custom error enums per domain area, wrapping underlying errors:
   - `UpdateError` - update query failures (invalid serial, network, parsing)
-  - `DownloadError` - download failures (hash mismatch, I/O, network)
+  - `DownloadError` - download failures (hash mismatch, a firmware file short of its stated size, I/O, network)
   - `utils::FileError` - Files failures (I/O, path containment, a file too short to verify); PSN converts it into `DownloadError`
   - `MergeError` - merge failures (filepath issues, unmergable packages)
   - `parser::ParseError` - XML parsing errors

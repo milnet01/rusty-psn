@@ -1180,8 +1180,12 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 2 MEDIUM.
   Lanes: Security.
 
-- 📋 [RPSN-0103] **Fail a firmware download that ends short of its stated size.**
+- ✅ [RPSN-0103] **Fail a firmware download that ends short of its stated size.**
   src/psn/firmware.rs:226-229 sends DownloadSuccess without comparing downloaded with self.size, so a dropped connection leaves a truncated PUP reported as done. Remedy: when size is Some and differs, send DownloadFailure and return an error.
+  Resolved 2026-10-12: firmware::check_complete compares the bytes
+  received with the stated size; a mismatch sends DownloadFailure and
+  returns the new DownloadError::Incomplete {received, expected}. Both
+  front ends handle the variant. Test: short_firmware_download_fails.
   **Layman:** A cut-off firmware download is reported as a success.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 2 MEDIUM.

@@ -381,6 +381,15 @@ pub fn start_app(args: Args) {
                                         error!("Security check failed for {} {}: {e}", update.title_id, pkg.id());
                                         println!("Security check failed: {e}.")
                                     }
+                                    // Packages are checked by hash instead; only firmware reports this.
+                                    DownloadError::Incomplete { received, expected } => {
+                                        error!(
+                                            "Download of {} {} ended at {received} of {expected} bytes",
+                                            update.title_id,
+                                            pkg.id()
+                                        );
+                                        println!("Error downloading update: it ended at {received} of {expected} bytes.")
+                                    }
                                     DownloadError::Cancelled { .. } => {
                                         // CLI downloads are never cancelled, but handle gracefully.
                                         info!("Download cancelled for {} {}", update.title_id, pkg.id());
