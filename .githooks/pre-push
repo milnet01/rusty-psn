@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Delegate the push gate to the machine-wide hook.
+#
+# WHY THIS FILE EXISTS. `core.hooksPath` holds ONE value and the repository's
+# own wins, so a project that sets it to `.githooks` for the commit-msg check
+# stops seeing `~/.claude/githooks/pre-push` — silently. Before this file, every
+# scaffolded project got the commit checks and NO push gate, and nothing said
+# so. local-gate.md § 2 requires the gate; that is the breach this closes.
+#
+# WHY A DELEGATOR AND NOT A COPY. A copy is correct on the day it is written
+# and drifts from then on, which is the same argument local-gate.md § 3 makes
+# about a hand-written mirror of a CI workflow. One implementation, one place
+# to fix.
+#
+# WHAT IT DOES. Everything: discovering this project's gate script, deciding
+# whether the push is documentation-only, and checking the PUSHED COMMITS out
+# into a worktree rather than gating whatever happens to be on disk. Read that
+# file for the escape hatches and the per-repository knobs.
+#
+# ON A MACHINE WITHOUT IT — a colleague's clone, CI, a fresh box — there is no
+# gate, and this says so rather than exiting 0 in silence. A check that did not
+# run must not look like one that passed.
+set -Eeuo pipefail
+
+GLOBAL_HOOK="${ANTS_GLOBAL_HOOKS:-$HOME/.claude/githooks}/pre-push"
+
+if [[ -x $GLOBAL_HOOK ]]; then
+    exec "$GLOBAL_HOOK" "$@"
+fi
+
+printf 'pre-push: no push gate on this machine (%s is absent).\n' "$GLOBAL_HOOK" >&2
+printf 'pre-push: NOTHING WAS CHECKED. local-gate.md § 2 wants the pipeline run\n' >&2
+printf 'pre-push: locally, over the commits being pushed, before they go.\n' >&2
+exit 0

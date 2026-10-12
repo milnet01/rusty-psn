@@ -3,3 +3,6 @@
 
 *.pkg
 *.log
+
+# Roadmap ID counter — per-machine cache, not source.
+.roadmap-counter
