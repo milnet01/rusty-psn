@@ -1,0 +1,8 @@
+{
+    "docs_dir": "docs",
+    "roadmap": "ROADMAP.md",
+    "source_roots": [
+        "src",
+        "scripts"
+    ]
+}
