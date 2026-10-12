@@ -1,57 +1,197 @@
-use std::convert::TryInto;
+use std::fmt;
 use std::path::{Path, PathBuf};
 
-use sha1_smol::Sha1;
-
+use log::{error, info};
+use serde::{Deserialize, Serialize};
+use sha1::{Digest, Sha1};
 use tokio::fs;
 use tokio::fs::{File, OpenOptions};
 
-use tokio::io::{self, AsyncBufReadExt, AsyncSeekExt, BufReader, SeekFrom};
+use tokio::io::{self, AsyncSeekExt, SeekFrom};
 
 use crate::psn::DownloadError;
 
+/// Controls how download directories are organized on disk.
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum DirectoryFormat {
+    /// `{serial}/` — e.g., `BLUS31147/`
+    SerialOnly,
+    /// `{serial} - {title}/` — e.g., `BLUS31147 - Batman Arkham Origins/`
+    #[default]
+    SerialTitle,
+    /// `{title}/{serial}/` — e.g., `Batman - Arkham Origins/BLUS31147/`
+    TitleSerial,
+}
+
+impl fmt::Display for DirectoryFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DirectoryFormat::SerialOnly => write!(f, "Serial only"),
+            DirectoryFormat::SerialTitle => write!(f, "Serial - Title"),
+            DirectoryFormat::TitleSerial => write!(f, "Title / Serial"),
+        }
+    }
+}
+
+impl DirectoryFormat {
+    /// Returns a human-readable example of the directory structure.
+    #[cfg(feature = "egui")]
+    pub fn example(&self) -> &'static str {
+        match self {
+            DirectoryFormat::SerialOnly => "BLUS31147/",
+            DirectoryFormat::SerialTitle => "BLUS31147 - Batman Arkham Origins/",
+            DirectoryFormat::TitleSerial => "Batman - Arkham Origins/BLUS31147/",
+        }
+    }
+}
+
+/// Characters that are invalid in file/directory names on the current platform.
 #[cfg(target_family = "windows")]
-const INVALID_CHARS: [char; 9] = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
+const INVALID_CHARS: [char; 7] = ['<', '>', '"', '/', '\\', '|', '*'];
 
 #[cfg(target_family = "unix")]
 const INVALID_CHARS: [char; 1] = ['/'];
 
+/// Windows reserved device names that cannot be used as file/directory names.
+const WINDOWS_RESERVED: &[&str] = &[
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3",
+    "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
+/// Maximum length for sanitized directory names (in characters).
+/// Keeps well within the 255-byte filesystem limit while leaving room for serial prefixes.
+const MAX_TITLE_LENGTH: usize = 100;
+
+/// Sanitize a game title for use as a directory name.
+///
+/// Applies these rules in order:
+/// 1. Strip null bytes
+/// 2. Replace `: ` with ` - ` for readability (e.g., "Batman: Arkham Origins" → "Batman - Arkham Origins")
+/// 3. Replace standalone `:` with ` -`
+/// 4. Replace `?` with empty string (common in some titles)
+/// 5. Replace remaining OS-invalid characters with `_`
+/// 6. Replace `..` path traversal sequences
+/// 7. Collapse multiple consecutive spaces into one
+/// 8. Strip leading/trailing dots and spaces (Windows disallows these)
+/// 9. Check against Windows reserved names and append `_` if matched
+/// 10. Truncate to MAX_TITLE_LENGTH characters (UTF-8 safe)
 fn sanitize_title(title: &str) -> String {
-    //replace invalid characters with underscores or anything we want lol
-    title.replace(|c| INVALID_CHARS.contains(&c), "_")
+    // 1. Strip null bytes
+    let mut result = title.replace('\0', "");
+
+    // 2-3. Readable colon handling: `: ` → ` - `, standalone `:` → ` -`
+    result = result.replace(": ", " - ");
+    result = result.replace(':', " -");
+
+    // 4. Strip question marks
+    result = result.replace('?', "");
+
+    // 5. Replace remaining OS-invalid chars with underscore
+    result = result.replace(|c: char| INVALID_CHARS.contains(&c), "_");
+
+    // 6. Replace path traversal sequences
+    result = result.replace("..", "_");
+
+    // 7. Collapse multiple consecutive spaces
+    while result.contains("  ") {
+        result = result.replace("  ", " ");
+    }
+
+    // 8. Strip leading/trailing dots and spaces
+    let trimmed = result.trim_matches(|c: char| c == '.' || c == ' ');
+    result = trimmed.to_string();
+
+    // 9. Check Windows reserved names (case-insensitive)
+    if WINDOWS_RESERVED.iter().any(|r| result.eq_ignore_ascii_case(r)) {
+        result.push('_');
+    }
+
+    // 10. Truncate to MAX_TITLE_LENGTH (UTF-8 safe, don't split mid-char)
+    if result.chars().count() > MAX_TITLE_LENGTH {
+        result = result.chars().take(MAX_TITLE_LENGTH).collect();
+        // Trim any trailing space from truncation
+        result = result.trim_end().to_string();
+    }
+
+    result
 }
 
-fn create_old_pkg_path<P>(download_path: P, serial: &str) -> PathBuf
+/// Build the download directory path for a given game using the specified format.
+pub fn create_pkg_path<P>(download_path: &P, serial: &str, title: &str, format: DirectoryFormat) -> PathBuf
 where
     P: AsRef<Path>,
 {
-    download_path.as_ref().join(serial)
-}
-
-pub fn create_new_pkg_path<P>(download_path: &P, serial: &str, title: &str) -> PathBuf
-where
-    P: AsRef<Path>,
-{
-    let target_path = download_path.as_ref();
+    let base = download_path.as_ref();
     let sanitized_title = sanitize_title(title);
-    target_path.join(format!("{} - {}", serial, sanitized_title))
+    match format {
+        DirectoryFormat::SerialOnly => base.join(serial),
+        DirectoryFormat::SerialTitle => base.join(format!("{} - {}", serial, sanitized_title)),
+        DirectoryFormat::TitleSerial => base.join(&sanitized_title).join(serial),
+    }
 }
 
-pub async fn create_pkg_file(download_path: PathBuf, serial: &str, title: &str, pkg_name: &str) -> Result<File, DownloadError> {
-    let mut target_path = create_new_pkg_path(&download_path, serial, title);
+/// Try to find and migrate an existing download directory from any historical format
+/// to the currently selected format. Returns the target path (possibly after renaming).
+async fn migrate_existing_dir(download_path: &Path, serial: &str, title: &str, format: DirectoryFormat) -> PathBuf {
+    let target = create_pkg_path(&download_path, serial, title, format);
 
-    // Check for the old path format.
-    let old_path = create_old_pkg_path(&download_path, serial);
-    if old_path.exists() {
-        info!("Found a folder with the old name format, trying to rename to current one.");
+    if target.exists() {
+        return target;
+    }
 
-        if let Err(e) = fs::rename(&old_path, &target_path).await {
-            error!("Failed to rename folder: {e}");
+    let sanitized_title = sanitize_title(title);
+
+    // Check all alternative formats and rename if found.
+    let alternatives = [
+        // SerialOnly format: {download_path}/{serial}/
+        download_path.join(serial),
+        // SerialTitle format: {download_path}/{serial} - {title}/
+        download_path.join(format!("{} - {}", serial, sanitized_title)),
+        // TitleSerial format: {download_path}/{title}/{serial}/
+        download_path.join(&sanitized_title).join(serial),
+    ];
+
+    for alt in &alternatives {
+        if alt == &target {
+            continue; // Skip the target format itself
+        }
+        if alt.exists() {
+            info!("Found download folder in old format at {:?}, migrating to {:?}", alt, target);
+            // For TitleSerial format, the parent title directory may need to be created first.
+            if let Some(parent) = target.parent() {
+                if let Err(e) = fs::create_dir_all(parent).await {
+                    error!("Failed to create parent directory for migration: {e}");
+                    return alt.clone(); // Fall back to old path
+                }
+            }
+            if let Err(e) = fs::rename(alt, &target).await {
+                error!("Failed to migrate folder: {e}");
+                return alt.clone(); // Fall back to old path
+            }
+            return target;
         }
     }
 
+    target
+}
+
+pub async fn create_pkg_file(
+    download_path: PathBuf,
+    serial: &str,
+    title: &str,
+    pkg_name: &str,
+    format: DirectoryFormat,
+) -> Result<(File, PathBuf), DownloadError> {
+    let mut target_path = migrate_existing_dir(&download_path, serial, title, format).await;
+
     target_path.push(pkg_name);
     info!("Creating file for pkg at path {:?}", target_path);
+
+    // Validate the target path stays within the download directory.
+    if let Err(e) = crate::security::validate_path_containment(&target_path, &download_path) {
+        error!("Path containment check failed: {e}");
+        return Err(DownloadError::Security(e));
+    }
 
     if let Some(parent) = target_path.parent() {
         match fs::create_dir_all(parent).await {
@@ -62,29 +202,128 @@ pub async fn create_pkg_file(download_path: PathBuf, serial: &str, title: &str, 
             },
         }
     } else {
-        return Err(DownloadError::Tokio(io::Error::new(
-            io::ErrorKind::Other,
-            "Target path has no parent directory",
-        )));
+        return Err(DownloadError::Tokio(io::Error::other("Target path has no parent directory")));
     }
 
     // Using OpenOptions to avoid the file getting truncated if it already exists
     // .create(true) preserves an existing file's contents.
-    OpenOptions::default()
+    let file = OpenOptions::default()
         .create(true)
         .read(true)
         .write(true)
-        .open(target_path)
+        .open(&target_path)
         .await
-        .map_err(DownloadError::Tokio)
+        .map_err(DownloadError::Tokio)?;
+
+    Ok((file, target_path))
+}
+
+/// Regex-like check for a serial pattern: 4 uppercase letters followed by 5 digits.
+pub fn looks_like_serial(name: &str) -> bool {
+    if name.len() != 9 {
+        return false;
+    }
+    let bytes = name.as_bytes();
+    bytes[..4].iter().all(|b| b.is_ascii_uppercase()) && bytes[4..].iter().all(|b| b.is_ascii_digit())
+}
+
+/// Scan a download directory and detect folders that could be migrated to the target format.
+/// Returns a list of (current_path, proposed_new_path) pairs.
+#[cfg(feature = "egui")]
+pub fn detect_migratable_directories(download_path: &Path, target_format: DirectoryFormat) -> Vec<(PathBuf, PathBuf)> {
+    let mut migrations = Vec::new();
+
+    let entries = match std::fs::read_dir(download_path) {
+        Ok(entries) => entries,
+        Err(_) => return migrations,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+
+        // Detect SerialOnly format: exactly a serial (e.g., "BLUS31147")
+        if looks_like_serial(&name) {
+            let new_path = create_pkg_path(&download_path, &name, &name, target_format);
+            if new_path != path {
+                migrations.push((path, new_path));
+            }
+            continue;
+        }
+
+        // Detect SerialTitle format: "SERIAL - Title" (e.g., "BLUS31147 - Batman Arkham Origins")
+        if name.len() > 12 && looks_like_serial(&name[..9]) && name[9..].starts_with(" - ") {
+            let serial = &name[..9];
+            let title = &name[12..];
+            let new_path = create_pkg_path(&download_path, serial, title, target_format);
+            if new_path != path {
+                migrations.push((path, new_path));
+            }
+            continue;
+        }
+
+        // Detect TitleSerial format: a title dir containing a serial subdir
+        if target_format != DirectoryFormat::TitleSerial {
+            if let Ok(sub_entries) = std::fs::read_dir(&path) {
+                for sub in sub_entries.flatten() {
+                    let sub_name = match sub.file_name().into_string() {
+                        Ok(n) => n,
+                        Err(_) => continue,
+                    };
+                    if sub.path().is_dir() && looks_like_serial(&sub_name) {
+                        let new_path = create_pkg_path(&download_path, &sub_name, &name, target_format);
+                        if new_path != sub.path() {
+                            migrations.push((sub.path(), new_path));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    migrations
+}
+
+/// Execute a set of directory migrations (renames).
+/// Returns the number of successful migrations.
+#[cfg(feature = "egui")]
+pub async fn migrate_directories(migrations: &[(PathBuf, PathBuf)]) -> usize {
+    let mut success_count = 0;
+    for (old_path, new_path) in migrations {
+        // Create parent directories for the new path if needed (e.g., TitleSerial format).
+        if let Some(parent) = new_path.parent() {
+            if let Err(e) = fs::create_dir_all(parent).await {
+                error!("Failed to create directory {:?}: {e}", parent);
+                continue;
+            }
+        }
+        match fs::rename(old_path, new_path).await {
+            Ok(()) => {
+                info!("Migrated {:?} -> {:?}", old_path, new_path);
+                success_count += 1;
+            }
+            Err(e) => {
+                error!("Failed to migrate {:?} -> {:?}: {e}", old_path, new_path);
+            }
+        }
+    }
+    success_count
 }
 
 const CHUNK_SIZE: usize = 1024 * 1024 * 128;
-pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Result<bool, DownloadError> {
-    let mut hasher = Sha1::new();
 
+/// Verify a downloaded file's SHA1 hash. Runs the CPU-intensive hashing on the
+/// tokio blocking thread pool so it doesn't starve async I/O tasks.
+pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Result<bool, DownloadError> {
     // Last 0x20 bytes are the SHA1 hash for PS3 updates. PS4 updates don't include hash suffix.
-    let suffix_size = if hash_whole_file { 0 } else { 0x20 };
+    let suffix_size: u64 = if hash_whole_file { 0 } else { 0x20 };
 
     // If the file size is below the length of the embedded sha1-hash suffix,
     // don't bother hashing the contents. Download's borked.
@@ -93,18 +332,32 @@ pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Re
         return Ok(false);
     }
 
+    // Reset seek pointer so we read from the start.
+    file.seek(SeekFrom::Start(0)).await.map_err(DownloadError::Tokio)?;
+
+    // Clone the handle and convert to a std::fs::File for blocking I/O.
+    let std_file = file.try_clone().await.map_err(DownloadError::Tokio)?.into_std().await;
+    let hash_owned = hash.to_string();
+
+    tokio::task::spawn_blocking(move || hash_file_blocking(std_file, &hash_owned, file_length, suffix_size))
+        .await
+        .map_err(|e| DownloadError::Tokio(std::io::Error::other(format!("hash task panicked: {e}"))))?
+}
+
+/// Synchronous SHA1 hashing, designed to run inside `spawn_blocking`.
+fn hash_file_blocking(file: std::fs::File, hash: &str, file_length: u64, suffix_size: u64) -> Result<bool, DownloadError> {
+    use std::io::{BufRead, BufReader};
+
+    let mut hasher = Sha1::new();
+
     let file_length_without_suffix: usize = (file_length - suffix_size)
         .try_into()
         .map_err(|_| DownloadError::HashMismatch(true))?;
 
-    // Write operations during the download move the internal seek pointer.
-    // Resetting it to 0 makes reader actually read the whole thing.
-    file.seek(SeekFrom::Start(0)).await.map_err(DownloadError::Tokio)?;
-
     let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
     let mut processed_length = 0;
     loop {
-        let chunk_buffer = reader.fill_buf().await.map_err(DownloadError::Tokio)?;
+        let chunk_buffer = reader.fill_buf().map_err(DownloadError::Tokio)?;
         let chunk_length = chunk_buffer.len();
         if chunk_length == 0 {
             break;
@@ -127,9 +380,90 @@ pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Re
         hasher.update(hashable_buffer);
         reader.consume(chunk_length);
         if suffix_part_in_chunk {
-            break; // Since unhashable suffix has already been encountered, either in part or in full, there's no need to read rest of the file anymore.
+            break;
         }
     }
 
-    Ok(hasher.digest().to_string() == hash)
+    Ok(format!("{:x}", hasher.finalize()) == hash)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_colon_to_dash() {
+        assert_eq!(sanitize_title("Batman: Arkham Origins"), "Batman - Arkham Origins");
+        assert_eq!(
+            sanitize_title("Assassin's Creed: Brotherhood"),
+            "Assassin's Creed - Brotherhood"
+        );
+    }
+
+    #[test]
+    fn sanitize_standalone_colon() {
+        assert_eq!(sanitize_title("Title:Subtitle"), "Title -Subtitle");
+    }
+
+    #[test]
+    fn sanitize_question_mark() {
+        assert_eq!(sanitize_title("Catherine: Full Body?"), "Catherine - Full Body");
+    }
+
+    #[test]
+    fn sanitize_path_traversal() {
+        assert_eq!(sanitize_title("../../etc/passwd"), "____etc_passwd");
+        assert_eq!(sanitize_title("game..update"), "game_update");
+    }
+
+    #[test]
+    fn sanitize_null_bytes() {
+        assert_eq!(sanitize_title("Game\0Title"), "GameTitle");
+    }
+
+    #[test]
+    fn sanitize_leading_trailing_dots_spaces() {
+        assert_eq!(sanitize_title("  .Game Title.  "), "Game Title");
+        assert_eq!(sanitize_title("...hidden"), "_.hidden");
+    }
+
+    #[test]
+    fn sanitize_windows_reserved_names() {
+        assert_eq!(sanitize_title("CON"), "CON_");
+        assert_eq!(sanitize_title("nul"), "nul_");
+        assert_eq!(sanitize_title("LPT1"), "LPT1_");
+    }
+
+    #[test]
+    fn sanitize_length_limit() {
+        let long_title = "A".repeat(200);
+        let sanitized = sanitize_title(&long_title);
+        assert_eq!(sanitized.chars().count(), MAX_TITLE_LENGTH);
+    }
+
+    #[test]
+    fn sanitize_preserves_unicode() {
+        assert_eq!(sanitize_title("龍が如く0"), "龍が如く0");
+        assert_eq!(sanitize_title("Hustle Kings(TM)"), "Hustle Kings(TM)");
+    }
+
+    #[test]
+    fn sanitize_newline_in_title() {
+        // BCUS98233 is known to have a newline in its title.
+        // The newline replacement happens in psn/mod.rs, but sanitize_title
+        // should still handle it gracefully if one slips through.
+        assert_eq!(sanitize_title("Game\nTitle"), "Game\nTitle");
+    }
+
+    #[test]
+    fn sanitize_multiple_spaces_collapsed() {
+        assert_eq!(sanitize_title("Game     Title"), "Game Title");
+    }
+
+    #[test]
+    fn sanitize_normal_titles_unchanged() {
+        assert_eq!(sanitize_title("God of War III"), "God of War III");
+        assert_eq!(sanitize_title("LittleBigPlanet"), "LittleBigPlanet");
+        assert_eq!(sanitize_title("inFAMOUS 2"), "inFAMOUS 2");
+    }
 }

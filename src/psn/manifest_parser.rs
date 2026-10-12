@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use super::{PackageInfo, UpdateInfo};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 struct Piece {
     url: String,
     #[serde(rename = "fileOffset")]
@@ -13,12 +13,8 @@ struct Piece {
     hash_value: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 struct Manifest {
-    #[serde(rename = "originalFileSize")]
-    original_file_size: u64,
-    #[serde(rename = "packageDigest")]
-    package_digest: String,
     #[serde(rename = "numberOfSplitFiles")]
     number_of_split_files: u32,
     pieces: Vec<Piece>,

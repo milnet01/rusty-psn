@@ -1,3 +1,5 @@
+use log::warn;
+use quick_xml::events::attributes::Attributes;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
@@ -8,6 +10,49 @@ pub enum ParseError {
     ErrorCode(String),
     XmlParsing(quick_xml::Error),
     XmlEncodingError(quick_xml::encoding::EncodingError),
+}
+
+fn parse_package_attributes(attributes: Attributes, info: &mut UpdateInfo) -> Result<(), ParseError> {
+    for attribute in attributes.filter_map(|a| a.ok()) {
+        match attribute.key.as_ref() {
+            b"version" => {
+                let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
+
+                let mut package = PackageInfo::empty();
+                package.version = value.to_string();
+
+                info.packages.push(package);
+            }
+            b"size" => {
+                if let Some(last) = info.packages.last_mut() {
+                    let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
+                    let parsed_value = value.parse::<u64>().unwrap_or_default();
+
+                    last.size = parsed_value;
+                }
+            }
+            b"sha1sum" => {
+                if let Some(last) = info.packages.last_mut() {
+                    let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
+                    last.sha1sum = value.to_string();
+                }
+            }
+            b"url" => {
+                if let Some(last) = info.packages.last_mut() {
+                    let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
+                    last.url = value.to_string();
+                }
+            }
+            b"manifest_url" => {
+                if let Some(last) = info.packages.last_mut() {
+                    let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
+                    last.manifest_url = value.to_string();
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), ParseError> {
@@ -46,45 +91,7 @@ pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), Par
                         }
                     }
                     b"package" => {
-                        for attribute in e.attributes().filter_map(|a| a.ok()) {
-                            match attribute.key.as_ref() {
-                                b"version" => {
-                                    let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
-
-                                    let mut package = PackageInfo::empty();
-                                    package.version = value.to_string();
-
-                                    info.packages.push(package);
-                                }
-                                b"size" => {
-                                    if let Some(last) = info.packages.last_mut() {
-                                        let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
-                                        let parsed_value = value.parse::<u64>().unwrap_or_default();
-
-                                        last.size = parsed_value;
-                                    }
-                                }
-                                b"sha1sum" => {
-                                    if let Some(last) = info.packages.last_mut() {
-                                        let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
-                                        last.sha1sum = value.to_string();
-                                    }
-                                }
-                                b"url" => {
-                                    if let Some(last) = info.packages.last_mut() {
-                                        let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
-                                        last.url = value.to_string();
-                                    }
-                                }
-                                b"manifest_url" => {
-                                    if let Some(last) = info.packages.last_mut() {
-                                        let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
-                                        last.manifest_url = value.to_string();
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
+                        parse_package_attributes(e.attributes(), info)?;
                     }
                     b"Error" => {
                         err_encountered = true;
@@ -112,39 +119,7 @@ pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), Par
             }
             Ok(Event::Empty(e)) => {
                 if let b"package" = e.name().as_ref() {
-                    for attribute in e.attributes().filter_map(|a| a.ok()) {
-                        match attribute.key.as_ref() {
-                            b"version" => {
-                                let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
-
-                                let mut package = PackageInfo::empty();
-                                package.version = value.to_string();
-
-                                info.packages.push(package);
-                            }
-                            b"size" => {
-                                if let Some(last) = info.packages.last_mut() {
-                                    let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
-                                    let parsed_value = value.parse::<u64>().unwrap_or_default();
-
-                                    last.size = parsed_value;
-                                }
-                            }
-                            b"sha1sum" => {
-                                if let Some(last) = info.packages.last_mut() {
-                                    let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
-                                    last.sha1sum = value.to_string();
-                                }
-                            }
-                            b"url" => {
-                                if let Some(last) = info.packages.last_mut() {
-                                    let value = attribute.unescape_value().map_err(ParseError::XmlParsing)?;
-                                    last.url = value.to_string();
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
+                    parse_package_attributes(e.attributes(), info)?;
                 }
             }
             Ok(Event::Text(e)) => {

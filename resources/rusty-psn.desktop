@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=rusty-psn
+Comment=Download PlayStation game updates for use with emulators
+Exec=rusty-psn
+Icon=rusty-psn
+Terminal=false
+Type=Application
+Categories=Utility;Game;
+Keywords=playstation;ps3;ps4;update;download;rpcs3;emulator;
+StartupWMClass=rusty-psn

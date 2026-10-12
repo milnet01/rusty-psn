@@ -1,23 +1,26 @@
 // On release builds, this hides the console window that's created on Windows.
 #![cfg_attr(all(not(debug_assertions), feature = "egui"), windows_subsystem = "windows")]
 
-#[cfg(target_os = "macos")]
-extern crate dirs;
-
 use clap::Parser;
 use flexi_logger::{Logger, LoggerHandle};
 #[cfg(feature = "cli")]
 use std::path::PathBuf;
+#[cfg(feature = "egui")]
 use std::sync::Arc;
+#[cfg(feature = "egui")]
 use tokio::{runtime::Runtime, sync::Notify};
 
-#[macro_use]
-extern crate log;
+use log::info;
+
+mod batch;
 #[cfg(feature = "cli")]
 mod cli;
+mod content;
 #[cfg(feature = "egui")]
 mod egui;
 mod psn;
+mod rpcs3;
+mod security;
 mod utils;
 
 #[derive(Debug, Parser)]
@@ -27,10 +30,12 @@ struct Args {
     #[clap(
         short,
         long,
-        required = true,
         help = "The serial(s) you want to search for, in quotes and separated by spaces"
     )]
     titles: Vec<String>,
+    #[cfg(feature = "cli")]
+    #[clap(short = 'b', long, help = "Path to a text file with serials (one per line, # for comments)")]
+    batch_file: Option<PathBuf>,
     #[cfg(feature = "cli")]
     #[clap(
         short,
@@ -41,6 +46,38 @@ struct Args {
     #[cfg(feature = "cli")]
     #[clap(short, long, help = "Target folder to save the downloaded update files to.")]
     destination_path: Option<PathBuf>,
+    #[cfg(feature = "cli")]
+    #[clap(
+        long,
+        default_value = "serial-title",
+        help = "Directory format: serial-only, serial-title, or title-serial"
+    )]
+    directory_format: String,
+    #[cfg(feature = "cli")]
+    #[clap(long, help = "Path to RPCS3 config directory (containing games.yml).")]
+    rpcs3_config_dir: Option<PathBuf>,
+    #[cfg(feature = "cli")]
+    #[clap(long, help = "Scan RPCS3 library for available updates.")]
+    scan_rpcs3: bool,
+    #[cfg(feature = "cli")]
+    #[clap(long, help = "Download firmware instead of game updates.")]
+    firmware: bool,
+    #[cfg(feature = "cli")]
+    #[clap(long, default_value = "PS3", help = "Firmware console: PS3, PS4, PS5, PSVita")]
+    firmware_console: String,
+    #[cfg(feature = "cli")]
+    #[clap(
+        long,
+        default_value = "US",
+        help = "Firmware region: US, EU, JP, KR, UK, MX, AU, SA, TW, RU, CN"
+    )]
+    firmware_region: String,
+    #[cfg(feature = "cli")]
+    #[clap(long, help = "Auto-install downloaded PKGs to RPCS3 after download.")]
+    install: bool,
+    #[cfg(feature = "cli")]
+    #[clap(long, help = "Path to RPCS3 executable (AppImage, binary, or launch script).")]
+    rpcs3_executable: Option<PathBuf>,
     #[clap(
         long,
         help = "Disables writing the program's log to a .log file. Don't use if you need help."
@@ -66,6 +103,7 @@ fn main() {
         // Prevents egui blocking the same thread that tokio runtime is running on,
         // which can lead to network and io tasks being blocked when the application
         // is minimised or otherwise suspended by egui.
+        // Tokio runtime is required for all async operations; no recovery possible without it.
         let rt = Runtime::new().unwrap();
         let rt_handle = rt.handle().clone();
         let notify_main = Arc::new(Notify::new());
@@ -76,9 +114,20 @@ fn main() {
             })
         });
 
+        let icon =
+            eframe::icon_data::from_png_bytes(include_bytes!("../resources/icon-256.png")).expect("Failed to load app icon");
+
+        let native_options = eframe::NativeOptions {
+            viewport: eframe::egui::ViewportBuilder::default()
+                .with_inner_size([800.0, 600.0])
+                .with_min_inner_size([600.0, 400.0])
+                .with_icon(Arc::new(icon)),
+            ..Default::default()
+        };
+
         eframe::run_native(
             "rusty-psn",
-            eframe::NativeOptions::default(),
+            native_options,
             Box::new(|cc| Ok(Box::new(egui::UpdatesApp::new(cc, rt_handle)))),
         )
         .expect("Failed to run egui app");
@@ -96,11 +145,12 @@ fn init_log(no_log_file: bool) -> LoggerHandle {
     if no_log_file {
         logger = logger.do_not_log();
     } else {
-        let mut logs_dir = dirs::data_local_dir().unwrap();
+        // Falls back to current directory if platform data dir is unavailable.
+        let mut logs_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
         logs_dir.push("rusty-psn");
 
         match std::fs::create_dir_all(&logs_dir) {
-            Ok(_) => info!("Created directory for updates"),
+            Ok(_) => {} // Logger not started yet, can't log here.
             Err(e) => match e.kind() {
                 std::io::ErrorKind::AlreadyExists => {}
                 _ => panic!("{}", e),
