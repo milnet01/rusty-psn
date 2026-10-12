@@ -90,7 +90,8 @@ pub fn scan_library(installation: &Rpcs3Installation) -> Result<Vec<InstalledGam
         };
 
         // 2. {game_path}/PS3_GAME/PARAM.SFO — for .PS3/ folder-format games on disc.
-        let disc_sfo = if hdd0_sfo.is_none() {
+        // Also read it when the dev_hdd0 SFO gives no version (a disc game with no update installed).
+        let disc_sfo = if hdd0_sfo.as_ref().and_then(|sfo| sfo.app_ver.as_ref()).is_none() {
             let disc_sfo_path = game_path.join("PS3_GAME").join("PARAM.SFO");
             if disc_sfo_path.exists() {
                 match sfo::parse_sfo(&disc_sfo_path) {
@@ -116,8 +117,11 @@ pub fn scan_library(installation: &Rpcs3Installation) -> Result<Vec<InstalledGam
             title_from_path(game_path)
         };
 
-        // Installed version comes from dev_hdd0 SFO (the update data).
-        let installed_version = hdd0_sfo.as_ref().and_then(|sfo| sfo.app_ver.clone());
+        // Installed version comes from dev_hdd0 SFO (the update data), else from the disc.
+        let installed_version = hdd0_sfo
+            .as_ref()
+            .and_then(|sfo| sfo.app_ver.clone())
+            .or_else(|| disc_sfo.as_ref().and_then(|sfo| sfo.app_ver.clone()));
 
         installed_games.push(InstalledGame {
             serial: serial.clone(),
@@ -265,6 +269,29 @@ fn looks_like_serial(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scan_library_reads_disc_app_ver_when_no_update_installed() {
+        // A disc game with no update installed has no dev_hdd0/game/{serial} folder.
+        // Its installed version must come from the disc's own PARAM.SFO.
+        let root = tempfile::tempdir().unwrap();
+        let config_dir = root.path().join("config");
+        let game_path = root.path().join("disc");
+        std::fs::create_dir_all(game_path.join("PS3_GAME")).unwrap();
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(game_path.join("PS3_GAME/PARAM.SFO"), sfo::tests::make_test_sfo()).unwrap();
+        std::fs::write(config_dir.join("games.yml"), format!("BCUS99999: {}/\n", game_path.display())).unwrap();
+        let installation = Rpcs3Installation {
+            config_dir,
+            dev_hdd0_path: root.path().join("dev_hdd0"),
+            executable: None,
+        };
+
+        let games = scan_library(&installation).unwrap();
+
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].installed_version.as_deref(), Some("01.05"));
+    }
 
     #[test]
     fn version_comparison() {

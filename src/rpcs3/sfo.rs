@@ -128,11 +128,11 @@ pub fn parse_sfo(path: &Path) -> Result<SfoParams, String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     // Minimal valid SFO with TITLE="Test Game", TITLE_ID="BCUS99999", APP_VER="01.05", VERSION="01.00"
-    fn make_test_sfo() -> Vec<u8> {
+    pub(crate) fn make_test_sfo() -> Vec<u8> {
         let mut data = Vec::new();
 
         // Keys: "APP_VER\0TITLE\0TITLE_ID\0VERSION\0"

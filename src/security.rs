@@ -94,8 +94,11 @@ pub fn validate_path_containment(target: &Path, base_dir: &Path) -> Result<(), S
             // If the base doesn't exist yet, normalize both paths lexically and use
             // Path::starts_with (component-aware) instead of string comparison.
             // String-based starts_with is UNSAFE: "/base-evil/" passes against "/base".
-            let base_normalized = normalize_lexical(base_dir);
-            let target_normalized = normalize_lexical(target);
+            // Both are made absolute first, so a leading ".." on a relative path is resolved
+            // against the current folder instead of being dropped.
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let base_normalized = normalize_lexical(&cwd.join(base_dir));
+            let target_normalized = normalize_lexical(&cwd.join(target));
             if target_normalized.starts_with(&base_normalized) {
                 return Ok(());
             }
@@ -114,6 +117,14 @@ pub fn validate_path_containment(target: &Path, base_dir: &Path) -> Result<(), S
     let resolved = loop {
         if let Ok(canonical) = std::fs::canonicalize(existing) {
             break canonical;
+        }
+        // Something is there but cannot be resolved, such as a link to a missing file.
+        // Opening it would follow the link, so it is not a "missing" part: refuse.
+        if std::fs::symlink_metadata(existing).is_ok() {
+            return Err(SecurityError::PathEscape {
+                attempted: target.to_path_buf(),
+                boundary: base_dir.to_path_buf(),
+            });
         }
         match (existing.parent(), existing.file_name()) {
             (Some(parent), Some(name)) => {
@@ -273,6 +284,26 @@ mod tests {
         assert!(relative_base.is_relative());
         assert!(validate_path_containment(&relative_base.join("BLUS31147/x.pkg"), relative_base).is_ok());
         assert!(validate_path_containment(&relative_base.join("../escape.pkg"), relative_base).is_err());
+    }
+
+    #[test]
+    fn path_escape_via_leading_parent_on_missing_relative_base() {
+        // The base does not exist yet, so the check is lexical. A leading ".." must not be dropped.
+        let base = Path::new("rusty-psn-missing-base");
+        assert!(!base.exists());
+        let target = base.join("../../rusty-psn-missing-base/x.pkg");
+        assert!(validate_path_containment(&target, base).is_err());
+    }
+
+    #[cfg(target_family = "unix")]
+    #[test]
+    fn path_escape_via_dangling_symlink_detected() {
+        // A link inside the base pointing at a path that does not exist yet must not count as "missing".
+        let root = tempfile::tempdir().unwrap();
+        let base = root.path().join("downloads");
+        std::fs::create_dir(&base).unwrap();
+        std::os::unix::fs::symlink(root.path().join("outside.pkg"), base.join("link.pkg")).unwrap();
+        assert!(validate_path_containment(&base.join("link.pkg"), &base).is_err());
     }
 
     #[cfg(target_family = "unix")]

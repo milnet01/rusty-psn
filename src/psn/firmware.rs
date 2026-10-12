@@ -31,6 +31,7 @@ pub enum FirmwareConsole {
     PSVita,
 }
 
+#[cfg_attr(not(feature = "egui"), allow(dead_code))]
 impl FirmwareConsole {
     pub fn all() -> &'static [Self] {
         &[Self::PS3, Self::PS4, Self::PS5, Self::PSVita]
@@ -73,6 +74,7 @@ pub enum FirmwareRegion {
     CN,
 }
 
+#[cfg_attr(not(feature = "egui"), allow(dead_code))]
 impl FirmwareRegion {
     pub fn locale_code(&self) -> &'static str {
         match self {
@@ -152,6 +154,7 @@ pub struct FirmwareInfo {
     pub fw_type: FirmwareType,
 }
 
+#[cfg_attr(not(feature = "egui"), allow(dead_code))]
 impl FirmwareInfo {
     /// Build a human-readable display name for this firmware entry.
     pub fn display_name(&self) -> String {

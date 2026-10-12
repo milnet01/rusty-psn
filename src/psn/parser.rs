@@ -10,6 +10,7 @@ pub enum ParseError {
     ErrorCode(String),
     XmlParsing(quick_xml::Error),
     XmlEncodingError(quick_xml::encoding::EncodingError),
+    InvalidTitleId(String),
 }
 
 fn parse_package_attributes(attributes: Attributes, info: &mut UpdateInfo) -> Result<(), ParseError> {
@@ -76,6 +77,10 @@ pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), Par
                         for attribute in e.attributes().filter_map(|a| a.ok()) {
                             if attribute.key.as_ref() == b"titleid" {
                                 if let Ok(value) = attribute.unescape_value() {
+                                    // The title id becomes a folder name, so it must be a valid serial.
+                                    if crate::security::validate_serial(&value).is_err() {
+                                        return Err(ParseError::InvalidTitleId(value.to_string()));
+                                    }
                                     info.title_id = value.to_string();
                                 }
                             }
@@ -147,4 +152,18 @@ pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), Par
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::psn::PlatformVariant;
+
+    #[test]
+    fn parse_response_rejects_unsafe_title_id() {
+        // The title id in Sony's reply becomes a folder name, so it must be a valid serial.
+        let xml = r#"<titlepatch titleid="../../evil"><tag name="x"><package version="01.01" size="1" sha1sum="a" url="https://a0.ww.np.dl.playstation.net/x.pkg"/></tag></titlepatch>"#;
+        let mut info = UpdateInfo::empty(PlatformVariant::PS3);
+        assert!(parse_response(xml.to_string(), &mut info).is_err());
+    }
 }

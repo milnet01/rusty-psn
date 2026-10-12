@@ -252,15 +252,12 @@ pub fn start_app(args: Args) {
 
             info!("User input was '{}'", response);
 
-            if !response.is_empty() {
-                updates_to_fetch = response
-                    .split(' ')
-                    .filter_map(|s| s.parse::<usize>().ok())
-                    .filter(|idx| *idx < update.packages.len())
-                    .collect();
-
-                updates_to_fetch.sort_unstable();
-                updates_to_fetch.dedup();
+            match parse_update_selection(&response, update.packages.len()) {
+                Some(selection) => updates_to_fetch = selection,
+                None => {
+                    println!("No valid update numbers in '{response}'; skipping {}.", update.title_id);
+                    continue;
+                }
             }
 
             let updates = {
@@ -327,12 +324,16 @@ pub fn start_app(args: Args) {
                 let mut stdout = std::io::stdout();
                 let mut downloaded = 0u64;
                 let mut should_retry = false;
+                let mut downloaded_file: Option<PathBuf> = None;
 
                 crossterm::execute!(stdout, cursor::SavePosition).unwrap();
 
                 loop {
                     match promise.ready() {
                         Some(result) => {
+                            if let Ok(path) = result {
+                                downloaded_file = Some(path.clone());
+                            }
                             if let Err(e) = result {
                                 match e {
                                     DownloadError::HashMismatch(short_on_data) => {
@@ -473,32 +474,21 @@ pub fn start_app(args: Args) {
                 }
 
                 if !should_retry {
-                    // If download succeeded and --install is set, install to RPCS3.
+                    // If the download succeeded and --install is set, install exactly the file it wrote.
                     if install_mode {
-                        if let Some(ref exe) = rpcs3_exe {
-                            let pkg_dir =
-                                crate::utils::create_pkg_path(&destination_path, &update.title_id, &title, directory_format);
-                            // Find the PKG file in the download directory.
-                            if let Ok(entries) = std::fs::read_dir(&pkg_dir) {
-                                for entry in entries.flatten() {
-                                    let path = entry.path();
-                                    if path.is_file() && path.extension().map_or(false, |e| e.eq_ignore_ascii_case("pkg")) {
-                                        if !silent_mode {
-                                            println!("  Installing {} to RPCS3...", path.display());
-                                        }
-                                        match runtime.block_on(crate::rpcs3::install_pkg(exe, &path)) {
-                                            Ok(()) => {
-                                                if !silent_mode {
-                                                    println!("  Installed successfully.");
-                                                }
-                                            }
-                                            Err(e) => {
-                                                error!("RPCS3 install failed: {e}");
-                                                eprintln!("  Install failed: {e}");
-                                            }
-                                        }
-                                        break; // Only install the first PKG per version
+                        if let (Some(exe), Some(path)) = (rpcs3_exe.as_ref(), downloaded_file.as_ref()) {
+                            if !silent_mode {
+                                println!("  Installing {} to RPCS3...", path.display());
+                            }
+                            match runtime.block_on(crate::rpcs3::install_pkg(exe, path)) {
+                                Ok(()) => {
+                                    if !silent_mode {
+                                        println!("  Installed successfully.");
                                     }
+                                }
+                                Err(e) => {
+                                    error!("RPCS3 install failed: {e}");
+                                    eprintln!("  Install failed: {e}");
                                 }
                             }
                         }
@@ -697,5 +687,40 @@ async fn download_firmware_cli(
                 }
             }
         }
+    }
+}
+
+/// Parse the update numbers typed at the download prompt. An empty selection means every update.
+/// Returns `None` when any entry is not a listed update number, so a typo never means "everything".
+fn parse_update_selection(input: &str, count: usize) -> Option<Vec<usize>> {
+    let mut selection = Vec::new();
+    for token in input.split_whitespace() {
+        selection.push(token.parse::<usize>().ok().filter(|idx| *idx < count)?);
+    }
+    selection.sort_unstable();
+    selection.dedup();
+    Some(selection)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_selection_empty_means_all() {
+        assert_eq!(parse_update_selection("", 3), Some(vec![]));
+    }
+
+    #[test]
+    fn update_selection_parses_numbers() {
+        assert_eq!(parse_update_selection("2 0 2", 3), Some(vec![0, 2]));
+    }
+
+    #[test]
+    fn update_selection_rejects_invalid_input() {
+        // "n" or an out-of-range number must not fall through to "download everything".
+        assert_eq!(parse_update_selection("n", 3), None);
+        assert_eq!(parse_update_selection("5", 3), None);
+        assert_eq!(parse_update_selection("1,2", 3), None);
     }
 }

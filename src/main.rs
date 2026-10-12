@@ -3,7 +3,7 @@
 
 use clap::Parser;
 use flexi_logger::{Logger, LoggerHandle};
-#[cfg(feature = "cli")]
+#[cfg(any(feature = "cli", target_os = "macos"))]
 use std::path::PathBuf;
 #[cfg(feature = "egui")]
 use std::sync::Arc;
@@ -15,6 +15,7 @@ use log::info;
 mod batch;
 #[cfg(feature = "cli")]
 mod cli;
+#[cfg_attr(not(feature = "egui"), allow(dead_code))]
 mod content;
 #[cfg(feature = "egui")]
 mod egui;

@@ -199,6 +199,10 @@ impl UpdateInfo {
                 }
                 parser::ParseError::XmlParsing(reason) => return Err(UpdateError::XmlParsing(reason)),
                 parser::ParseError::XmlEncodingError(reason) => return Err(UpdateError::XmlEncodingError(reason)),
+                parser::ParseError::InvalidTitleId(id) => {
+                    warn!("Sony's reply named an invalid title id: {id:?}");
+                    return Err(UpdateError::InvalidSerial);
+                }
             },
         }
 
@@ -352,7 +356,7 @@ impl PackageInfo {
         format: DirectoryFormat,
         cancel_signal: Arc<AtomicU8>,
         client: &reqwest::Client,
-    ) -> Result<(), DownloadError> {
+    ) -> Result<PathBuf, DownloadError> {
         info!("Starting download for {serial} {}", self.version);
         info!("Sending pkg file request to url: {}", &self.url);
 
@@ -387,7 +391,7 @@ impl PackageInfo {
                 self.version
             );
             let _ = tx.send(DownloadStatus::DownloadSuccess).await;
-            return Ok(());
+            return Ok(pkg_file_path);
         }
 
         // File is not complete. Determine whether we can resume from a partial download.
@@ -410,7 +414,13 @@ impl PackageInfo {
             info!("Attempting resume from byte {resume_offset} for {serial} {}", self.version);
         }
 
-        let mut response = request.send().await.map_err(DownloadError::Reqwest)?;
+        // An error status (4xx/5xx) must not reach the file: the partial download stays for a later resume.
+        let mut response = request
+            .send()
+            .await
+            .map_err(DownloadError::Reqwest)?
+            .error_for_status()
+            .map_err(DownloadError::Reqwest)?;
 
         // Determine actual write offset based on server response.
         let actual_offset = if resume_offset > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT {
@@ -423,7 +433,7 @@ impl PackageInfo {
                 .map_err(DownloadError::Tokio)?;
             resume_offset
         } else {
-            // 200 or other: server didn't honor Range (or file changed per ETag).
+            // 200: server didn't honor Range (or file changed per ETag).
             // Truncate and start fresh.
             if resume_offset > 0 {
                 info!(
@@ -496,7 +506,7 @@ impl PackageInfo {
         if crate::utils::hash_file(&mut pkg_file, &self.sha1sum, self.hash_whole_file).await? {
             info!("Hash for {serial} {} matched, wrapping up...", self.version);
             let _ = tx.send(DownloadStatus::DownloadSuccess).await;
-            Ok(())
+            Ok(pkg_file_path)
         } else {
             error!("Hash mismatch for {serial} {}!", self.version);
             let _ = tx.send(DownloadStatus::DownloadFailure).await;

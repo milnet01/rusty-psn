@@ -57,7 +57,7 @@ pub struct ActiveDownload {
     progress_status: Arc<std::sync::Mutex<DownloadProgressStatus>>,
     cancel_signal: Arc<AtomicU8>,
 
-    promise: Promise<Result<(), DownloadError>>,
+    promise: Promise<Result<PathBuf, DownloadError>>,
 }
 
 /// Maximum number of automatic retries when Sony's servers drop the connection mid-transfer.
@@ -82,6 +82,8 @@ struct PausedDownload {
     pkg_id: String,
     title: String,
     pkg: PackageInfo,
+    /// The partial file, so Abort removes only this package's file.
+    file_path: Option<PathBuf>,
 }
 
 struct ActiveFirmwareDownload {
@@ -287,6 +289,8 @@ struct VolatileData {
     download_queue: Vec<ActiveDownload>,
     failed_downloads: Vec<FailedDownload>,
     completed_downloads: Vec<(String, String)>,
+    /// The file each completed download wrote, keyed by (title id, package id).
+    completed_paths: HashMap<(String, String), PathBuf>,
     pending_downloads: VecDeque<PendingDownload>,
     paused_downloads: Vec<PausedDownload>,
 
@@ -386,6 +390,7 @@ impl Default for VolatileData {
             download_queue: Vec::new(),
             failed_downloads: Vec::new(),
             completed_downloads: Vec::new(),
+            completed_paths: HashMap::new(),
             pending_downloads: VecDeque::new(),
             paused_downloads: Vec::new(),
 
@@ -665,8 +670,11 @@ impl UpdatesApp {
                 entries_to_remove.push(i);
 
                 match r {
-                    Ok(_) => {
+                    Ok(path) => {
                         info!("Download completed! ({} {})", &download.title_id, &download.pkg_id);
+                        self.v
+                            .completed_paths
+                            .insert((download.title_id.clone(), download.pkg_id.clone()), path.clone());
 
                         toasts.push((
                             format!("{} v{} downloaded successfully!", &download.title_id, &download.pkg_id),
@@ -776,6 +784,7 @@ impl UpdatesApp {
                                         pkg_id: download.pkg_id.clone(),
                                         title: download.title.clone(),
                                         pkg: download.pkg.clone(),
+                                        file_path: file_path.clone(),
                                     });
                                     toasts.push((format!("{} v{} paused", download.title_id, download.pkg_id), ToastLevel::Info));
                                 }
@@ -1687,6 +1696,12 @@ impl UpdatesApp {
                                                 let exe = self.settings.rpcs3_executable.clone().unwrap();
                                                 let pkg = patch.pkg_path.clone();
                                                 let key = patch_key.clone();
+                                                let rt = self
+                                                    .v
+                                                    .rt_handle
+                                                    .clone()
+                                                    .expect("rt_handle set in UpdatesApp::new before any UI code runs");
+                                                let _guard = rt.enter();
                                                 let promise = Promise::spawn_async(async move {
                                                     crate::rpcs3::install_pkg(&exe, &pkg)
                                                         .await
@@ -1730,6 +1745,12 @@ impl UpdatesApp {
                                                     .as_ref()
                                                     .map(|d| d.join("dev_hdd0/home/00000001/exdata"))
                                                     .unwrap_or_default();
+                                                let rt = self
+                                                    .v
+                                                    .rt_handle
+                                                    .clone()
+                                                    .expect("rt_handle set in UpdatesApp::new before any UI code runs");
+                                                let _guard = rt.enter();
                                                 let promise = Promise::spawn_async(async move {
                                                     crate::content::install_dlc_zip(&exe, &zip, &exdata).await
                                                 });
@@ -1775,6 +1796,9 @@ impl UpdatesApp {
     /// Queue a download, respecting the max concurrent downloads setting.
     /// If all slots are full, the download is added to the pending queue.
     fn queue_download(&mut self, title_id: String, title: String, pkg: PackageInfo, ui: &egui::Ui) {
+        if self.is_download_known(&title_id, &pkg) {
+            return;
+        }
         if self.v.download_queue.len() < self.settings.max_concurrent_downloads as usize {
             let active = self.start_download(title_id, title, pkg, ui);
             self.v.download_queue.push(active);
@@ -1785,6 +1809,9 @@ impl UpdatesApp {
 
     /// Queue a download without a UI reference (for "Download All" and pending promotion).
     fn queue_download_no_ui(&mut self, title_id: String, title: String, pkg: PackageInfo) {
+        if self.is_download_known(&title_id, &pkg) {
+            return;
+        }
         if self.v.download_queue.len() < self.settings.max_concurrent_downloads as usize {
             let active = self.start_download_with_retry(title_id, title, pkg, 0);
             self.v.download_queue.push(active);
@@ -2465,18 +2492,24 @@ impl UpdatesApp {
                         }
                         ActiveDownloadStatus::Paused => {
                             if ui.button("Abort").clicked() {
+                                let file_path = self
+                                    .v
+                                    .paused_downloads
+                                    .iter()
+                                    .find(|p| p.title_id == title_id && p.pkg_id == pkg.id())
+                                    .and_then(|p| p.file_path.clone());
                                 self.v
                                     .paused_downloads
                                     .retain(|p| !(p.title_id == title_id && p.pkg_id == pkg.id()));
-                                let path = crate::utils::create_pkg_path(
-                                    &self.settings.pkg_download_path,
-                                    title_id,
-                                    &title,
-                                    self.settings.directory_format,
-                                );
-                                if path.exists() {
-                                    if let Err(e) = std::fs::remove_dir_all(&path) {
-                                        warn!("Failed to clean up paused download dir {}: {e}", path.display());
+                                // Remove only this package's partial file, and only inside the download folder.
+                                if let Some(path) = file_path {
+                                    match crate::security::validate_path_containment(&path, &self.settings.pkg_download_path) {
+                                        Ok(()) => {
+                                            if let Err(e) = std::fs::remove_file(&path) {
+                                                warn!("Failed to clean up paused download {}: {e}", path.display());
+                                            }
+                                        }
+                                        Err(e) => warn!("Not removing paused download: {e}"),
                                     }
                                 }
                             }
@@ -2500,16 +2533,26 @@ impl UpdatesApp {
                             if !is_installing && !is_installed {
                                 if let Some(rpcs3_exe) = &self.settings.rpcs3_executable {
                                     if ui.button("Install to RPCS3").clicked() {
-                                        let folder = crate::utils::create_pkg_path(
-                                            &self.settings.pkg_download_path,
-                                            title_id,
-                                            &title,
-                                            self.settings.directory_format,
-                                        );
-                                        if let Some(pkg_file) = find_pkg_in_dir(&folder) {
+                                        // Install exactly the file this download wrote.
+                                        let pkg_file = self
+                                            .v
+                                            .completed_paths
+                                            .get(&(title_id.to_string(), pkg.id()))
+                                            .filter(|p| p.is_file())
+                                            .cloned();
+                                        if pkg_file.is_none() {
+                                            warn!("No downloaded file recorded for {title_id} {}", pkg.id());
+                                        }
+                                        if let Some(pkg_file) = pkg_file {
                                             let exe = rpcs3_exe.clone();
                                             let tid = title_id.to_string();
                                             let pid = pkg.id();
+                                            let rt = self
+                                                .v
+                                                .rt_handle
+                                                .clone()
+                                                .expect("rt_handle set in UpdatesApp::new before any UI code runs");
+                                            let _guard = rt.enter();
                                             let promise =
                                                 Promise::spawn_async(
                                                     async move { crate::rpcs3::install_pkg(&exe, &pkg_file).await },
@@ -3178,6 +3221,18 @@ impl UpdatesApp {
         self.v.download_queue.push(download);
     }
 
+    /// True when this package is already downloading, waiting for a slot, or finished this session.
+    fn is_download_known(&self, title_id: &str, pkg: &PackageInfo) -> bool {
+        let pkg_id = pkg.id();
+        self.get_active_download(title_id, pkg).is_some()
+            || self
+                .v
+                .pending_downloads
+                .iter()
+                .any(|p| p.title_id == title_id && p.pkg.id() == pkg_id)
+            || self.v.completed_downloads.iter().any(|(t, p)| t == title_id && *p == pkg_id)
+    }
+
     fn get_active_download(&self, title_id: &str, pkg: &PackageInfo) -> Option<&ActiveDownload> {
         self.v
             .download_queue
@@ -3283,19 +3338,6 @@ fn default_download_path() -> PathBuf {
 }
 
 /// Open a folder in the platform's file manager.
-/// Find the first .pkg file in a directory (or its serial subdirectories).
-fn find_pkg_in_dir(dir: &Path) -> Option<PathBuf> {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() && path.extension().is_some_and(|e| e.eq_ignore_ascii_case("pkg")) {
-                return Some(path);
-            }
-        }
-    }
-    None
-}
-
 fn open_folder(path: &Path) {
     #[cfg(target_os = "linux")]
     {

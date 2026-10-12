@@ -405,12 +405,28 @@ fn hash_file_blocking(file: std::fs::File, hash: &str, file_length: u64, suffix_
         }
     }
 
-    Ok(format!("{:x}", hasher.finalize()) == hash)
+    // Sony gives the checksum in either case (PSVita replies use upper case).
+    Ok(format!("{:x}", hasher.finalize()).eq_ignore_ascii_case(hash))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn hash_file_accepts_upper_case_checksum() {
+        // Sony's PSVita update XML gives sha1sum in upper case (PCSA00007 01.01, 2026-10-12).
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("x.pkg");
+        let body = b"package body";
+        let mut content = body.to_vec();
+        content.extend_from_slice(&[0u8; 0x20]);
+        std::fs::write(&path, &content).unwrap();
+        let expected = format!("{:x}", Sha1::digest(body)).to_uppercase();
+
+        let mut file = File::open(&path).await.unwrap();
+        assert!(hash_file(&mut file, &expected, false).await.unwrap());
+    }
 
     #[tokio::test]
     async fn create_pkg_file_does_not_migrate_outside_download_folder() {
