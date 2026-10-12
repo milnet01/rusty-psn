@@ -9,7 +9,7 @@ jobs:
       matrix:
         feature: ["cli", "egui"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies (egui)
         if: ${{ matrix.feature == 'egui' }}

@@ -13,7 +13,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
@@ -90,21 +90,21 @@ jobs:
 
       - name: Upload artifact (Linux)
         if: ${{ matrix.os == 'ubuntu-22.04' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rusty-psn-${{ matrix.feature }}-linux
           path: result
 
       - name: Upload artifact (MacOS)
         if: ${{ matrix.os == 'macos-latest' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rusty-psn-${{ matrix.feature }}-macos-universal
           path: result
 
       - name: Upload artifact (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rusty-psn-${{ matrix.feature }}-windows
           path: result
@@ -117,14 +117,14 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       
       - name: Get Cargo.toml version
         id: cargo_version
         uses: dante-signal31/rust-app-version@v1.2.0
 
       - name: Download artifacts
-        uses: dawidd6/action-download-artifact@v9
+        uses: dawidd6/action-download-artifact@v27
         with:
           path: artifacts
           skip_unpack: true
@@ -133,7 +133,7 @@ jobs:
         run: ls -R artifacts
 
       - name: Create release
-        uses: softprops/action-gh-release@v2.2.1
+        uses: softprops/action-gh-release@v3.0.3
         with:
           name: "v${{ steps.cargo_version.outputs.app_version }}"
           tag_name: "v${{ steps.cargo_version.outputs.app_version }}"
