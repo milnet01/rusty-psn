@@ -1358,6 +1358,11 @@ reviewer proposed; check both against the code before fixing.
   Superseded (2026-10-12): the icon was redesigned (a game disc with an
   update badge) at the website session's request; the new icon.svg has
   no gradient on a zero-width line.
+  Decided (2026-10-12, user, via the website session): the disc icon
+  with the update badge and "PS3·PS4" lettering (8495ca1) is approved
+  for the app and the site. Guidance: the icon need not say
+  "PlayStation" but should imply it; plain console names do that, Sony
+  marks stay out.
   **Layman:** The app's vector icon is missing the stem of its download arrow in some viewers.
   Kind: fix.
   Source: in-session-2026-10-12 (RPSN-0127 logo work).
