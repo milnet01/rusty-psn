@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=128 -->
+<!-- ants-roadmap-id-high-water: RPSN=130 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -745,7 +745,7 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0127] **Deliver the material for the Rusty PSN page on antsprojectshub.co.za.**
+- ✅ [RPSN-0127] **Deliver the material for the Rusty PSN page on antsprojectshub.co.za.**
   Requested 2026-10-12 by the ants-projects-hub-website session, on the
   user's behalf. Deliver into ~/.local/share/claude-handoff/rusty-psn-site-page/,
   then message that session (ants-projects-hub-website). Never edit the
@@ -767,6 +767,15 @@ Lower priority items that would improve the overall experience.
      Taking them also gives the eframe 0.36 build its first hand test
      (RPSN-0125's open item): open the Settings folder dialog too.
   Trailer footage may be asked for after a release; not now.
+  Resolved (2026-10-12): delivered to
+  ~/.local/share/claude-handoff/rusty-psn-site-page/ (README.md, logo SVG
+  and PNG, four screenshots); messaged ants-projects-hub-website. Hand
+  test on a private display: the eframe 0.36 window opens, the RPCS3 scan
+  reaches Sony and lists updates, a download runs, Settings draws. Not
+  testable there: typed text never reached the serial field (same on the
+  pre-upgrade build, and demoreel types fine into xterm, so not a
+  regression), and rfd's folder dialog goes to the real desktop through
+  the portal. Both left for the owner to try by hand.
   **Layman:** Give the website what it needs for the Rusty PSN page: credits, licence, a logo, corrected text, facts and screenshots.
   Kind: marketing.
   Source: ants-projects-hub-website session request 2026-10-12 (user asked it).
@@ -1284,3 +1293,26 @@ reviewer proposed; check both against the code before fixing.
   Kind: doc.
   Source: user-request-2026-10-12.
   Lanes: Docs.
+
+- 📋 [RPSN-0129] **Draw the arrow shaft in resources/icon.svg.**
+  The shaft is a vertical line painted with a gradient in the default
+  objectBoundingBox units. A vertical line has a zero-width box, so a
+  spec-following renderer (librsvg, checked with rsvg-convert) draws
+  nothing. The PNG icons are fine. Fix: gradientUnits="userSpaceOnUse"
+  with explicit coordinates, as the site logo does.
+  **Layman:** The app's vector icon is missing the stem of its download arrow in some viewers.
+  Kind: fix.
+  Source: in-session-2026-10-12 (RPSN-0127 logo work).
+  Lanes: Build.
+
+- 📋 [RPSN-0130] **Fall back to X11 when the Wayland connection fails, instead of panicking.**
+  With WAYLAND_DISPLAY set to a socket that does not exist and DISPLAY
+  valid, run_native returns WaylandError(Connection(NoCompositor)) and
+  src/main.rs panics on .expect("Failed to run egui app"). Seen under
+  demoreel, which points Wayland at nothing on purpose. Research first:
+  whether winit has an option to try X11 next, or whether to retry with
+  WAYLAND_DISPLAY removed.
+  **Layman:** The window app crashes at start if the Wayland setting points nowhere, even when X11 is available.
+  Kind: fix.
+  Source: in-session-2026-10-12 (RPSN-0127 screenshots).
+  Lanes: UI.
