@@ -75,13 +75,16 @@ Foundational work that should be done before adding new features, as it reduces 
   Kind: refactor.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0008] **Update dependencies to latest compatible versions.**
+- ✅ [RPSN-0008] **Update dependencies to latest compatible versions.**
   Checked against the code 2026-10-12: Not done — cannot be decided
   from the code; needs a version check.
   Former TODO.md task 1.8.
+  Resolved (2026-10-12): done by RPSN-0125, every crate and workflow
+  action at its latest release (c7ab91e..8dbf8a5).
   **Layman:** Bring the app's building blocks up to their newest versions.
   Kind: refactor.
   Source: todo-md-import-2026-10-12.
+  Duplicate-of: RPSN-0125.
 
 - ✅ [RPSN-0009] **Add `clippy` linting to CI pipeline alongside `rustfmt`.**
   Checked against the code 2026-10-12: Done —
@@ -955,19 +958,25 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: design-review-2026-10-12.
   Lanes: Files, Window app, Command line.
 
-- 📋 [RPSN-0085] **Untangle the two-way dependency between Files and PSN.**
+- ✅ [RPSN-0085] **Untangle the two-way dependency between Files and PSN.**
   `src/utils.rs` uses PSN's `DownloadError` while PSN uses Files.
   docs/design.md allows this only until this item ships. Move the shared
   error so the dependency runs one way.
+  Resolved (2026-10-12, 4b11053): utils::FileError replaces PSN's
+  DownloadError in Files; PSN converts it with From. design.md's
+  exception removed.
   **Layman:** Tidy two parts of the code that lean on each other, so each can change alone.
   Kind: refactor.
   Source: design-2026-10-12.
   Lanes: PSN, Files.
 
-- 📋 [RPSN-0086] **Split the window app into one file per screen.**
+- ✅ [RPSN-0086] **Split the window app into one file per screen.**
   `src/egui/mod.rs` holds the whole window app. The owner chose a planned
   split on 2026-10-12. Until it ships, a new screen goes in its own file
   under `src/egui/`, per docs/design.md.
+  Resolved (2026-10-12, 58ed580): src/egui/ now holds ten files by
+  screen or concern; mod.rs keeps shared state, new() and the frame
+  loop. Move-only, proved by a removed/added line comparison.
   **Layman:** Break the window app's one huge code file into smaller files, one per screen.
   Kind: refactor.
   Source: design-2026-10-12.

@@ -44,28 +44,7 @@ Build commands:
 
 ### 2.3 Dependency Inventory
 
-| Crate | Version | Purpose |
-|---|---|---|
-| `reqwest` | 0.12.x | HTTP client (rustls-tls backend, no native OpenSSL) |
-| `tokio` | 1.47.x | Async runtime (rt, io-util, macros, fs features) |
-| `poll-promise` | 0.3.x | Bridge between async tasks and synchronous UI loops |
-| `quick-xml` | 0.38.x | XML parsing for Sony's update API responses |
-| `serde` / `serde_json` | 1.0.x | JSON deserialization for PS4 manifests; GUI settings persistence |
-| `sha1_smol` | 1.0.x | SHA1 hashing for download integrity verification |
-| `hmac` / `sha2` | 0.12.x / 0.10.x | HMAC-SHA256 for PS4 update URL generation |
-| `hex` | 0.4.x | Hex encoding/decoding for cryptographic keys |
-| `bytesize` | 2.0.x | Human-readable file size formatting |
-| `clap` | 4.5.x | CLI argument parsing (derive feature) |
-| `flexi_logger` | 0.31.x | File + stdout logging |
-| `log` | 0.4.x | Logging facade macros |
-| `eframe` | 0.32.x | egui application framework (with persistence) |
-| `egui-notify` | 0.20.x | In-app toast notifications |
-| `notify-rust` | 4.11.x | OS-level desktop notifications |
-| `rfd` | 0.15.x | Native file dialog (folder picker) |
-| `copypasta` | 0.10.x | Clipboard access |
-| `crossterm` | 0.29.x | Terminal manipulation for CLI mode |
-| `serde_yaml` | 0.9.x | YAML parsing for RPCS3 config files (games.yml, vfs.yml) |
-| `dirs` | 6.0.x | Platform-specific directory paths |
+`Cargo.toml` is the authority on which crates are used and their versions (`docs/design.md`). Every crate is kept at its latest release; `docs/dependency-holds.md` lists any held back and why.
 
 ---
 
