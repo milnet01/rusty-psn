@@ -16,7 +16,7 @@ on 2026-10-12. The signs it places are in `docs/discovery.md`.
 | Part | Responsible for | Files |
 |---|---|---|
 | Entry | Parses arguments, starts logging, hands over to each front end the build includes | `src/main.rs` |
-| Window app | The desktop interface: search, downloads, settings, RPCS3 library, content | `src/egui/mod.rs` |
+| Window app | The desktop interface: search, downloads, settings, RPCS3 library, content | `src/egui/`: one file per screen or concern; `mod.rs` holds the shared state and the frame loop |
 | Command line | The terminal interface, including batch and silent runs | `src/cli/mod.rs` |
 | PSN | Talking to Sony: building update URLs, parsing replies, downloading, resuming, verifying, merging multi-part PS4 updates, firmware | `src/psn/mod.rs`, `src/psn/parser.rs`, `src/psn/manifest_parser.rs`, `src/psn/utils.rs`, `src/psn/firmware.rs` |
 | RPCS3 | Finding RPCS3, reading its config and game metadata, comparing versions, installing packages | `src/rpcs3/mod.rs`, `src/rpcs3/auto_detect.rs`, `src/rpcs3/config.rs`, `src/rpcs3/sfo.rs` |
@@ -49,9 +49,8 @@ for the window app (`#[cfg(feature = "egui")]`). That code may stay, and a
 fix to it stays where it is. **New code used only by one front end goes in
 that front end's own folder.**
 
-**New screens.** The window app is one large file, and a roadmap item plans
-splitting it by screen. Until then, **a new screen or panel goes in its own
-file under `src/egui/`**, the default `~/.claude/standards/coding.md` § 1.8
+**New screens.** **A new screen or panel goes in its own file under
+`src/egui/`**, the default `~/.claude/standards/coding.md` § 1.8
 sets for a second reason to change.
 
 ## Where each sign of success lives
