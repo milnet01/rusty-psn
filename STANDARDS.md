@@ -102,7 +102,7 @@ get_update_info_url() -> construct API URL
     |                     PS4:    https://gs-sec.ww.np.dl.playstation.net/plo/np/{id}/{hmac}/{id}-ver.xml
     |                     PSVita: https://gs-sec.ww.np.dl.playstation.net/pl/np/{id}/{hmac}/{id}-ver.xml
     v
-HTTP GET (danger_accept_invalid_certs = true)
+HTTP GET (certificate check skipped for Sony hosts only)
     |
     v
 parser::parse_response() -> parse XML into UpdateInfo + Vec<PackageInfo>
@@ -249,11 +249,9 @@ PackageInfo {
 
 ### 5.1 TLS Certificate Handling
 
-```rust
-.danger_accept_invalid_certs(true)
-```
+Sony's PSN update servers present certificates that fail normal validation: the update hosts chain to Sony's private "SCEI DNAS Root 05", signed with SHA-1, and `gs2.ww.prod.dl.playstation.net` serves a certificate for another name. Skipping the check is **intentional** and **required** for those hosts.
 
-Sony's PSN update servers use non-standard certificate chains that fail normal validation. This is an **intentional** and **required** bypass. Both the update metadata query and the `.pkg` download clients use this setting.
+It is scoped: `security::sony_tls_config()` skips certificate verification only for hosts under `security::ALLOWED_DOMAINS` and verifies every other host normally. The handshake signature is checked on every host. `build_psn_client()` uses this config for every request.
 
 ### 5.2 Cryptographic Keys
 

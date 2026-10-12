@@ -1,5 +1,10 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use rustls::{DigitallySignedStruct, SignatureScheme};
 
 use log::warn;
 
@@ -43,6 +48,11 @@ impl fmt::Display for SecurityError {
     }
 }
 
+/// Whether a host name falls under one of the allowed Sony domains.
+fn is_allowed_sony_host(host: &str) -> bool {
+    ALLOWED_DOMAINS.iter().any(|d| host.ends_with(d))
+}
+
 /// Validate that a URL points to an allowed Sony PlayStation domain.
 pub fn validate_download_url(url: &str) -> Result<(), SecurityError> {
     let parsed = match reqwest::Url::parse(url) {
@@ -61,7 +71,7 @@ pub fn validate_download_url(url: &str) -> Result<(), SecurityError> {
         None => return Err(SecurityError::DisallowedDomain(url.to_string())),
     };
 
-    if ALLOWED_DOMAINS.iter().any(|d| host.ends_with(d)) {
+    if is_allowed_sony_host(host) {
         Ok(())
     } else {
         Err(SecurityError::DisallowedDomain(url.to_string()))
@@ -196,12 +206,78 @@ pub fn sony_redirect_policy() -> reqwest::redirect::Policy {
     reqwest::redirect::Policy::custom(|attempt| {
         let url_string = attempt.url().to_string();
         if let Some(host) = attempt.url().host_str() {
-            if ALLOWED_DOMAINS.iter().any(|d| host.ends_with(d)) {
+            if is_allowed_sony_host(host) {
                 return attempt.follow();
             }
         }
         attempt.error(RedirectError(url_string))
     })
+}
+
+/// Certificate check that skips verification for Sony hosts only.
+///
+/// Sony's update hosts chain to Sony's private "SCEI DNAS Root 05", signed with SHA-1, so no
+/// system trusts it and rustls refuses to; gs2.ww.prod.dl.playstation.net serves Akamai's
+/// certificate under another name. Every other host gets the system's normal verification.
+/// The handshake signature is still checked on every host.
+#[derive(Debug)]
+struct SonyOnlyCertBypass {
+    inner: rustls_platform_verifier::Verifier,
+}
+
+impl ServerCertVerifier for SonyOnlyCertBypass {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        intermediates: &[CertificateDer<'_>],
+        server_name: &ServerName<'_>,
+        ocsp_response: &[u8],
+        now: UnixTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
+        if let ServerName::DnsName(name) = server_name {
+            if is_allowed_sony_host(name.as_ref()) {
+                return Ok(ServerCertVerified::assertion());
+            }
+        }
+        self.inner
+            .verify_server_cert(end_entity, intermediates, server_name, ocsp_response, now)
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        self.inner.verify_tls12_signature(message, cert, dss)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        self.inner.verify_tls13_signature(message, cert, dss)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.inner.supported_verify_schemes()
+    }
+}
+
+/// Build the TLS configuration for the PSN client: Sony hosts skip certificate verification,
+/// every other host is verified normally.
+pub fn sony_tls_config() -> Result<rustls::ClientConfig, rustls::Error> {
+    let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
+    let verifier = SonyOnlyCertBypass {
+        inner: rustls_platform_verifier::Verifier::new(provider.clone())?,
+    };
+    Ok(rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()?
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(verifier))
+        .with_no_client_auth())
 }
 
 #[cfg(test)]

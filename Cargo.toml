@@ -26,6 +26,10 @@ clap = { version = "4.6.7", features = ["derive"] }
 crossterm = { version = "0.29.0", optional = true }
 
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls"] }
+# Named directly only to give reqwest a certificate check scoped to Sony hosts (src/security.rs).
+# Both must stay on the versions reqwest itself uses, or reqwest rejects the TLS config.
+rustls = { version = "0.23.45", default-features = false, features = ["std", "tls12", "aws-lc-rs"] }
+rustls-platform-verifier = "0.7.1"
 
 rfd = { version = "0.17.2", optional = true }
 eframe = { version = "0.36.2", features = ["persistence"], optional = true }

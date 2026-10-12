@@ -25,16 +25,34 @@ use crate::utils::DirectoryFormat;
 
 /// Build a reqwest client configured for Sony PSN servers.
 ///
-/// Sony uses non-standard TLS certificates, so `danger_accept_invalid_certs` is required.
-/// The redirect policy validates that each hop stays within allowed Sony domains.
+/// Sony's servers present certificates that fail normal validation, so the TLS config skips
+/// certificate verification for Sony hosts only (`security::sony_tls_config`); any other host
+/// is verified normally. The redirect policy validates that each hop stays within allowed Sony domains.
 ///
 /// This client should be constructed once and reused — it holds a connection pool and
 /// TLS session cache internally, and `Clone` is just an `Arc::clone`.
-pub fn build_psn_client() -> Result<reqwest::Client, reqwest::Error> {
+pub fn build_psn_client() -> Result<reqwest::Client, PsnClientError> {
+    let tls = crate::security::sony_tls_config().map_err(PsnClientError::Tls)?;
     reqwest::ClientBuilder::default()
-        .danger_accept_invalid_certs(true)
+        .tls_backend_preconfigured(tls)
         .redirect(crate::security::sony_redirect_policy())
         .build()
+        .map_err(PsnClientError::Reqwest)
+}
+
+#[derive(Debug)]
+pub enum PsnClientError {
+    Tls(rustls::Error),
+    Reqwest(reqwest::Error),
+}
+
+impl std::fmt::Display for PsnClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PsnClientError::Tls(e) => write!(f, "TLS setup failed: {e}"),
+            PsnClientError::Reqwest(e) => write!(f, "{e}"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -535,6 +553,13 @@ impl PackageInfo {
 mod tests {
     fn test_client() -> reqwest::Client {
         super::build_psn_client().expect("failed to build test client")
+    }
+
+    #[tokio::test]
+    async fn psn_client_checks_certificates_outside_sony() {
+        // The certificate bypass Sony needs must not reach any other host (RPSN-0031).
+        let result = test_client().get("https://self-signed.badssl.com/").send().await;
+        assert!(result.is_err(), "a self-signed certificate on a non-Sony host was accepted");
     }
 
     #[cfg(feature = "egui")]
