@@ -1,0 +1,3 @@
+[default.extend-words]
+# Part of Sony's real firmware file name, PS3UPDAT.PUP (src/psn/firmware.rs).
+UPDAT = "UPDAT"

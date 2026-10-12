@@ -1,0 +1,2 @@
+# ants-audit learned false positives (JSONL, ANTS-1708). Keyed by line-independent content fingerprint.
+{"fingerprint":"aa9c313e091ba030","reason":"SHA-1 is what Sony publishes for each update package (sha1sum in the update XML and the trailing 0x20 bytes of the pkg); the check can only compare against it. Integrity against corruption, not authentication. Audit 2026-10-12.","rule":"rust.lang.security.insecure-hashes.insecure-hashes","timestamp":"2026-10-12T15:13:03Z"}

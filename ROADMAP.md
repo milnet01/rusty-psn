@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=97 -->
+<!-- ants-roadmap-id-high-water: RPSN=124 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -869,6 +869,9 @@ Work named by docs/design.md and its review on 2026-10-12.
   CLI's `--directory-format` default `serial-title`). Discovery S4 and
   CLAUDE.md rule 6 make Title / ID the default; the other layouts stay
   selectable. Claims S4.
+  Progress 2026-10-12 (verify-delivery, CLI run): downloads landed
+  inside the chosen folder, laid out ID - Title, confirming this item is
+  still open.
   **Layman:** Sort downloads into Game Title / Game ID folders unless you pick another layout.
   Kind: feature.
   Source: design-review-2026-10-12.
@@ -921,6 +924,12 @@ shipped items that built it.
   file completes and passes the SHA1 check, and that a corrupted file is
   not kept. Built by the upstream download code; RPSN-0025 re-hashes after
   a resume.
+  Progress 2026-10-12 (verify-delivery, CLI run): PS3 NPUB30826 01.07
+  and PS4 CUSA01021 01.54 downloaded and verified; PSVita PCSA00007
+  01.01 failed verification because Sony's Vita sha1sum is upper case
+  (fixed in 981f8ff; regression test
+  hash_file_accepts_upper_case_checksum). Still open: a failed file is
+  kept (RPSN-0116).
   **Layman:** Check that every update for a game downloads completely and undamaged.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -930,6 +939,9 @@ shipped items that built it.
   Interrupt a large download mid-way and restart it. Check it resumes from
   where it stopped and finishes with a matching checksum. Built by
   RPSN-0024, RPSN-0025 and RPSN-0030.
+  Progress 2026-10-12: not run. Read: any non-206 reply during resume
+  truncated the partial file; fixed in 981f8ff (error statuses now leave
+  it intact). Content-Range is still unchecked (RPSN-0118).
   **Layman:** Check that an interrupted download picks up where it left off.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -939,6 +951,9 @@ shipped items that built it.
   Look up one known game ID for each console and download an update from
   each list, with S1 holding for each. PSVita support was built by
   RPSN-0041, RPSN-0043 and RPSN-0047.
+  Progress 2026-10-12 (verify-delivery, CLI run): PS3 NPUB30826, PS4
+  CUSA01021 and PSVita PCSA00007 each listed their updates. The psn
+  network tests also pass in ./scripts/local-ci.sh.
   **Layman:** Check that updates are found for PS3, PS4 and Vita games.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -947,6 +962,10 @@ shipped items that built it.
 - 📋 [RPSN-0092] **Confirm S6: a downloaded update installs into RPCS3 and shows the new version.**
   Download a PS3 update, install it through the app, then open RPCS3 and
   check the game reports the new version. Built by RPSN-0053.
+  Progress 2026-10-12: not run (no RPCS3 on the test machine). Read: the
+  window app's Install to RPCS3 panicked outside the tokio runtime and
+  installed the first .pkg in the folder; CLI --install did the same,
+  even after a failed download. Both fixed in 981f8ff.
   **Layman:** Check that an update installed through the app shows up in RPCS3.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -956,6 +975,11 @@ shipped items that built it.
   Scan an RPCS3 library holding both up-to-date and outdated games, and
   check each is marked correctly. Built by RPSN-0050, RPSN-0051,
   RPSN-0052 and RPSN-0057.
+  Progress 2026-10-12: a disc game with no update installed was never
+  marked, because the disc PARAM.SFO's APP_VER was discarded; fixed in
+  981f8ff (regression test
+  scan_library_reads_disc_app_ver_when_no_update_installed). Unsettled:
+  whether games.yml lists digital games at all.
   **Layman:** Check that the library scan correctly shows which games need updates.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -965,6 +989,9 @@ shipped items that built it.
   On a fresh settings file, check the app finds the RPCS3 folder by itself,
   and that a path typed in settings replaces it. Built by RPSN-0049,
   RPSN-0054 and RPSN-0056.
+  Progress 2026-10-12: not run (no RPCS3 on the test machine). Read:
+  macOS and Windows detection rarely succeed (RPSN-0112, RPSN-0113); the
+  AppImage fallback can pick any program (RPSN-0110).
   **Layman:** Check that the app finds RPCS3 by itself and lets you change the folder.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -974,7 +1001,207 @@ shipped items that built it.
   Install a DLC zip through the app, then check in RPCS3 that the game
   lists the DLC and its licence file is in place. Built by
   `content::install_dlc_zip`, which no roadmap item recorded.
+  Progress 2026-10-12: not run (no RPCS3). Read: the Content Browser
+  Install buttons panicked outside the tokio runtime (fixed in 981f8ff);
+  multi-file zips and the licence folder remain (RPSN-0111, RPSN-0112,
+  RPSN-0098).
   **Layman:** Check that installing a DLC zip you own makes the DLC appear in the game.
   Kind: test.
   Source: check-queue-2026-10-12.
   Lanes: Content, RPCS3.
+
+## 14. Audit follow-ups (2026-10-12)
+
+Findings from the 2026-10-12 audit (check-code, review-code, verify-delivery)
+not fixed in that session. The Critical and High findings were fixed in commit
+981f8ff. Each item names its file and line as of that commit and the remedy the
+reviewer proposed; check both against the code before fixing.
+
+- 📋 [RPSN-0098] **Resolve the DLC licence folder through vfs.yml, and refuse when no RPCS3 folder is set.**
+  src/egui/mod.rs:1731 builds exdata as config_dir/dev_hdd0/home/00000001/exdata, ignoring the dev_hdd0 path vfs.yml sets (used at :1009-1020). With no config dir the fallback is an empty path, so the .rap is copied into the current folder. Remedy: resolve through the same vfs logic; refuse when the config dir is unset.
+  **Layman:** DLC licence files can land in the wrong folder.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lanes 1+4 MEDIUM.
+  Lanes: Window app, Content.
+
+- 📋 [RPSN-0099] **Append a new batch search to a running one instead of replacing it.**
+  src/egui/mod.rs:983-986 and :1063-1067 assign batch_search_queue while a batch runs: queued serials are dropped, and in-flight results can make errors exceed the total, so batch_search_total - errors at :941 underflows. Remedy: append to the batch; use saturating_sub.
+  **Layman:** Starting a second batch search can lose game IDs or crash a debug build.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 1 MEDIUM.
+  Lanes: Window app.
+
+- 📋 [RPSN-0100] **Report folders the migration refused, and check against the scanned folder.**
+  src/egui/mod.rs:3081 and :3025 toast only the migrated count; utils::migrate_directories skips refused entries silently. The preview uses the download path at menu time (:2977), the check uses the path at click time. Remedy: return (migrated, skipped), show both, and pass the scanned folder.
+  **Layman:** The folder-migration message hides folders it skipped.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 1 MEDIUM.
+  Lanes: Window app, Files.
+
+- 📋 [RPSN-0101] **Log and keep stored settings that fail to load instead of resetting them.**
+  src/egui/mod.rs:564 eframe::get_value(...).unwrap_or_default() resets every setting on a deserialize failure (for example after a downgrade meeting a new AppTheme variant), and the next save overwrites the stored copy. Remedy: log the failure; per-field serde defaults or a lenient enum fallback.
+  **Layman:** A settings file the app cannot read silently resets every setting.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 1 MEDIUM.
+  Lanes: Window app.
+
+- 📋 [RPSN-0102] **Cap redirects in the Sony redirect policy.**
+  src/security.rs:185 reqwest::redirect::Policy::custom replaces reqwest's default limit of 10 and never checks attempt.previous().len(). Remedy: error when previous().len() >= 10.
+  **Layman:** A redirect loop on Sony's side could hang a download forever.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 2 MEDIUM.
+  Lanes: Security.
+
+- 📋 [RPSN-0103] **Fail a firmware download that ends short of its stated size.**
+  src/psn/firmware.rs:226-229 sends DownloadSuccess without comparing downloaded with self.size, so a dropped connection leaves a truncated PUP reported as done. Remedy: when size is Some and differs, send DownloadFailure and return an error.
+  **Layman:** A cut-off firmware download is reported as a success.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 2 MEDIUM.
+  Lanes: PSN.
+
+- 📋 [RPSN-0104] **Return reader errors from the update XML parser.**
+  src/psn/parser.rs:137 `_ => {}` swallows Err from read_event_into (the firmware parser returns it). Unsettled: whether quick-xml (0.37.5 and 0.38.4 both in Cargo.lock) advances after an error; if not, this loops. Remedy: Err(e) => return Err(ParseError::XmlParsing(e)).
+  **Layman:** A damaged reply from Sony can give a half-filled update list with no error.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 2 MEDIUM.
+  Lanes: PSN.
+
+- 📋 [RPSN-0105] **Accept every -t flag and any whitespace between serials.**
+  src/cli/mod.rs:103 reads args.titles[0].split(' '): every -t after the first is dropped, and a double space yields an empty serial. Remedy: flat_map over all titles with split_whitespace, then normalise and dedup as batch.rs does.
+  **Layman:** Giving -t twice silently ignores the second game.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 3 MEDIUM.
+  Lanes: Command line.
+
+- 📋 [RPSN-0106] **Exit non-zero when a command-line run had failures.**
+  src/cli/mod.rs:157-194, 336-386 and the install path print each failure and exit 0, so --silent batch runs that fail look successful; the same in download_firmware_cli (:574-583, :654-656). Remedy: count failures and exit with a non-zero code.
+  **Layman:** Scripts cannot tell when a silent run failed.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 3 MEDIUM.
+  Lanes: Command line.
+
+- 📋 [RPSN-0107] **Strip control characters from Sony titles and batch-file text before printing.**
+  src/cli/mod.rs:229-236, 298, 406, 423 print the game title from Sony's reply, and :86-88 print raw batch-file text, unfiltered; escape sequences reach the terminal. Remedy: drop c.is_control() characters before printing.
+  **Layman:** Text from Sony or a batch file can mess with the terminal.
+  Kind: security.
+  Source: audit-2026-10-12 review-code lane 3 MEDIUM.
+  Lanes: Command line.
+
+- 📋 [RPSN-0108] **Decide whether a build with both front ends is supported, then fix main.rs or design.md.**
+  src/main.rs:92-96 runs cli::start_app first; with no CLI arguments it exits (cli/mod.rs:104-106), so the window never starts. windows_subsystem also hides CLI output on Windows. Owner decision: compile_error! on cli+egui, or choose the front end at runtime.
+  **Layman:** A build with both the window app and the command line never opens the window.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 3 MEDIUM.
+  Lanes: Entry.
+
+- 📋 [RPSN-0109] **Make the local gate match CI: add the cli build legs and fix its header.**
+  scripts/local-ci.sh:4-11 says .github/workflows/ci.yml calls it; no such file exists and the workflows restate their own steps. The gate never builds --no-default-features --features cli, where clippy failed until 981f8ff. Remedy: add clippy, build and test for the cli feature; correct the header.
+  **Layman:** The local checks miss problems that CI's command-line build catches.
+  Kind: chore.
+  Source: audit-2026-10-12 review-code lane 3 MEDIUM + check-code.
+  Lanes: Build.
+
+- 📋 [RPSN-0110] **Only fall back to an AppImage whose name says rpcs3.**
+  src/rpcs3/auto_detect.rs:126-131 returns the first *.AppImage in the folder when the expected one is missing; install_pkg then runs it with --installpkg. Remedy: require rpcs3 in the name (case-insensitive) or return None.
+  **Layman:** Auto-detect could pick an unrelated program as RPCS3.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 4 MEDIUM.
+  Lanes: RPCS3.
+
+- 📋 [RPSN-0111] **Install every PKG and licence in a multi-file DLC zip.**
+  src/content.rs:198-201 keep only the last .pkg and .rap from a zip, yet return Ok. Remedy: collect all, install or copy each, fail if any step fails.
+  **Layman:** DLC bundles install only their last item.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 4 MEDIUM.
+  Lanes: Content.
+
+- 📋 [RPSN-0112] **Prepare the licence folder before installing a DLC package.**
+  src/content.rs:223-226 copy the .rap after the PKG install; a missing exdata folder (fresh RPCS3 profile) fails the copy after the PKG is in. Remedy: create or check the folder first, or name the partial state in the error.
+  **Layman:** A DLC can install without its licence and say only that it failed.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 4 MEDIUM.
+  Lanes: Content.
+
+- 📋 [RPSN-0113] **Bound DLC zip extraction and extract outside the system temp folder.**
+  src/content.rs:174 and :195 extract with no size limit into the system temp folder (RAM-backed on many systems). Unsettled: Flatpak RPCS3 may not see host /tmp. Remedy: extract beside the downloads and cap the total uncompressed size from the zip headers.
+  **Layman:** A large or hostile DLC zip can fill memory.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 4 MEDIUM.
+  Lanes: Content.
+
+- 📋 [RPSN-0114] **Find RPCS3.app on macOS.**
+  src/rpcs3/auto_detect.rs:96-106 uses `which rpcs3`; RPCS3 ships as RPCS3.app, not on PATH. Remedy: also check /Applications/RPCS3.app/Contents/MacOS/rpcs3 and ~/Applications.
+  **Layman:** On a Mac, the app almost never finds RPCS3 by itself.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 4 MEDIUM.
+  Lanes: RPCS3.
+
+- 📋 [RPSN-0115] **Find portable RPCS3 on Windows.**
+  src/rpcs3/auto_detect.rs:172-183 probe %APPDATA%\rpcs3 and Program Files; RPCS3 is portable and keeps its config beside rpcs3.exe. Remedy: probe the folder of an rpcs3.exe found on PATH; say in the UI that Windows usually needs the path set.
+  **Layman:** On Windows, the app rarely finds RPCS3 by itself.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 4 MEDIUM.
+  Lanes: RPCS3.
+
+- 📋 [RPSN-0116] **Remove a download that fails its checksum, once retries are exhausted.**
+  S1 says a file that fails the check is never kept. Reproduced 2026-10-12: PCSA00007 01.01 failed verification (before F12) and the 13,977,360-byte file stayed. Resume relies on keeping a partial file, so delete only after the final failed attempt; decide whether PSN or the front end owns it (src/cli/mod.rs:336-389).
+  **Layman:** A download that failed its check stays on disk.
+  Kind: fix.
+  Source: audit-2026-10-12 verify-delivery VD2 (S1).
+  Lanes: PSN, Command line.
+
+- 📋 [RPSN-0117] **Window app: small review findings from the 2026-10-12 audit.**
+  src/egui/mod.rs: :2812 says the executable is auto-detected, but scan sets only the config dir. :803-806 and :2546-2547 retries bypass max_concurrent_downloads. :1541-1549 and :2899 Escape or X keeps a previewed theme. :3023-3031 Escape mid-migration skips the completion check. :2587, :2595, :3302-3310 ignore clipboard and xdg-open errors. :929 expect() panics if the client failed to build (only logged at :440). :823-824 a stored max of 0 is not clamped. :3281 default pkgs/ is relative to the current folder. :859-865 logs the Security error twice.
+  **Layman:** Small window-app fixes: wrong hints, ignored errors, unclamped limits.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 1 LOW.
+  Lanes: Window app.
+
+- 📋 [RPSN-0118] **PSN and Files: small review findings from the 2026-10-12 audit.**
+  src/psn/firmware.rs:184 creates the Firmware folder before the containment check at :190; move the check first. src/psn/mod.rs:416 a 206 is not checked against Content-Range. src/psn/mod.rs:256 merge_parts uses create_pkg_path, but a failed migration leaves downloads in the old folder (utils.rs return Ok(alt.clone())); share one resolver. src/utils.rs:166/175 check-then-rename window. src/psn/mod.rs:35: document beside hash_file that the SHA-1 arrives over the same unauthenticated channel as the URL.
+  **Layman:** Small download and file-handling fixes.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 2 LOW.
+  Lanes: PSN, Files, Security.
+
+- 📋 [RPSN-0119] **Command line: small review findings from the 2026-10-12 audit.**
+  src/cli/mod.rs:39-43 a misspelt --directory-format silently uses the default (use a ValueEnum). src/main.rs:30-80 contradictory options are silently ranked (use conflicts_with). src/cli/mod.rs: unwrap() calls lack the comment CLAUDE.md rule 4 requires, and crossterm/flush unwraps panic on a closed pipe. scripts/local-ci.sh:74-86 --docs exits 0 verifying nothing. src/cli/mod.rs:513 sleeps 3 s after every title, silent mode included.
+  **Layman:** Small command-line fixes: silent defaults and needless waits.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 3 LOW.
+  Lanes: Command line, Entry, Build.
+
+- 📋 [RPSN-0120] **RPCS3 and Content: small review findings from the 2026-10-12 audit.**
+  src/rpcs3/sfo.rs:52 and config.rs:22, :40 check size then read unbounded (use take()). auto_detect scans /mnt and spawns which/flatpak on the window thread (egui/mod.rs:2078, :2948 call it synchronously). src/content.rs:215 extracts synchronously inside an async fn (spawn_blocking). src/content.rs:126 comment promises DLC subfolder layouts the code does not scan. src/rpcs3/config.rs:24 one non-string games.yml value fails the whole scan.
+  **Layman:** Small RPCS3 and DLC fixes: unbounded reads and a blocking scan.
+  Kind: review-fix.
+  Source: audit-2026-10-12 review-code lane 4 LOW.
+  Lanes: RPCS3, Content.
+
+- 📋 [RPSN-0121] **Harden the GitHub workflows zizmor flagged.**
+  zizmor, 25 findings over the 4 workflows: unpinned-uses 15 (High), artipacked 4, excessive-permissions 4, template-injection 1 (main.yml:54, informational), superfluous-actions 1 (:134). The workflows are the upstream author's; decide with the fork (RPSN-0096).
+  **Layman:** Tighten the automated build scripts' security settings.
+  Kind: audit-fix.
+  Source: audit-2026-10-12 check-code zizmor.
+  Lanes: Build.
+
+- 📋 [RPSN-0122] **Tidy YAML style in the GitHub workflows.**
+  yamllint -d relaxed (no project config): trailing-spaces 5, new-line-at-end-of-file 1, line-length 8, indentation 1, across .github/. Style only; adopting a .yamllint is the alternative.
+  **Layman:** Formatting clean-up in the build scripts.
+  Kind: chore.
+  Source: audit-2026-10-12 check-code yamllint.
+  Lanes: Build.
+
+- 📋 [RPSN-0123] **Fix the spelling mistakes typos found.**
+  Mergable/Unmergable (src/egui/mod.rs:850, 2316, 2340, 2555, 3208, 3213, 3328; src/psn/mod.rs:64, 248; STANDARDS.md:199) includes the enum variant PackagesUnmergable, so the rename touches every use. Plaform (STANDARDS.md:219; ROADMAP item text), preceeding (src/psn/parser.rs:101), PN (ROADMAP.md:757, 766; check context). ROADMAP text changes go through roadmap_log.
+  **Layman:** Correct a handful of misspelt words in the code and docs.
+  Kind: chore.
+  Source: audit-2026-10-12 check-code typos.
+  Lanes: Window app, PSN, Docs.
+
+- 📋 [RPSN-0124] **Update STANDARDS.md's download-flow diagram.**
+  STANDARDS.md 3.4 Download Flow says the file is truncated before streaming. The code resumes with Range/If-Range, and since 981f8ff an HTTP error status leaves the partial file untouched. Already stale before that commit.
+  **Layman:** A diagram describes the old download steps.
+  Kind: doc-fix.
+  Source: audit-2026-10-12 close-findings sweep.
+  Lanes: Docs.
