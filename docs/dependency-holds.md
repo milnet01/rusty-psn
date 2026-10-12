@@ -4,9 +4,7 @@
 > retestable decision, never an accident.**
 
 Every dependency tracks its latest release (`~/.claude/standards/dependencies.md`
-§ 1). The owner's rule (2026-10-12) is stricter than § 1: a dependency
-may be held back only when a newer version breaks a feature and there is
-no other way. Each hold gets one row here, with the
+§ 1), and § 1 says when one may be held back. Each hold gets one row here, with the
 version that broke, so a later release can be retested and the hold lifted
 (§ 3).
 
