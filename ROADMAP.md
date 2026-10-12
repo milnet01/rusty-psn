@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=88 -->
+<!-- ants-roadmap-id-high-water: RPSN=95 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -874,3 +874,72 @@ Work named by docs/design.md and its review on 2026-10-12.
   Kind: doc-fix.
   Source: design-review-2026-10-12.
   Lanes: docs.
+
+## 13. Confirm the signs of success
+
+One item per discovery sign that no other item claimed on 2026-10-12. Each runs
+the sign by hand against real Sony servers and a real RPCS3, and names the
+shipped items that built it.
+
+- 📋 [RPSN-0089] **Confirm S1: every listed update downloads in full and matches Sony's checksum.**
+  Pick game IDs with several updates and download them all. Check every
+  file completes and passes the SHA1 check, and that a corrupted file is
+  not kept. Built by the upstream download code; RPSN-0025 re-hashes after
+  a resume.
+  **Layman:** Check that every update for a game downloads completely and undamaged.
+  Kind: test.
+  Source: check-queue-2026-10-12.
+  Lanes: PSN.
+
+- 📋 [RPSN-0090] **Confirm S2: a dropped connection resumes and still ends verified.**
+  Interrupt a large download mid-way and restart it. Check it resumes from
+  where it stopped and finishes with a matching checksum. Built by
+  RPSN-0024, RPSN-0025 and RPSN-0030.
+  **Layman:** Check that an interrupted download picks up where it left off.
+  Kind: test.
+  Source: check-queue-2026-10-12.
+  Lanes: PSN.
+
+- 📋 [RPSN-0091] **Confirm S5: PS3, PS4 and PSVita game IDs each return their updates.**
+  Look up one known game ID for each console and download an update from
+  each list, with S1 holding for each. PSVita support was built by
+  RPSN-0041, RPSN-0043 and RPSN-0047.
+  **Layman:** Check that updates are found for PS3, PS4 and Vita games.
+  Kind: test.
+  Source: check-queue-2026-10-12.
+  Lanes: PSN.
+
+- 📋 [RPSN-0092] **Confirm S6: a downloaded update installs into RPCS3 and shows the new version.**
+  Download a PS3 update, install it through the app, then open RPCS3 and
+  check the game reports the new version. Built by RPSN-0053.
+  **Layman:** Check that an update installed through the app shows up in RPCS3.
+  Kind: test.
+  Source: check-queue-2026-10-12.
+  Lanes: RPCS3.
+
+- 📋 [RPSN-0093] **Confirm S7: a library scan marks every installed game correctly.**
+  Scan an RPCS3 library holding both up-to-date and outdated games, and
+  check each is marked correctly. Built by RPSN-0050, RPSN-0051,
+  RPSN-0052 and RPSN-0057.
+  **Layman:** Check that the library scan correctly shows which games need updates.
+  Kind: test.
+  Source: check-queue-2026-10-12.
+  Lanes: RPCS3, Window app.
+
+- 📋 [RPSN-0094] **Confirm S8: RPCS3 is found without typing a path, and can be overridden.**
+  On a fresh settings file, check the app finds the RPCS3 folder by itself,
+  and that a path typed in settings replaces it. Built by RPSN-0049,
+  RPSN-0054 and RPSN-0056.
+  **Layman:** Check that the app finds RPCS3 by itself and lets you change the folder.
+  Kind: test.
+  Source: check-queue-2026-10-12.
+  Lanes: RPCS3.
+
+- 📋 [RPSN-0095] **Confirm S10: a DLC zip the user has installs into RPCS3 and the game sees it.**
+  Install a DLC zip through the app, then check in RPCS3 that the game
+  lists the DLC and its licence file is in place. Built by
+  `content::install_dlc_zip`, which no roadmap item recorded.
+  **Layman:** Check that installing a DLC zip you own makes the DLC appear in the game.
+  Kind: test.
+  Source: check-queue-2026-10-12.
+  Lanes: Content, RPCS3.

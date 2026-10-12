@@ -2,7 +2,7 @@
 
 ## Where this project is
 
-**State:** 3 — Design agreed (`docs/design.md`, 2026-10-12); the queue is not yet checked.
+**State:** 4 — Queue checked (2026-10-12): every discovery sign is named by a roadmap item.
 **In flight:** nothing.
 
 ## How work is done here
