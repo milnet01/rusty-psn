@@ -1,5 +1,18 @@
 # Project Rules for rusty-psn
 
+## Where this project is
+
+**State:** 2 — Discovery agreed (`docs/discovery.md`, 2026-10-12); no design yet.
+**In flight:** nothing.
+
+## How work is done here
+
+- **`~/.claude/workflow.md`** — the states, the gates, and what "done" means. Read in place.
+- **`~/.claude/standards/`** — how to write code, tests, commits, documents and releases. Read in place.
+- **`docs/discovery.md`** — what this project is for, and the signs that it works.
+
+The rules below are this project's own, layered on top of those.
+
 ## Workflow Rules
 
 These rules apply to ALL work on this project, in every conversation.
