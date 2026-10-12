@@ -6,7 +6,7 @@
 **This document is a gate.** Work is not broken into items until it is
 agreed — `~/.claude/workflow.md` § 4 says when it passes.
 
-**Status:** draft, awaiting review and the owner's agreement.
+**Status:** agreed (2026-10-12).
 
 This records the shape the code already has, plus the rules the owner set
 on 2026-10-12. The signs it places are in `docs/discovery.md`.

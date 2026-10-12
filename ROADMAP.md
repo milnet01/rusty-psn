@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=82 -->
+<!-- ants-roadmap-id-high-water: RPSN=88 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -812,3 +812,65 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   **Layman:** Take the owner's own folder names out of the code.
   Kind: fix.
   Source: in-session-2026-10-12.
+
+## 12. Design follow-ups
+
+Work named by docs/design.md and its review on 2026-10-12.
+
+- 📋 [RPSN-0083] **Check the folder boundary on every write into the download folder.**
+  docs/design.md names three writes that skip
+  `security::validate_path_containment`: the merged PS4 package written by
+  `psn::merge_parts`, and the layout migration in
+  `utils::migrate_existing_dir` (run by `utils::create_pkg_file` before its
+  own check) and `utils::migrate_directories`. CLAUDE.md rule 1 requires the
+  check. Claims S4.
+  **Layman:** Make sure merged PS4 updates and folder moves can never write outside your download folder.
+  Kind: security.
+  Source: design-review-2026-10-12.
+  Lanes: PSN, Files, Security.
+
+- 📋 [RPSN-0084] **Make Title / ID the default download layout.**
+  Both apps default to ID - Title (`DirectoryFormat::SerialTitle`, and the
+  CLI's `--directory-format` default `serial-title`). Discovery S4 and
+  CLAUDE.md rule 6 make Title / ID the default; the other layouts stay
+  selectable. Claims S4.
+  **Layman:** Sort downloads into Game Title / Game ID folders unless you pick another layout.
+  Kind: feature.
+  Source: design-review-2026-10-12.
+  Lanes: Files, Window app, Command line.
+
+- 📋 [RPSN-0085] **Untangle the two-way dependency between Files and PSN.**
+  `src/utils.rs` uses PSN's `DownloadError` while PSN uses Files.
+  docs/design.md allows this only until this item ships. Move the shared
+  error so the dependency runs one way.
+  **Layman:** Tidy two parts of the code that lean on each other, so each can change alone.
+  Kind: refactor.
+  Source: design-2026-10-12.
+  Lanes: PSN, Files.
+
+- 📋 [RPSN-0086] **Split the window app into one file per screen.**
+  `src/egui/mod.rs` holds the whole window app. The owner chose a planned
+  split on 2026-10-12. Until it ships, a new screen goes in its own file
+  under `src/egui/`, per docs/design.md.
+  **Layman:** Break the window app's one huge code file into smaller files, one per screen.
+  Kind: refactor.
+  Source: design-2026-10-12.
+  Lanes: Window app.
+
+- 📋 [RPSN-0087] **Let the command line merge multi-part PS4 updates.**
+  `psn::merge_parts`, `MergeStatus` and `copy_pkg_file` compile only with
+  the `egui` feature, so a command-line build cannot merge a multi-part PS4
+  update. Found by the design review 2026-10-12. Claims S3 and S9.
+  **Layman:** Make the command-line version join multi-part PS4 updates, like the window app does.
+  Kind: feature.
+  Source: design-review-2026-10-12.
+  Lanes: PSN, Command line.
+
+- 📋 [RPSN-0088] **Bring STANDARDS.md § 2.3's crate list in line with Cargo.toml.**
+  § 2.3 lists `sha1_smol` and `serde_yaml`; Cargo.toml uses `sha1` and
+  `serde_yaml_ng`, and adds `zip` and `tempfile`. docs/design.md names
+  Cargo.toml the authority. Replace the list with a pointer, or correct it.
+  **Layman:** Fix an out-of-date list of the app's building blocks in the project notes.
+  Kind: doc-fix.
+  Source: design-review-2026-10-12.
+  Lanes: docs.
