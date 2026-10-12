@@ -399,7 +399,7 @@ Ensure the application has no vulnerabilities and follows security best practice
   Kind: security.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0039] **Memory safety.**
+- ✅ [RPSN-0039] **Memory safety.**
   Review all `unwrap()` calls and replace with proper error handling
   where a panic would be unacceptable (especially in async contexts
   where a panic kills the runtime)
@@ -409,6 +409,12 @@ Ensure the application has no vulnerabilities and follows security best practice
   `self.settings.rpcs3_executable.clone().unwrap()` in the RPCS3
   install buttons in src/egui/mod.rs, with no justifying comment.
   Former TODO.md task 5.9.
+  Resolved (2026-10-12, 082030f): no bare unwrap left outside tests
+  except two part_number ones justified by the check above them. The
+  PSN client is built before the window opens (error dialog on
+  failure); locks recover from poisoning; command-line writes no longer
+  panic; end of input at a prompt now skips instead of downloading
+  everything.
   **Layman:** Replace spots where the app could crash suddenly with proper error messages.
   Kind: security.
   Source: todo-md-import-2026-10-12.
@@ -1152,8 +1158,13 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM.
   Lanes: Command line.
 
-- 📋 [RPSN-0107] **Strip control characters from Sony titles and batch-file text before printing.**
+- ✅ [RPSN-0107] **Strip control characters from Sony titles and batch-file text before printing.**
   src/cli/mod.rs:229-236, 298, 406, 423 print the game title from Sony's reply, and :86-88 print raw batch-file text, unfiltered; escape sequences reach the terminal. Remedy: drop c.is_control() characters before printing.
+  Resolved (2026-10-12, 5be5291): security::strip_control applied
+  to Sony titles, PARAM.SFO values, firmware versions and batch warning
+  text. Same commit fixes titles containing an entity (such as "&amp;")
+  being cut at the first one, a quick-xml 0.38+ change taken in
+  RPSN-0125.
   **Layman:** Text from Sony or a batch file can mess with the terminal.
   Kind: security.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM.
