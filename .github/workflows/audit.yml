@@ -1,0 +1,27 @@
+on:
+  push:
+  pull_request:
+  schedule:
+    # Weekly, so a new advisory against an unchanged lockfile is still found.
+    - cron: "17 4 * * 1"
+
+name: Dependency audit
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install cargo-audit (version pinned in scripts/local-ci.sh)
+        run: |
+          version=$(sed -n "s/^CARGO_AUDIT_VERSION='\(.*\)'$/\1/p" scripts/local-ci.sh)
+          cargo install cargo-audit --locked --version "$version"
+
+      - name: Run cargo audit
+        run: cargo audit

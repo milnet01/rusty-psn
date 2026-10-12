@@ -37,6 +37,7 @@ DOCS_GLOB='docs/*|*.md|LICENSE'
 # fail on GitHub. Measured case: ruff's default rule set changed between
 # releases, so an unpinned run enforces a different set on each machine.
 # RUFF_VERSION='0.16.8'
+CARGO_AUDIT_VERSION='0.22.2'
 
 if [[ ${1:-} == --docs-glob ]]; then printf '%s\n' "$DOCS_GLOB"; exit 0; fi
 
@@ -114,6 +115,16 @@ for feature in cli egui; do
     step "build (main.yml ubuntu-22.04, feature $feature)"
     cargo build --release --no-default-features --features "$feature"
 done
+
+step 'dependency audit (audit.yml)'
+need cargo-audit || exit 1
+installed=$(cargo audit --version | awk '{print $2}')
+if [[ $installed != "$CARGO_AUDIT_VERSION" ]]; then
+    printf 'local-ci: cargo-audit %s is installed, the pin is %s — that check did NOT run\n' "$installed" "$CARGO_AUDIT_VERSION" >&2
+    printf 'local-ci: install it: cargo install cargo-audit --locked --version %s\n' "$CARGO_AUDIT_VERSION" >&2
+    exit 1
+fi
+cargo audit
 
 printf '\nlocal-ci: NOT RUN here: main.yml windows-latest and macos-latest legs (cli and egui).\n' >&2
 
