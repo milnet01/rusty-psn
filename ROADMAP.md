@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=132 -->
+<!-- ants-roadmap-id-high-water: RPSN=133 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1010,6 +1010,21 @@ Work named by docs/design.md and its review on 2026-10-12.
   Kind: doc-fix.
   Source: design-review-2026-10-12.
   Lanes: docs.
+
+- 💭 [RPSN-0133] **Redesign the window app after the approved mockups.**
+  Mockups: https://claude.ai/artifact/PWr5yiihCDzG1JCswamS3m
+  (four screens: Search, Downloads, RPCS3 library, Settings).
+  Approved by the owner on 2026-10-12 ("I like the new look").
+  Not yet split into build items, and the owner has not said to
+  build it. Recommended first pieces: a text-size setting and a
+  high-contrast theme, since the owner is partially sighted.
+  Other pieces in the mockups: a sidebar in place of the menu
+  bar, status labels that pair an icon with words, a library
+  table with filter buttons, and a Settings page with Save and
+  Undo. Stays considered until the owner picks.
+  **Layman:** The owner liked a new look for the app; which parts to build, and in what order, is still theirs to choose.
+  Kind: ux.
+  Source: user-request-2026-10-12.
 
 ## 13. Confirm the signs of success
 
