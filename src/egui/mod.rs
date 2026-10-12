@@ -1679,18 +1679,17 @@ impl UpdatesApp {
                                                     egui::RichText::new("Installing...")
                                                         .color(egui::Rgba::from_rgb(1.0, 0.8, 0.0)),
                                                 );
-                                            } else if has_rpcs3
-                                                && ui.small_button("Install").clicked() {
-                                                    let exe = self.settings.rpcs3_executable.clone().unwrap();
-                                                    let pkg = patch.pkg_path.clone();
-                                                    let key = patch_key.clone();
-                                                    let promise = Promise::spawn_async(async move {
-                                                        crate::rpcs3::install_pkg(&exe, &pkg).await.map_err(|e| {
-                                                            crate::content::ContentError::InstallFailed(e.to_string())
-                                                        })
-                                                    });
-                                                    self.v.content_install_promises.push((key, promise));
-                                                }
+                                            } else if has_rpcs3 && ui.small_button("Install").clicked() {
+                                                let exe = self.settings.rpcs3_executable.clone().unwrap();
+                                                let pkg = patch.pkg_path.clone();
+                                                let key = patch_key.clone();
+                                                let promise = Promise::spawn_async(async move {
+                                                    crate::rpcs3::install_pkg(&exe, &pkg)
+                                                        .await
+                                                        .map_err(|e| crate::content::ContentError::InstallFailed(e.to_string()))
+                                                });
+                                                self.v.content_install_promises.push((key, promise));
+                                            }
                                         });
                                     }
                                     ui.add_space(3.0);
@@ -1716,23 +1715,22 @@ impl UpdatesApp {
                                                     egui::RichText::new("Installing...")
                                                         .color(egui::Rgba::from_rgb(1.0, 0.8, 0.0)),
                                                 );
-                                            } else if has_rpcs3
-                                                && ui.small_button("Install").clicked() {
-                                                    let exe = self.settings.rpcs3_executable.clone().unwrap();
-                                                    let zip = dlc_item.zip_path.clone();
-                                                    let key = dlc_key.clone();
-                                                    // Resolve exdata directory from RPCS3 config
-                                                    let exdata = self
-                                                        .settings
-                                                        .rpcs3_config_dir
-                                                        .as_ref()
-                                                        .map(|d| d.join("dev_hdd0/home/00000001/exdata"))
-                                                        .unwrap_or_default();
-                                                    let promise = Promise::spawn_async(async move {
-                                                        crate::content::install_dlc_zip(&exe, &zip, &exdata).await
-                                                    });
-                                                    self.v.content_install_promises.push((key, promise));
-                                                }
+                                            } else if has_rpcs3 && ui.small_button("Install").clicked() {
+                                                let exe = self.settings.rpcs3_executable.clone().unwrap();
+                                                let zip = dlc_item.zip_path.clone();
+                                                let key = dlc_key.clone();
+                                                // Resolve exdata directory from RPCS3 config
+                                                let exdata = self
+                                                    .settings
+                                                    .rpcs3_config_dir
+                                                    .as_ref()
+                                                    .map(|d| d.join("dev_hdd0/home/00000001/exdata"))
+                                                    .unwrap_or_default();
+                                                let promise = Promise::spawn_async(async move {
+                                                    crate::content::install_dlc_zip(&exe, &zip, &exdata).await
+                                                });
+                                                self.v.content_install_promises.push((key, promise));
+                                            }
                                         });
                                     }
                                 }
