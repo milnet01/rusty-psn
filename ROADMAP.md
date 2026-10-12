@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=130 -->
+<!-- ants-roadmap-id-high-water: RPSN=131 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -290,7 +290,7 @@ Support resuming partially downloaded files instead of re-downloading from scrat
 
 Ensure the application has no vulnerabilities and follows security best practices.
 
-- 📋 [RPSN-0031] **Audit `danger_accept_invalid_certs(true)`.**
+- ✅ [RPSN-0031] **Audit `danger_accept_invalid_certs(true)`.**
   This is currently required for Sony's servers but is applied
   globally. Scope it to only Sony PSN domains:
     - Create a custom `reqwest::Client` per target domain
@@ -300,6 +300,11 @@ Ensure the application has no vulnerabilities and follows security best practice
   build_psn_client still disables certificate checks for every
   request, though the redirect policy limits hosts to Sony.
   Former TODO.md task 5.1.
+  Resolved (2026-10-12): build_psn_client uses a rustls config whose
+  verifier skips the certificate check only for hosts under
+  security::ALLOWED_DOMAINS; every other host gets the system verifier.
+  Regression test psn_client_checks_certificates_outside_sony (live,
+  self-signed.badssl.com).
   **Layman:** Only skip the security certificate check when talking to Sony's servers.
   Kind: security.
   Source: todo-md-import-2026-10-12.
@@ -1315,4 +1320,16 @@ reviewer proposed; check both against the code before fixing.
   **Layman:** The window app crashes at start if the Wayland setting points nowhere, even when X11 is available.
   Kind: fix.
   Source: in-session-2026-10-12 (RPSN-0127 screenshots).
+  Lanes: UI.
+
+- 📋 [RPSN-0131] **Say "version unknown" in the RPCS3 library window when a game has no installed version on record.**
+  Seen on a scan where games.yml lists games but no PARAM.SFO gives an
+  APP_VER: the header reads "3 game(s) installed, 0 with updates
+  available", Installed and Status show "--", and Available shows a
+  version. Correct by the code (nothing to compare against), but it
+  reads as a contradiction. Say "in library" in the header and
+  "version unknown" in Status.
+  **Layman:** The library window calls a game "installed" but leaves its status blank when it can't tell the version, which looks like a contradiction.
+  Kind: ux.
+  Source: ants-projects-hub-website session 2026-10-12 (shot 3 review).
   Lanes: UI.
