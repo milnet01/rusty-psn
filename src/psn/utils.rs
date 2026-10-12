@@ -6,7 +6,7 @@ use std::io::{Error, SeekFrom};
 #[cfg(feature = "egui")]
 use std::path::PathBuf;
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 #[cfg(feature = "egui")]
 use tokio::{
@@ -85,7 +85,7 @@ fn hmac_url_hash(hex_key: &str, title_id: &str) -> Result<String, UpdateError> {
     let mut hasher = HmacSha256::new_from_slice(&key).map_err(|_| UpdateError::InvalidSerial)?;
     hasher.update(msg.as_ref());
     let hash_bytes = hasher.finalize().into_bytes();
-    Ok(format!("{hash_bytes:x}"))
+    Ok(hex::encode(hash_bytes))
 }
 
 #[cfg(feature = "egui")]
