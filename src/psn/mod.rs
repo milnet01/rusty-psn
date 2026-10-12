@@ -62,6 +62,7 @@ pub enum MergeError {
     FilepathMismatch(String),
     FileMergeFailure,
     PackagesUnmergable(String),
+    Security(crate::security::SecurityError),
 }
 
 /// Cancel signal values for download pause/abort.
@@ -280,6 +281,9 @@ impl UpdateInfo {
             merged_path.push(&merged_file_name);
             let mut package_path = package_download_path.clone();
             package_path.push(&file_name);
+            for path in [&merged_path, &package_path] {
+                crate::security::validate_path_containment(path, download_path).map_err(MergeError::Security)?;
+            }
             match copy_pkg_file(&package_path, &merged_path, package.offset).await {
                 Ok(read_length) => {
                     let _ = tx.send(MergeStatus::PartProgress(part_number)).await;
@@ -523,6 +527,40 @@ impl PackageInfo {
 mod tests {
     fn test_client() -> reqwest::Client {
         super::build_psn_client().expect("failed to build test client")
+    }
+
+    #[cfg(feature = "egui")]
+    #[tokio::test]
+    async fn merge_parts_refuses_folder_outside_download_folder() {
+        // A title id carrying "../" points the merge at a folder outside the download folder.
+        let root = tempfile::tempdir().unwrap();
+        let download_path = root.path().join("downloads");
+        std::fs::create_dir(&download_path).unwrap();
+        let outside = root.path().join("escape - Title");
+        std::fs::create_dir(&outside).unwrap();
+        std::fs::write(outside.join("UP0000-CUSA00001_00-PART_0.pkg"), b"part").unwrap();
+
+        let mut package = super::PackageInfo::empty();
+        package.url = "https://gs2.ww.prod.dl.playstation.net/ppkg/UP0000-CUSA00001_00-PART_0.pkg".to_string();
+        package.part_number = Some(1);
+        let info = super::UpdateInfo {
+            title_id: "../escape".to_string(),
+            tag_name: String::new(),
+            titles: vec!["Title".to_string()],
+            packages: vec![package],
+            platform_variant: super::PlatformVariant::PS4,
+        };
+        let (tx, _rx) = tokio::sync::mpsc::channel(10);
+
+        let result = info
+            .merge_parts(tx, &download_path, crate::utils::DirectoryFormat::SerialTitle)
+            .await;
+
+        assert!(matches!(result, Err(super::MergeError::Security(_))));
+        assert!(
+            !outside.join("UP0000-CUSA00001_00-PART.pkg").exists(),
+            "a merged file was written outside"
+        );
     }
 
     #[tokio::test]

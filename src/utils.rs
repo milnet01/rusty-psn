@@ -132,11 +132,19 @@ where
 
 /// Try to find and migrate an existing download directory from any historical format
 /// to the currently selected format. Returns the target path (possibly after renaming).
-async fn migrate_existing_dir(download_path: &Path, serial: &str, title: &str, format: DirectoryFormat) -> PathBuf {
+/// Refuses a target outside the download folder, and never moves a folder from outside it.
+async fn migrate_existing_dir(
+    download_path: &Path,
+    serial: &str,
+    title: &str,
+    format: DirectoryFormat,
+) -> Result<PathBuf, DownloadError> {
     let target = create_pkg_path(&download_path, serial, title, format);
 
+    crate::security::validate_path_containment(&target, download_path).map_err(DownloadError::Security)?;
+
     if target.exists() {
-        return target;
+        return Ok(target);
     }
 
     let sanitized_title = sanitize_title(title);
@@ -155,24 +163,24 @@ async fn migrate_existing_dir(download_path: &Path, serial: &str, title: &str, f
         if alt == &target {
             continue; // Skip the target format itself
         }
-        if alt.exists() {
+        if alt.exists() && crate::security::validate_path_containment(alt, download_path).is_ok() {
             info!("Found download folder in old format at {:?}, migrating to {:?}", alt, target);
             // For TitleSerial format, the parent title directory may need to be created first.
             if let Some(parent) = target.parent() {
                 if let Err(e) = fs::create_dir_all(parent).await {
                     error!("Failed to create parent directory for migration: {e}");
-                    return alt.clone(); // Fall back to old path
+                    return Ok(alt.clone()); // Fall back to old path
                 }
             }
             if let Err(e) = fs::rename(alt, &target).await {
                 error!("Failed to migrate folder: {e}");
-                return alt.clone(); // Fall back to old path
+                return Ok(alt.clone()); // Fall back to old path
             }
-            return target;
+            return Ok(target);
         }
     }
 
-    target
+    Ok(target)
 }
 
 pub async fn create_pkg_file(
@@ -182,7 +190,13 @@ pub async fn create_pkg_file(
     pkg_name: &str,
     format: DirectoryFormat,
 ) -> Result<(File, PathBuf), DownloadError> {
-    let mut target_path = migrate_existing_dir(&download_path, serial, title, format).await;
+    let mut target_path = match migrate_existing_dir(&download_path, serial, title, format).await {
+        Ok(path) => path,
+        Err(e) => {
+            error!("Path containment check failed before migration: {e:?}");
+            return Err(e);
+        }
+    };
 
     target_path.push(pkg_name);
     info!("Creating file for pkg at path {:?}", target_path);
@@ -294,9 +308,16 @@ pub fn detect_migratable_directories(download_path: &Path, target_format: Direct
 /// Execute a set of directory migrations (renames).
 /// Returns the number of successful migrations.
 #[cfg(feature = "egui")]
-pub async fn migrate_directories(migrations: &[(PathBuf, PathBuf)]) -> usize {
+pub async fn migrate_directories(migrations: &[(PathBuf, PathBuf)], download_path: &Path) -> usize {
     let mut success_count = 0;
     for (old_path, new_path) in migrations {
+        let contained = [old_path, new_path]
+            .iter()
+            .try_for_each(|path| crate::security::validate_path_containment(path, download_path));
+        if let Err(e) = contained {
+            error!("Skipping migration of {:?}: {e}", old_path);
+            continue;
+        }
         // Create parent directories for the new path if needed (e.g., TitleSerial format).
         if let Some(parent) = new_path.parent() {
             if let Err(e) = fs::create_dir_all(parent).await {
@@ -390,6 +411,64 @@ fn hash_file_blocking(file: std::fs::File, hash: &str, file_length: u64, suffix_
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn create_pkg_file_does_not_migrate_outside_download_folder() {
+        // A serial carrying "../" makes both the old-format folder and the migration target
+        // sit outside the download folder. Nothing may be moved there.
+        let root = tempfile::tempdir().unwrap();
+        let download_path = root.path().join("downloads");
+        std::fs::create_dir(&download_path).unwrap();
+        let outside_old = root.path().join("escape");
+        std::fs::create_dir(&outside_old).unwrap();
+
+        let result = create_pkg_file(download_path, "../escape", "Title", "x.pkg", DirectoryFormat::SerialTitle).await;
+
+        assert!(matches!(result, Err(DownloadError::Security(_))));
+        assert!(outside_old.exists(), "the folder outside the download folder was moved");
+        assert!(!root.path().join("escape - Title").exists());
+    }
+
+    #[tokio::test]
+    async fn create_pkg_file_does_not_migrate_from_outside_download_folder() {
+        // With Title / Serial and an existing Title folder, "../escape" resolves back inside the
+        // download folder, but the old Serial-only folder it would be moved from sits outside.
+        // It must stay put.
+        let root = tempfile::tempdir().unwrap();
+        let download_path = root.path().join("downloads");
+        std::fs::create_dir_all(download_path.join("Title")).unwrap();
+        let outside_old = root.path().join("escape");
+        std::fs::create_dir(&outside_old).unwrap();
+
+        let result = create_pkg_file(download_path, "../escape", "Title", "x.pkg", DirectoryFormat::TitleSerial).await;
+
+        assert!(result.is_ok());
+        assert!(outside_old.exists(), "a folder from outside the download folder was moved in");
+    }
+
+    #[cfg(feature = "egui")]
+    #[tokio::test]
+    async fn migrate_directories_skips_moves_outside_download_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let download_path = root.path().join("downloads");
+        let inside_old = download_path.join("BLUS31147");
+        std::fs::create_dir_all(&inside_old).unwrap();
+        let inside_new = download_path.join("Title").join("BLUS31147");
+        let outside_new = root.path().join("escaped");
+        let second_old = download_path.join("BCES00001");
+        std::fs::create_dir_all(&second_old).unwrap();
+
+        let migrations = vec![
+            (inside_old.clone(), inside_new.clone()),
+            (second_old.clone(), outside_new.clone()),
+        ];
+        let count = migrate_directories(&migrations, &download_path).await;
+
+        assert_eq!(count, 1);
+        assert!(inside_new.exists());
+        assert!(second_old.exists(), "a folder was moved out of the download folder");
+        assert!(!outside_new.exists());
+    }
 
     #[test]
     fn sanitize_colon_to_dash() {

@@ -85,14 +85,12 @@ sets for a second reason to change.
   taken from a Sony reply passes `security::validate_download_url` before
   it is fetched. Update-lookup URLs are built from fixed Sony hosts in
   `src/psn/utils.rs`. New network code follows the same rules.
-- **Downloaded files** — a package file opened through
-  `utils::create_pkg_file`, and every firmware file, passes
-  `security::validate_path_containment` before it is written. Not yet
-  checked: the merged PS4 package written by `psn::merge_parts`, and the
-  layout migration in `utils::migrate_existing_dir` (which
-  `utils::create_pkg_file` runs before its own check) and
-  `utils::migrate_directories`. A roadmap item covers them. `CLAUDE.md`
-  rule 1 requires the check of every write into the download folder.
+- **Downloaded files** — every write into the download folder passes
+  `security::validate_path_containment` first: a package file opened
+  through `utils::create_pkg_file`, every firmware file, the merged PS4
+  package written by `psn::merge_parts`, and the layout migrations in
+  `utils::migrate_existing_dir` and `utils::migrate_directories`.
+  `CLAUDE.md` rule 1 requires the check.
 - **Writes outside the download folder** — Content unpacks a DLC zip only
   into a temporary folder, through the zip crate's `enclosed_name`, and
   copies the licence file by its bare file name into the RPCS3 `exdata`

@@ -824,7 +824,7 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   Kind: chore.
   Source: in-session-2026-10-12.
 
-- 🚧 [RPSN-0097] **Make the folder-boundary check accept relative and linked download folders.**
+- ✅ [RPSN-0097] **Make the folder-boundary check accept relative and linked download folders.**
   `security::validate_path_containment` compared a new file's lexical path
   with the canonical base. Once a relative base existed (the command line's
   default `pkgs/`), every new file was refused. A linked download folder was
@@ -832,6 +832,8 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   escape. Found while working RPSN-0083, whose new checks would have spread
   it. Fix: canonicalize the target's deepest existing ancestor, then append
   the missing part.
+  Resolved 2026-10-12 in commit a6eec07, with three regression tests
+  shown failing first.
   **Layman:** Downloads into a folder named by a short path, or reached through a shortcut link, no longer fail, and a link can't be used to escape the folder.
   Kind: fix.
   Source: in-session-2026-10-12.
@@ -841,13 +843,18 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
 
 Work named by docs/design.md and its review on 2026-10-12.
 
-- 📋 [RPSN-0083] **Check the folder boundary on every write into the download folder.**
+- ✅ [RPSN-0083] **Check the folder boundary on every write into the download folder.**
   docs/design.md names three writes that skip
   `security::validate_path_containment`: the merged PS4 package written by
   `psn::merge_parts`, and the layout migration in
   `utils::migrate_existing_dir` (run by `utils::create_pkg_file` before its
   own check) and `utils::migrate_directories`. CLAUDE.md rule 1 requires the
   check. Claims S4.
+  Resolved 2026-10-12: merge_parts checks the merged and part paths;
+  migrate_existing_dir checks its target and the old folder it moves
+  from; migrate_directories takes the download folder and skips any move
+  with either end outside. Four regression tests, each shown failing
+  first.
   **Layman:** Make sure merged PS4 updates and folder moves can never write outside your download folder.
   Kind: security.
   Source: design-review-2026-10-12.

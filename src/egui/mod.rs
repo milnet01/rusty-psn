@@ -856,6 +856,10 @@ impl UpdatesApp {
                                     ToastLevel::Error,
                                 ));
                             }
+                            MergeError::Security(e) => {
+                                error!("Merge for {} refused: {e}", merge.title_id);
+                                toasts.push((format!("Failed to merge {}: {e}", merge.title_id), ToastLevel::Error));
+                            }
                         }
 
                         error!("Could not merge files for {}, reason: {:?}", merge.title_id, e);
@@ -3065,6 +3069,7 @@ impl UpdatesApp {
                 ui.horizontal(|ui| {
                     if ui.button("Migrate").clicked() {
                         let migrations = self.v.migration_preview.clone();
+                        let download_path = self.settings.pkg_download_path.clone();
                         let ctx = ui.ctx().clone();
                         let _guard = self
                             .v
@@ -3073,7 +3078,7 @@ impl UpdatesApp {
                             .expect("rt_handle set in UpdatesApp::new before any UI code runs")
                             .enter();
                         self.v.migration_promise = Some(Promise::spawn_async(async move {
-                            let count = crate::utils::migrate_directories(&migrations).await;
+                            let count = crate::utils::migrate_directories(&migrations, &download_path).await;
                             ctx.request_repaint();
                             count
                         }));
