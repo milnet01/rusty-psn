@@ -462,7 +462,30 @@ impl eframe::App for UpdatesApp {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    // Runs before every `ui` call, and also while the window is hidden, so downloads keep moving when minimised.
+    fn logic(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut toasts = Vec::new();
+
+        // Check the status of the search promise.
+        self.handle_search_promise(&mut toasts);
+        // Process batch search queue (parallel searches with concurrency limit).
+        self.handle_batch_search_queue(&mut toasts);
+        // Check in on active downloads.
+        self.handle_download_promises(&mut toasts);
+        self.handle_merge_promises(&mut toasts);
+        self.handle_rpcs3_scan_promise(&mut toasts);
+        self.handle_firmware_promises(&mut toasts);
+        self.handle_rpcs3_install_promises(&mut toasts);
+        self.handle_content_install_promises(&mut toasts);
+
+        for (msg, level) in toasts {
+            self.show_notifications(msg, level);
+        }
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = &ui.ctx().clone();
+
         // Build per-frame download status cache (avoids repeated linear scans).
         self.v.download_status_cache = self.build_download_status_cache();
 
@@ -470,11 +493,11 @@ impl eframe::App for UpdatesApp {
         self.handle_keyboard_shortcuts(ctx);
 
         // Menu bar must come before CentralPanel.
-        self.draw_menu_bar(ctx);
+        self.draw_menu_bar(ui);
         // Status bar must come before CentralPanel.
-        self.draw_status_bar(ctx);
+        self.draw_status_bar(ui);
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             self.draw_search_bar(ui);
             ui.separator();
             self.draw_results_list(ctx, ui);
@@ -510,24 +533,6 @@ impl eframe::App for UpdatesApp {
 
         if self.v.show_content_browser_window {
             self.draw_content_browser_window(ctx);
-        }
-
-        let mut toasts = Vec::new();
-
-        // Check the status of the search promise.
-        self.handle_search_promise(&mut toasts);
-        // Process batch search queue (parallel searches with concurrency limit).
-        self.handle_batch_search_queue(&mut toasts);
-        // Check in on active downloads.
-        self.handle_download_promises(&mut toasts);
-        self.handle_merge_promises(&mut toasts);
-        self.handle_rpcs3_scan_promise(&mut toasts);
-        self.handle_firmware_promises(&mut toasts);
-        self.handle_rpcs3_install_promises(&mut toasts);
-        self.handle_content_install_promises(&mut toasts);
-
-        for (msg, level) in toasts {
-            self.show_notifications(msg, level);
         }
 
         self.v.toasts.show(ctx);
@@ -2958,8 +2963,8 @@ impl UpdatesApp {
         });
     }
 
-    fn draw_menu_bar(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
+    fn draw_menu_bar(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::top("menu_bar").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("Settings...").clicked() {
@@ -3131,8 +3136,8 @@ impl UpdatesApp {
         }
     }
 
-    fn draw_status_bar(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
+    fn draw_status_bar(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::bottom("status_bar").show(ui, |ui| {
             ui.horizontal(|ui| {
                 // Batch search progress.
                 let batch_total = self.v.batch_search_total;
