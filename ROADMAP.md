@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=131 -->
+<!-- ants-roadmap-id-high-water: RPSN=132 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1383,3 +1383,15 @@ reviewer proposed; check both against the code before fixing.
   Kind: ux.
   Source: ants-projects-hub-website session 2026-10-12 (shot 3 review).
   Lanes: UI.
+
+- 📋 [RPSN-0132] **Fix two stale passages in STANDARDS.md seen during the 2026-10-12 fixes.**
+  1. § 4 (Domain model notes) spells `PlaformVariant`; the type is
+     PlatformVariant.
+  2. The technical-debt list says a new reqwest::Client is built for
+     each get_info() and start_download() call; the client is now built
+     once and shared (build_psn_client, passed into UpdatesApp::new).
+  Check the rest of that list against the code while there.
+  **Layman:** Two places in the project notes say things that are no longer true.
+  Kind: doc-fix.
+  Source: in-session-2026-10-12 (check-doc-facts over STANDARDS.md).
+  Lanes: docs.
