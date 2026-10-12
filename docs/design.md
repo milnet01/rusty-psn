@@ -46,9 +46,10 @@ while PSN uses Files. The two depend on each other. It is allowed until
 the roadmap item that untangles it ships. **No new two-way dependency may be
 added.**
 
-**Frontend-only code.** PSN and RPCS3 already hold some code compiled only
-for the window app (`#[cfg(feature = "egui")]`). That code may stay. **New
-code used only by one front end goes in that front end's own folder.**
+**Frontend-only code.** PSN and Files already hold some code compiled only
+for the window app (`#[cfg(feature = "egui")]`). That code may stay, and a
+fix to it stays where it is. **New code used only by one front end goes in
+that front end's own folder.**
 
 **New screens.** The window app is one large file, and a roadmap item plans
 splitting it by screen. Until then, **a new screen or panel goes in its own
@@ -62,7 +63,7 @@ sets for a second reason to change.
 | S1 — every listed update downloads in full and matches Sony's checksum | PSN, with Files for hashing |
 | S2 — a dropped connection resumes and still ends verified | PSN |
 | S3 — a multi-part PS4 update ends up as one package | PSN |
-| S4 — downloads land only in the chosen folder, as Title / ID / files | Files, with Security for containment |
+| S4 — downloads land only in the chosen folder, as Title / ID / files | Files, with Security for containment. Both apps still default to ID - Title; a roadmap item makes Title / ID the default, the layout `CLAUDE.md` rule 6 prefers |
 | S5 — PS3, PS4 and PSVita IDs each return their updates | PSN |
 | S6 — a downloaded update installs into RPCS3 and shows the new version | RPCS3 |
 | S7 — a library scan marks every game correctly | RPCS3 |
@@ -86,9 +87,17 @@ sets for a second reason to change.
   `src/psn/utils.rs`. New network code follows the same rules.
 - **Downloaded files** — a package file opened through
   `utils::create_pkg_file`, and every firmware file, passes
-  `security::validate_path_containment` before it is written. The merged
-  PS4 package written by `psn::merge_parts` does not yet; a roadmap item
-  covers it. `CLAUDE.md` rule 1 requires the check of every write.
+  `security::validate_path_containment` before it is written. Not yet
+  checked: the merged PS4 package written by `psn::merge_parts`, and the
+  layout migration in `utils::migrate_existing_dir` (which
+  `utils::create_pkg_file` runs before its own check) and
+  `utils::migrate_directories`. A roadmap item covers them. `CLAUDE.md`
+  rule 1 requires the check of every write into the download folder.
+- **Writes outside the download folder** — Content unpacks a DLC zip only
+  into a temporary folder, through the zip crate's `enclosed_name`, and
+  copies the licence file by its bare file name into the RPCS3 `exdata`
+  folder it is given. RPCS3 installs a package by running RPCS3 itself
+  (`--installpkg`), so rusty-psn writes nothing into RPCS3's folders there.
 
 ## The stack, and what it rules out
 
@@ -113,3 +122,4 @@ exception rather than a decision, and its roadmap item closes it.
 | Loop | Date | Lanes | Q1 | Q2 | Q3 | Q4 | Outcome |
 |------|------|-------|----|----|----|----|---------|
 | 1 | 2026-10-12 | 2 (both lanes held every question) | 3 | 2 | 0 | — | 5 verified, 5 fixed, 0 dismissed. Both lanes found Entry's `Args` used by the command line. Others: STANDARDS § 2.3 crate list disagrees with `Cargo.toml`; merged PS4 package skips path containment; a both-front-ends build exists; RPCS3's never-use-PSN rule needed "directly". The packet's import grep was lower-case only; corrected. Open questions resolved: the default folder layout is SerialTitle (a queue matter, not design); the window app does not use `Args`. |
+| 2 | 2026-10-12 | 2 (both lanes held every question) | 2 | 2 | 1 | — | 5 verified, 5 fixed, 0 dismissed. Both lanes found S4's Title / ID layout is not the default, and RPCS3 and Content writes had no stated boundary. Also: layout migration writes before the containment check (`migrate_directories` found while verifying); egui-only code sits in PSN and Files, not RPCS3; a fix inside egui-only `merge_parts` had two possible homes. Open question resolved: `config.rs` writes only in tests. |
