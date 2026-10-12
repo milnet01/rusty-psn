@@ -183,6 +183,20 @@ async fn migrate_existing_dir(
     Ok(target)
 }
 
+/// Open options for a file the app downloads or writes into the download folder.
+///
+/// On Unix the file is created with mode 0644, so a loose umask cannot leave it writable
+/// by other users; an existing file keeps its mode. The open also refuses a link as the
+/// final name (O_NOFOLLOW), so a link swapped in after the containment check cannot send
+/// the write outside the download folder. A swapped folder higher up is not covered.
+pub fn download_file_options() -> OpenOptions {
+    #[allow(unused_mut)]
+    let mut options = OpenOptions::new();
+    #[cfg(unix)]
+    options.mode(0o644).custom_flags(libc::O_NOFOLLOW);
+    options
+}
+
 pub async fn create_pkg_file(
     download_path: PathBuf,
     serial: &str,
@@ -221,7 +235,7 @@ pub async fn create_pkg_file(
 
     // Using OpenOptions to avoid the file getting truncated if it already exists
     // .create(true) preserves an existing file's contents.
-    let file = OpenOptions::default()
+    let file = download_file_options()
         .create(true)
         .read(true)
         .write(true)
@@ -460,6 +474,45 @@ mod tests {
 
         assert!(result.is_ok());
         assert!(outside_old.exists(), "a folder from outside the download folder was moved in");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn download_file_options_refuse_a_link() {
+        // A link swapped in after the containment check must not be followed (RPSN-0040).
+        let root = tempfile::tempdir().unwrap();
+        let outside = root.path().join("outside.txt");
+        std::fs::write(&outside, b"untouched").unwrap();
+        let link = root.path().join("x.pkg");
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+
+        let result = download_file_options().create(true).write(true).open(&link).await;
+
+        assert!(result.is_err(), "a link was opened for writing");
+        assert_eq!(std::fs::read(&outside).unwrap(), b"untouched");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn create_pkg_file_is_not_writable_by_group_or_others() {
+        use std::os::unix::fs::PermissionsExt;
+        // A loose umask must not leave a download writable by other users (RPSN-0037).
+        // SAFETY: umask only swaps the process file-mode mask; restored below.
+        let previous = unsafe { libc::umask(0o002) };
+        let root = tempfile::tempdir().unwrap();
+        let result = create_pkg_file(
+            root.path().to_path_buf(),
+            "BLUS31147",
+            "Title",
+            "x.pkg",
+            DirectoryFormat::SerialTitle,
+        )
+        .await;
+        unsafe { libc::umask(previous) };
+
+        let (_file, path) = result.unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o022, 0, "download created with mode {mode:o}");
     }
 
     #[cfg(feature = "egui")]

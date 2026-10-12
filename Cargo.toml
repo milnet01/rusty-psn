@@ -40,6 +40,10 @@ poll-promise = { version = "0.3.0", features = ["tokio"] }
 serde = { version = "1.0.229", default-features = false, features = ["derive"] }
 tokio = { version = "1.53.2", default-features = false, features = ["rt", "io-util", "macros", "fs", "sync", "process"] }
 
+[target.'cfg(unix)'.dependencies]
+# O_NOFOLLOW for download files (src/utils.rs, download_file_options).
+libc = "0.2.190"
+
 [dev-dependencies]
 
 [features]

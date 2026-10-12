@@ -3633,6 +3633,7 @@ dependencies = [
  "flexi_logger",
  "hex",
  "hmac",
+ "libc",
  "log",
  "notify-rust",
  "poll-promise",

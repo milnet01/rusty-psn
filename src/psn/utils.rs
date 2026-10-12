@@ -99,7 +99,7 @@ pub async fn copy_pkg_file(src_path: &PathBuf, target_path: &PathBuf, offset: u6
         .open(src_path)
         .await?;
 
-    let mut target_file = OpenOptions::default()
+    let mut target_file = crate::utils::download_file_options()
         .create(true)
         .read(false)
         .write(true)

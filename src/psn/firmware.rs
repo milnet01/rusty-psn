@@ -208,7 +208,13 @@ impl FirmwareInfo {
         info!("Downloading firmware from {}", self.download_url);
         let mut response = client.get(&self.download_url).send().await.map_err(DownloadError::Reqwest)?;
 
-        let mut file = tokio::fs::File::create(&output_path).await.map_err(DownloadError::Tokio)?;
+        let mut file = crate::utils::download_file_options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&output_path)
+            .await
+            .map_err(DownloadError::Tokio)?;
         let mut downloaded: u64 = 0;
 
         while let Some(chunk) = response.chunk().await.map_err(DownloadError::Reqwest)? {
