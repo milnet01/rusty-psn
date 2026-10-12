@@ -105,7 +105,7 @@ fn main() {
         // which can lead to network and io tasks being blocked when the application
         // is minimised or otherwise suspended by egui.
         // Tokio runtime is required for all async operations; no recovery possible without it.
-        let rt = Runtime::new().unwrap();
+        let rt = Runtime::new().expect("Failed to start the async runtime");
         let rt_handle = rt.handle().clone();
         let notify_main = Arc::new(Notify::new());
         let notify_thread = notify_main.clone();
@@ -126,10 +126,27 @@ fn main() {
             ..Default::default()
         };
 
+        // Every search and download needs this client, so a failure is reported here, once,
+        // rather than at the first click.
+        let psn_client = match psn::build_psn_client() {
+            Ok(client) => client,
+            Err(e) => {
+                log::error!("Failed to build HTTP client: {e}");
+                rfd::MessageDialog::new()
+                    .set_level(rfd::MessageLevel::Error)
+                    .set_title("rusty-psn")
+                    .set_description(format!("rusty-psn could not set up its network connection: {e}"))
+                    .show();
+                notify_main.notify_one();
+                let _ = rt_thread.join();
+                return;
+            }
+        };
+
         eframe::run_native(
             "rusty-psn",
             native_options,
-            Box::new(|cc| Ok(Box::new(egui::UpdatesApp::new(cc, rt_handle)))),
+            Box::new(|cc| Ok(Box::new(egui::UpdatesApp::new(cc, rt_handle, psn_client)))),
         )
         .expect("Failed to run egui app");
 

@@ -439,13 +439,7 @@ impl Default for VolatileData {
 
             egui_ctx: None,
 
-            psn_client: match crate::psn::build_psn_client() {
-                Ok(c) => Some(c),
-                Err(e) => {
-                    error!("Failed to build HTTP client: {e}");
-                    None
-                }
-            },
+            psn_client: None,
         }
     }
 }
@@ -540,7 +534,7 @@ impl eframe::App for UpdatesApp {
 }
 
 impl UpdatesApp {
-    pub fn new(cc: &eframe::CreationContext<'_>, rt_handle: Handle) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, rt_handle: Handle, psn_client: reqwest::Client) -> Self {
         let mut fonts = egui::FontDefinitions::default();
 
         fonts.font_data.insert(
@@ -577,6 +571,7 @@ impl UpdatesApp {
         };
 
         app.v.rt_handle = Some(rt_handle);
+        app.v.psn_client = Some(psn_client);
         app.v.egui_ctx = Some(cc.egui_ctx.clone());
 
         // Apply the persisted theme on startup.
@@ -934,7 +929,11 @@ impl UpdatesApp {
                 .expect("rt_handle set in UpdatesApp::new before any UI code runs")
                 .enter();
             let query = serial.clone();
-            let c = self.v.psn_client.clone().expect("psn_client built in VolatileData::default");
+            let c = self
+                .v
+                .psn_client
+                .clone()
+                .expect("psn_client set in UpdatesApp::new before any UI code runs");
             let promise = Promise::spawn_async(async move { UpdateInfo::get_info(query, &c).await });
             self.v.batch_search_active.push((serial, promise));
         }
@@ -1242,7 +1241,11 @@ impl UpdatesApp {
                         if ui.button("Check for Firmware").clicked() {
                             let console = consoles[self.v.firmware_console_idx];
                             let region = regions[self.v.firmware_region_idx];
-                            let client = self.v.psn_client.clone().expect("psn_client built in VolatileData::default");
+                            let client = self
+                                .v
+                                .psn_client
+                                .clone()
+                                .expect("psn_client set in UpdatesApp::new before any UI code runs");
                             let ctx_clone = ui.ctx().clone();
                             let _guard = self
                                 .v
@@ -1308,7 +1311,7 @@ impl UpdatesApp {
                     ui.separator();
                     ui.label(format!("Downloading: {}", dl.name));
 
-                    let status = dl.progress_status.lock().unwrap();
+                    let status = dl.progress_status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     let progress = status.progress;
                     let speed = status.speed_bps;
                     drop(status);
@@ -1363,7 +1366,11 @@ impl UpdatesApp {
         let async_status = status.clone();
         let ctx = self.v.egui_ctx.clone().unwrap_or_default();
 
-        let client = self.v.psn_client.clone().expect("psn_client built in VolatileData::default");
+        let client = self
+            .v
+            .psn_client
+            .clone()
+            .expect("psn_client set in UpdatesApp::new before any UI code runs");
         let _guard = self
             .v
             .rt_handle
@@ -1376,7 +1383,7 @@ impl UpdatesApp {
 
             let progress_fut = async {
                 while let Some(status_msg) = rx.recv().await {
-                    let mut locked = async_status.lock().unwrap();
+                    let mut locked = async_status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     if let DownloadStatus::Progress(bytes) = &status_msg {
                         locked.record_progress(*bytes, 1000);
                     }
@@ -1405,7 +1412,7 @@ impl UpdatesApp {
         // Handle firmware fetch promise.
         if let Some(ref promise) = self.v.firmware_fetch_promise {
             if promise.ready().is_some() {
-                let promise = self.v.firmware_fetch_promise.take().unwrap();
+                let promise = self.v.firmware_fetch_promise.take().expect("checked is_some above");
                 match promise.block_and_take() {
                     Ok(entries) => {
                         info!("Firmware fetch returned {} entries", entries.len());
@@ -1421,7 +1428,7 @@ impl UpdatesApp {
         // Handle firmware download promise.
         if let Some(ref dl) = self.v.firmware_download {
             if dl.promise.ready().is_some() {
-                let dl = self.v.firmware_download.take().unwrap();
+                let dl = self.v.firmware_download.take().expect("checked is_some above");
                 match dl.promise.block_and_take() {
                     Ok(()) => {
                         toasts.push((format!("{} downloaded successfully!", dl.name), ToastLevel::Success));
@@ -1470,7 +1477,7 @@ impl UpdatesApp {
 
         // Active downloads (with speed/progress data).
         for dl in &self.v.download_queue {
-            let status_guard = dl.progress_status.lock().unwrap();
+            let status_guard = dl.progress_status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             let status = match status_guard.last_received_status {
                 DownloadStatus::Resuming(offset) => {
                     ActiveDownloadStatus::Resuming(status_guard.progress as f32 / dl.size.max(1) as f32, offset)
@@ -1692,7 +1699,8 @@ impl UpdatesApp {
                                                         .color(egui::Rgba::from_rgb(1.0, 0.8, 0.0)),
                                                 );
                                             } else if has_rpcs3 && ui.small_button("Install").clicked() {
-                                                let exe = self.settings.rpcs3_executable.clone().unwrap();
+                                                let exe =
+                                                    self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
                                                 let pkg = patch.pkg_path.clone();
                                                 let key = patch_key.clone();
                                                 let rt = self
@@ -1734,7 +1742,8 @@ impl UpdatesApp {
                                                         .color(egui::Rgba::from_rgb(1.0, 0.8, 0.0)),
                                                 );
                                             } else if has_rpcs3 && ui.small_button("Install").clicked() {
-                                                let exe = self.settings.rpcs3_executable.clone().unwrap();
+                                                let exe =
+                                                    self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
                                                 let zip = dlc_item.zip_path.clone();
                                                 let key = dlc_key.clone();
                                                 // Resolve exdata directory from RPCS3 config
@@ -1861,7 +1870,11 @@ impl UpdatesApp {
         let cancel_signal = Arc::new(AtomicU8::new(CANCEL_NONE));
         let cancel_for_task = cancel_signal.clone();
 
-        let dl_client = self.v.psn_client.clone().expect("psn_client built in VolatileData::default");
+        let dl_client = self
+            .v
+            .psn_client
+            .clone()
+            .expect("psn_client set in UpdatesApp::new before any UI code runs");
         let _guard = self
             .v
             .rt_handle
@@ -1887,7 +1900,7 @@ impl UpdatesApp {
                     }
                     progress = rx.recv() => {
                         if let Some(progress_status) = progress {
-                            let mut guard = async_status.lock().unwrap();
+                            let mut guard = async_status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                             let download = guard.deref_mut();
                             if let DownloadStatus::Progress(progress) = progress_status {
                                 download.record_progress(progress, 500);
@@ -1945,7 +1958,7 @@ impl UpdatesApp {
                         return result
                     },
                     progress = rx.recv() => {
-                        let mut guard = async_status.lock().unwrap();
+                        let mut guard = async_status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                         let merge = guard.deref_mut();
                         if let Some(status) = progress {
                             if let MergeStatus::PartProgress(progress) = status {
@@ -2058,7 +2071,11 @@ impl UpdatesApp {
                     .enter();
                 let serial_query = self.v.serial_query.clone();
                 let ctx = ui.ctx().clone();
-                let c = self.v.psn_client.clone().expect("psn_client built in VolatileData::default");
+                let c = self
+                    .v
+                    .psn_client
+                    .clone()
+                    .expect("psn_client set in UpdatesApp::new before any UI code runs");
                 let promise = Promise::spawn_async(async move {
                     let result = UpdateInfo::get_info(serial_query, &c).await;
                     ctx.request_repaint();
@@ -3172,7 +3189,10 @@ impl UpdatesApp {
 
                         for download in &self.v.download_queue {
                             total_size += download.size;
-                            let status = download.progress_status.lock().unwrap();
+                            let status = download
+                                .progress_status
+                                .lock()
+                                .unwrap_or_else(std::sync::PoisonError::into_inner);
                             total_progress += status.progress;
                             total_speed += status.speed_bps;
                         }
@@ -3245,7 +3265,10 @@ impl UpdatesApp {
 
     fn title_merge_status(&self, update: &UpdateInfo) -> ActiveMergeStatus {
         if let Some(active_merge) = self.get_active_merge(&update.title_id) {
-            let merge = active_merge.progress_status.lock().unwrap();
+            let merge = active_merge
+                .progress_status
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let progress = merge.progress as f32 / update.packages.len() as f32;
             return ActiveMergeStatus::Merging(progress);
         } else if self.v.completed_merges.contains(&update.title_id) {
@@ -3268,7 +3291,10 @@ impl UpdatesApp {
         };
 
         if let Some(active_merge) = self.get_active_merge(title_id) {
-            let merge = active_merge.progress_status.lock().unwrap();
+            let merge = active_merge
+                .progress_status
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             if merge.progress < part_number {
                 return ActiveMergeStatus::Merging(0.0);
             } else {

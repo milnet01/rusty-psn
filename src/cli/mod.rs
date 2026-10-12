@@ -13,8 +13,19 @@ use crate::psn::*;
 use crate::utils::DirectoryFormat;
 use crate::Args;
 
+/// Read one line of the user's answer, trimmed. `None` when nothing could be read (end of
+/// input or a read error), so a caller never mistakes it for the empty answer, which means
+/// "everything" or "the default".
+fn read_answer(input: &mut impl std::io::BufRead) -> Option<String> {
+    let mut line = String::new();
+    match input.read_line(&mut line) {
+        Ok(n) if n > 0 => Some(line.trim().to_string()),
+        _ => None,
+    }
+}
+
 pub fn start_app(args: Args) {
-    let runtime = Runtime::new().unwrap();
+    let runtime = Runtime::new().expect("Failed to start the async runtime");
 
     let _guard = runtime.enter();
 
@@ -205,12 +216,11 @@ pub fn start_app(args: Args) {
         };
 
         if !silent_mode {
-            crossterm::execute!(
+            let _ = crossterm::execute!(
                 std::io::stdout(),
                 terminal::Clear(terminal::ClearType::All),
                 cursor::MoveTo(0, 0)
-            )
-            .unwrap();
+            );
 
             let total_size = {
                 let mut total = 0;
@@ -236,15 +246,19 @@ pub fn start_app(args: Args) {
             }
         }
 
-        let mut response = String::new();
         let mut updates_to_fetch = Vec::new();
 
         if !silent_mode {
             info!("Querying user for wanted updates for {}", update.title_id);
             println!("\nEnter the updates you want to download, separated by a space (ie: 1 3 4 5). An empty input will download all updates.");
 
-            std::io::stdin().read_line(&mut response).unwrap();
-            response = response.trim().to_string();
+            let response = match read_answer(&mut std::io::stdin().lock()) {
+                Some(answer) => answer,
+                None => {
+                    println!("No answer read; skipping {}.", update.title_id);
+                    continue;
+                }
+            };
 
             info!("User input was '{}'", response);
 
@@ -282,12 +296,11 @@ pub fn start_app(args: Args) {
 
             info!("Downloading updates {updates}");
 
-            crossterm::execute!(
+            let _ = crossterm::execute!(
                 std::io::stdout(),
                 terminal::Clear(terminal::ClearType::All),
                 cursor::MoveTo(0, 0)
-            )
-            .unwrap();
+            );
             println!("{} {} - Downloading update(s): {}", update.title_id, title, updates);
         }
 
@@ -322,7 +335,7 @@ pub fn start_app(args: Args) {
                 let mut should_retry = false;
                 let mut downloaded_file: Option<PathBuf> = None;
 
-                crossterm::execute!(stdout, cursor::SavePosition).unwrap();
+                let _ = crossterm::execute!(stdout, cursor::SavePosition);
 
                 loop {
                     match promise.ready() {
@@ -392,72 +405,67 @@ pub fn start_app(args: Args) {
                                         downloaded += bytes;
 
                                         if !silent_mode {
-                                            crossterm::execute!(
+                                            let _ = crossterm::execute!(
                                                 stdout,
                                                 cursor::RestorePosition,
                                                 terminal::Clear(terminal::ClearType::CurrentLine),
                                                 cursor::SavePosition
-                                            )
-                                            .unwrap();
+                                            );
                                             print!(
                                                 "        {} - {title} | {} / {}",
                                                 pkg.id(),
                                                 ByteSize::b(downloaded),
                                                 ByteSize::b(pkg.size)
                                             );
-                                            stdout.flush().unwrap();
+                                            let _ = stdout.flush();
                                         }
                                     }
                                     DownloadStatus::Resuming(offset) => {
                                         if !silent_mode {
-                                            crossterm::execute!(
+                                            let _ = crossterm::execute!(
                                                 stdout,
                                                 cursor::RestorePosition,
                                                 terminal::Clear(terminal::ClearType::CurrentLine),
                                                 cursor::SavePosition
-                                            )
-                                            .unwrap();
+                                            );
                                             print!("        {} - {title} | Resuming from {}...", pkg.id(), ByteSize::b(offset));
-                                            stdout.flush().unwrap();
+                                            let _ = stdout.flush();
                                         }
                                     }
                                     DownloadStatus::Verifying => {
                                         if !silent_mode {
-                                            crossterm::execute!(
+                                            let _ = crossterm::execute!(
                                                 stdout,
                                                 cursor::RestorePosition,
                                                 terminal::Clear(terminal::ClearType::CurrentLine),
                                                 cursor::SavePosition
-                                            )
-                                            .unwrap();
+                                            );
                                             print!("        {} - {title} | Verifying checksum... ", pkg.id());
-                                            stdout.flush().unwrap();
+                                            let _ = stdout.flush();
                                         }
                                     }
                                     DownloadStatus::DownloadSuccess => {
                                         if !silent_mode {
-                                            crossterm::execute!(
+                                            let _ = crossterm::execute!(
                                                 stdout,
                                                 cursor::RestorePosition,
                                                 terminal::Clear(terminal::ClearType::CurrentLine),
                                                 cursor::SavePosition
-                                            )
-                                            .unwrap();
+                                            );
                                             println!("        {} - {title} | Download completed successfully. ", pkg.id());
-                                            stdout.flush().unwrap();
+                                            let _ = stdout.flush();
                                         }
                                     }
                                     DownloadStatus::DownloadFailure => {
                                         if !silent_mode {
-                                            crossterm::execute!(
+                                            let _ = crossterm::execute!(
                                                 stdout,
                                                 cursor::RestorePosition,
                                                 terminal::Clear(terminal::ClearType::CurrentLine),
                                                 cursor::SavePosition
-                                            )
-                                            .unwrap();
+                                            );
                                             println!("        {} - {title} | Download failed. ", pkg.id());
-                                            stdout.flush().unwrap();
+                                            let _ = stdout.flush();
                                         }
                                     }
                                 }
@@ -499,12 +507,11 @@ pub fn start_app(args: Args) {
         std::thread::sleep(std::time::Duration::from_secs(3));
 
         if !silent_mode {
-            crossterm::execute!(
+            let _ = crossterm::execute!(
                 std::io::stdout(),
                 terminal::Clear(terminal::ClearType::All),
                 cursor::MoveTo(0, 0)
-            )
-            .unwrap();
+            );
         }
     }
 }
@@ -588,9 +595,14 @@ async fn download_firmware_cli(
             .or(entries.first())
     } else {
         println!("\nEnter the number to download (empty for first Full firmware):");
-        let mut response = String::new();
-        std::io::stdin().read_line(&mut response).unwrap();
-        let response = response.trim();
+        let response = match read_answer(&mut std::io::stdin().lock()) {
+            Some(answer) => answer,
+            None => {
+                println!("No answer read; nothing downloaded.");
+                return;
+            }
+        };
+        let response = response.as_str();
         if response.is_empty() {
             entries
                 .iter()
@@ -632,7 +644,7 @@ async fn download_firmware_cli(
     let mut downloaded = 0u64;
     let total_size = fw.size.unwrap_or(0);
 
-    crossterm::execute!(stdout, cursor::SavePosition).unwrap();
+    let _ = crossterm::execute!(stdout, cursor::SavePosition);
 
     loop {
         match promise.ready() {
@@ -651,19 +663,18 @@ async fn download_firmware_cli(
                         DownloadStatus::Progress(bytes) => {
                             downloaded += bytes;
                             if !silent {
-                                crossterm::execute!(
+                                let _ = crossterm::execute!(
                                     stdout,
                                     cursor::RestorePosition,
                                     terminal::Clear(terminal::ClearType::CurrentLine),
                                     cursor::SavePosition
-                                )
-                                .unwrap();
+                                );
                                 if total_size > 0 {
                                     print!("  {} / {}", ByteSize::b(downloaded), ByteSize::b(total_size));
                                 } else {
                                     print!("  {} downloaded", ByteSize::b(downloaded));
                                 }
-                                stdout.flush().unwrap();
+                                let _ = stdout.flush();
                             }
                         }
                         DownloadStatus::DownloadSuccess => {
@@ -699,6 +710,18 @@ fn parse_update_selection(input: &str, count: usize) -> Option<Vec<usize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn read_answer_end_of_input_is_no_answer() {
+        // End of input must not read as the empty answer, which downloads everything (RPSN-0039).
+        assert_eq!(read_answer(&mut std::io::Cursor::new("")), None);
+    }
+
+    #[test]
+    fn read_answer_trims_a_line() {
+        assert_eq!(read_answer(&mut std::io::Cursor::new("1 3\n")), Some("1 3".to_string()));
+        assert_eq!(read_answer(&mut std::io::Cursor::new("\n")), Some(String::new()));
+    }
 
     #[test]
     fn update_selection_empty_means_all() {
