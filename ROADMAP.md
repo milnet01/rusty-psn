@@ -808,6 +808,10 @@ Lower priority items that would improve the overall experience.
   pre-upgrade build, and demoreel types fine into xterm, so not a
   regression), and rfd's folder dialog goes to the real desktop through
   the portal. Both left for the owner to try by hand.
+  Follow-up (2026-10-12): the website session asked for a wordmark (not
+  a square logo) and a better shot 3; both delivered and published by
+  that session. It asks to be messaged when there is a public repo and a
+  first release, so the page can switch to downloads.
   **Layman:** Give the website what it needs for the Rusty PSN page: credits, licence, a logo, corrected text, facts and screenshots.
   Kind: marketing.
   Source: ants-projects-hub-website session request 2026-10-12 (user asked it).
@@ -1106,8 +1110,14 @@ not fixed in that session. The Critical and High findings were fixed in commit
 981f8ff. Each item names its file and line as of that commit and the remedy the
 reviewer proposed; check both against the code before fixing.
 
-- 📋 [RPSN-0098] **Resolve the DLC licence folder through vfs.yml, and refuse when no RPCS3 folder is set.**
+- ✅ [RPSN-0098] **Resolve the DLC licence folder through vfs.yml, and refuse when no RPCS3 folder is set.**
   src/egui/mod.rs:1731 builds exdata as config_dir/dev_hdd0/home/00000001/exdata, ignoring the dev_hdd0 path vfs.yml sets (used at :1009-1020). With no config dir the fallback is an empty path, so the .rap is copied into the current folder. Remedy: resolve through the same vfs logic; refuse when the config dir is unset.
+  Progress (2026-10-12, 5474e04): resolve_dev_hdd0 added and used at all
+  four sites; DLC Install needs the config folder. Not yet tried by hand
+  in the window app; flip shipped after that or on the next session's
+  review.
+  Resolved (2026-10-12, 5474e04); the window-app DLC install is still
+  untried by hand.
   **Layman:** DLC licence files can land in the wrong folder.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lanes 1+4 MEDIUM.
