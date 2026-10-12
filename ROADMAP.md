@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=126 -->
+<!-- ants-roadmap-id-high-water: RPSN=128 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -745,6 +745,33 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
+- 📋 [RPSN-0127] **Deliver the material for the Rusty PSN page on antsprojectshub.co.za.**
+  Requested 2026-10-12 by the ants-projects-hub-website session, on the
+  user's behalf. Deliver into ~/.local/share/claude-handoff/rusty-psn-site-page/,
+  then message that session (ants-projects-hub-website). Never edit the
+  website repo: every push there publishes the live site. Current page
+  text, read-only: /mnt/Games/Scripts/Linux/Ants_Projects_Hub_Website/src/about/rusty-psn.md
+  1. Credit: which parts are RainbowCookie32's (upstream author) and which
+     are ours; the downloading itself is theirs. One or two sentences.
+  2. Licence: confirm the upstream licence file and copyright notice are
+     kept; name the files.
+  3. Logo: ORIGINAL SVG, square, readable at 64 px, works on a dark
+     background, plus a matching app icon if the app ships one (see
+     section 10). No upstream branding without permission.
+  4. About review: corrections to the current text, plain language, no
+     version numbers.
+  5. Facts: repo is "private for now" (no fork yet, RPSN-0096); platforms
+     that really build; what must happen before a first release.
+  6. Screenshots: 2-4 PNGs of the window (an update list, a download in
+     progress), one-line caption each, made-up or public serial only.
+     Taking them also gives the eframe 0.36 build its first hand test
+     (RPSN-0125's open item): open the Settings folder dialog too.
+  Trailer footage may be asked for after a release; not now.
+  **Layman:** Give the website what it needs for the Rusty PSN page: credits, licence, a logo, corrected text, facts and screenshots.
+  Kind: marketing.
+  Source: ants-projects-hub-website session request 2026-10-12 (user asked it).
+  Lanes: Docs.
+
 ## 10. Custom Application Icon [P2]
 
 Create a unique, recognizable icon for rusty-psn that displays in the taskbar/task manager and on the compiled binary.
@@ -842,6 +869,19 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   Kind: fix.
   Source: in-session-2026-10-12.
   Lanes: Security.
+
+- 📋 [RPSN-0128] **Point the outer rusty-psn folder at rusty-psn-source once Ants Terminal ships ANTS-5667.**
+  The tab opens in /mnt/Games/Scripts/Linux/rusty-psn, one level above the
+  repo, so the Roadmap button and MCP verbs find nothing there. Ants
+  Terminal's fix (ANTS-5667) adds a key to the OUTER folder's
+  .ants/project.json, proposed as { "repo_root": "rusty-psn-source" }.
+  Blocked: do NOT write the key until the ants-terminal session messages
+  that its name is final (its spec was under review on 2026-10-12). Then
+  set it with project_settings, never by hand, from the outer folder.
+  Workaround until then: open the tab in rusty-psn-source.
+  **Layman:** Let the terminal tab find this project's roadmap from the folder it opens in.
+  Kind: chore.
+  Source: ants-terminal session message 2026-10-12 (ANTS-5664, ANTS-5667).
 
 ## 12. Design follow-ups
 
