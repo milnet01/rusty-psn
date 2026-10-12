@@ -358,7 +358,7 @@ impl PackageInfo {
         client: &reqwest::Client,
     ) -> Result<PathBuf, DownloadError> {
         info!("Starting download for {serial} {}", self.version);
-        info!("Sending pkg file request to url: {}", &self.url);
+        info!("Sending pkg file request to url: {}", self.url);
 
         // Validate download URL before making the request (URL comes from Sony's XML response).
         crate::security::validate_download_url(&self.url).map_err(DownloadError::Security)?;

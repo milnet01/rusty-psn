@@ -230,7 +230,7 @@ pub fn start_app(args: Args) {
                 "[{}] {} - {} - {} update(s) ({})",
                 update.platform_variant,
                 update.title_id,
-                &title,
+                title,
                 update.packages.len(),
                 total_size
             );
@@ -675,10 +675,8 @@ async fn download_firmware_cli(
                                 println!("\n  Download completed successfully.");
                             }
                         }
-                        DownloadStatus::DownloadFailure => {
-                            if !silent {
-                                println!("\n  Download failed.");
-                            }
+                        DownloadStatus::DownloadFailure if !silent => {
+                            println!("\n  Download failed.");
                         }
                         _ => {}
                     }

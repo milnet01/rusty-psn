@@ -200,19 +200,19 @@ impl AppTheme {
 
                 // Selection and interaction.
                 visuals.selection.bg_fill = ps_blue;
-                visuals.selection.stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
+                visuals.selection.stroke = egui::Stroke::new(1.0_f32, egui::Color32::WHITE);
                 visuals.widgets.hovered.bg_fill = ps_blue_dim;
                 visuals.widgets.active.bg_fill = ps_blue;
                 visuals.hyperlink_color = ps_blue;
 
                 // Non-interactive widgets (progress bars, labels).
                 visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(28, 32, 45);
-                visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 45, 60));
+                visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(40, 45, 60));
 
                 // Inactive widgets (buttons at rest).
                 visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(30, 35, 50);
-                visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, ps_blue_faint);
-                visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(200, 210, 230));
+                visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0_f32, ps_blue_faint);
+                visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(200, 210, 230));
 
                 // Open widgets (combo boxes, menus).
                 visuals.widgets.open.bg_fill = ps_blue_dim;
@@ -223,7 +223,7 @@ impl AppTheme {
                 visuals.extreme_bg_color = egui::Color32::from_rgb(12, 14, 20);
 
                 // Window border with subtle blue.
-                visuals.window_stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 50, 75));
+                visuals.window_stroke = egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(40, 50, 75));
 
                 ctx.set_visuals(visuals);
             }
@@ -671,13 +671,13 @@ impl UpdatesApp {
 
                 match r {
                     Ok(path) => {
-                        info!("Download completed! ({} {})", &download.title_id, &download.pkg_id);
+                        info!("Download completed! ({} {})", download.title_id, download.pkg_id);
                         self.v
                             .completed_paths
                             .insert((download.title_id.clone(), download.pkg_id.clone()), path.clone());
 
                         toasts.push((
-                            format!("{} v{} downloaded successfully!", &download.title_id, &download.pkg_id),
+                            format!("{} v{} downloaded successfully!", download.title_id, download.pkg_id),
                             ToastLevel::Success,
                         ));
                         self.v
@@ -847,9 +847,9 @@ impl UpdatesApp {
             if let Some(result) = merge.promise.ready() {
                 match result {
                     Ok(_) => {
-                        info!("Merge completed for {}", &merge.title_id);
+                        info!("Merge completed for {}", merge.title_id);
 
-                        toasts.push((format!("{} merged successfully!", &merge.title_id), ToastLevel::Success));
+                        toasts.push((format!("{} merged successfully!", merge.title_id), ToastLevel::Success));
                         self.v.completed_merges.push(merge.title_id.clone());
                     }
                     Err(e) => {

@@ -204,7 +204,7 @@ impl FirmwareInfo {
             }
         }
 
-        info!("Downloading firmware from {}", &self.download_url);
+        info!("Downloading firmware from {}", self.download_url);
         let mut response = client.get(&self.download_url).send().await.map_err(DownloadError::Reqwest)?;
 
         let mut file = tokio::fs::File::create(&output_path).await.map_err(DownloadError::Tokio)?;
