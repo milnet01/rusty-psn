@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=124 -->
+<!-- ants-roadmap-id-high-water: RPSN=126 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1094,8 +1094,13 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM.
   Lanes: Entry.
 
-- 📋 [RPSN-0109] **Make the local gate match CI: add the cli build legs and fix its header.**
+- ✅ [RPSN-0109] **Make the local gate match CI: add the cli build legs and fix its header.**
   scripts/local-ci.sh:4-11 says .github/workflows/ci.yml calls it; no such file exists and the workflows restate their own steps. The gate never builds --no-default-features --features cli, where clippy failed until 981f8ff. Remedy: add clippy, build and test for the cli feature; correct the header.
+  Resolved 2026-10-12: scripts/local-ci.sh runs the workflows' own Linux
+  commands (nightly rustfmt, clippy per feature, release build per
+  feature) and names the Windows and macOS legs as not run. Needs the
+  nightly toolchain with rustfmt (installed on this machine 2026-10-12).
+  Full run green: 69 + 70 tests.
   **Layman:** The local checks miss problems that CI's command-line build catches.
   Kind: chore.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM + check-code.
@@ -1204,4 +1209,23 @@ reviewer proposed; check both against the code before fixing.
   **Layman:** A diagram describes the old download steps.
   Kind: doc-fix.
   Source: audit-2026-10-12 close-findings sweep.
+  Lanes: Docs.
+
+- 📋 [RPSN-0125] **Upgrade every dependency and workflow action to its latest version, clearing the RustSec advisories.**
+  Owner rule 2026-10-12: every dependency at its latest version; an older one only where a newer one is shown to break a feature, documented with the breaking version (see the standard item below).
+  cargo audit 2026-10-12 (local DB, --no-fetch): 12 vulnerabilities, 7 warnings. Advisories: quick-xml 0.37.5/0.38.4/0.39.2 RUSTSEC-2026-0194, -0195 (fixed >=0.41.0; 0.37.5 via notify-rust); rustls 0.23.37 RUSTSEC-2026-0285 (>=0.23.45); rustls-webpki 0.103.10 RUSTSEC-2026-0098, -0099, -0104 (>=0.103.13); quinn-proto 0.11.14 RUSTSEC-2026-0185 (>=0.11.15); webbrowser 1.2.0 RUSTSEC-2026-0257 (>=1.2.2). Warnings: unsafe-libyaml (unmaintained, via serde_yaml_ng), rand 0.9.2, paste, ttf-parser, anyhow, event-listener, memmap2.
+  Behind latest (resolved -> latest): dirs 6->7, sha1 0.10->0.11, hmac 0.12->0.13, sha2 0.10->0.11, zip 2.4->9.0, reqwest 0.12->0.13, rfd 0.15->0.17, eframe 0.32->0.36, egui-notify 0.20->0.23, notify-rust 4.12->4.18, tokio 1.50->1.53, plus patch bumps.
+  Actions (latest release): actions/checkout v7.0.1, Swatinem/rust-cache v2.9.2, actions/upload-artifact v7.0.2, dawidd6/action-download-artifact v27, softprops/action-gh-release v3.0.3, c-hive/gha-remove-artifacts v1.8.0, mbrobbel/rustfmt-check 0.23.0. Workflows are upstream's; decide with RPSN-0096 and RPSN-0122.
+  Re-run check-dependencies first; these figures are a dated snapshot.
+  **Layman:** Bring every library the app uses up to date, including several with known security problems.
+  Kind: security.
+  Source: user-request-2026-10-12; cargo audit via pressless session 2026-10-12.
+  Lanes: Build, PSN, Content.
+
+- 📋 [RPSN-0126] **Write the dependency-version rule as a standard, with a record of versions known to break.**
+  Owner rule 2026-10-12: always the latest version, for features and security. An older version only when no other way exists and a newer one explicitly breaks a feature; then record which version breaks what, so a later release can be re-tested and the pin lifted.
+  First read ~/.claude/standards/dependencies.md: if the machine-wide standard already says this, apply it here; if not, the change belongs to the ~/.claude (claude-config) session, and a project override goes in docs/standards/. A new or changed standard takes CLAUDE.md rule 14's review-contract gate.
+  **Layman:** Write down the rule that libraries stay up to date, and keep a list of versions that broke something.
+  Kind: doc.
+  Source: user-request-2026-10-12.
   Lanes: Docs.
