@@ -1123,8 +1123,13 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lanes 1+4 MEDIUM.
   Lanes: Window app, Content.
 
-- 📋 [RPSN-0099] **Append a new batch search to a running one instead of replacing it.**
+- ✅ [RPSN-0099] **Append a new batch search to a running one instead of replacing it.**
   src/egui/mod.rs:983-986 and :1063-1067 assign batch_search_queue while a batch runs: queued serials are dropped, and in-flight results can make errors exceed the total, so batch_search_total - errors at :941 underflows. Remedy: append to the batch; use saturating_sub.
+  Resolved 2026-10-12: both batch sources (batch file, RPCS3 scan) now call
+  VolatileData::enqueue_batch_search in src/egui/search.rs, which appends
+  to a running batch and starts fresh counts only after one has finished.
+  The summary uses saturating_sub. Test:
+  second_batch_joins_a_running_one.
   **Layman:** Starting a second batch search can lose game IDs or crash a debug build.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 1 MEDIUM.

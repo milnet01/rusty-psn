@@ -47,19 +47,7 @@ impl UpdatesApp {
                 info!("RPCS3 scan found {count} installed games");
 
                 // Feed all serials into the batch search queue for PSN update checking.
-                let serials: Vec<String> = games
-                    .iter()
-                    .map(|g| g.serial.clone())
-                    .filter(|s| !self.v.update_results.iter().any(|u| u.title_id == *s))
-                    .filter(|s| !self.v.batch_search_queue.iter().any(|q| q == s))
-                    .filter(|s| !self.v.batch_search_active.iter().any(|(id, _)| id == s))
-                    .collect();
-
-                let search_count = serials.len();
-                self.v.batch_search_total = search_count;
-                self.v.batch_search_completed = 0;
-                self.v.batch_search_errors.clear();
-                self.v.batch_search_queue = serials.into();
+                let search_count = self.v.enqueue_batch_search(games.iter().map(|g| g.serial.clone()));
 
                 self.v.rpcs3_installed_games = games;
                 self.v.show_rpcs3_library_window = true;

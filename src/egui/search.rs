@@ -2,6 +2,29 @@
 
 use super::*;
 
+impl VolatileData {
+    /// Queues serials for a batch search, skipping any already found, queued or being searched.
+    /// A batch already running grows by the new serials rather than being replaced. Returns how many were queued.
+    pub(super) fn enqueue_batch_search(&mut self, serials: impl IntoIterator<Item = String>) -> usize {
+        let new_serials: Vec<String> = serials
+            .into_iter()
+            .filter(|s| !self.update_results.iter().any(|u| u.title_id == *s))
+            .filter(|s| !self.batch_search_queue.iter().any(|q| q == s))
+            .filter(|s| !self.batch_search_active.iter().any(|(id, _)| id == s))
+            .collect();
+
+        // A finished batch leaves its total at 0 (see handle_batch_search_queue), so start counting afresh.
+        if self.batch_search_total == 0 {
+            self.batch_search_completed = 0;
+            self.batch_search_errors.clear();
+        }
+        let queued = new_serials.len();
+        self.batch_search_total += queued;
+        self.batch_search_queue.extend(new_serials);
+        queued
+    }
+}
+
 impl UpdatesApp {
     pub(super) fn handle_search_promise(&mut self, toasts: &mut Vec<(String, ToastLevel)>) -> Option<()> {
         let is_ready = {
@@ -139,7 +162,7 @@ impl UpdatesApp {
             && self.v.batch_search_queue.is_empty()
         {
             let errors = self.v.batch_search_errors.len();
-            let found = self.v.batch_search_total - errors;
+            let found = self.v.batch_search_total.saturating_sub(errors);
             let msg = if errors > 0 {
                 format!("Batch search complete: {found} found, {errors} failed.")
             } else {
@@ -167,27 +190,15 @@ impl UpdatesApp {
                     );
                 }
 
-                // Filter out serials already in results or already queued.
-                let new_serials: Vec<String> = result
-                    .serials
-                    .into_iter()
-                    .filter(|s| !self.v.update_results.iter().any(|u| u.title_id == *s))
-                    .filter(|s| !self.v.batch_search_queue.iter().any(|q| q == s))
-                    .filter(|s| !self.v.batch_search_active.iter().any(|(id, _)| id == s))
-                    .collect();
+                let queued = self.v.enqueue_batch_search(result.serials);
 
-                if new_serials.is_empty() {
+                if queued == 0 {
                     self.show_notifications("All serials from the batch file are already loaded.", ToastLevel::Info);
                     return;
                 }
 
-                self.v.batch_search_total = new_serials.len();
-                self.v.batch_search_completed = 0;
-                self.v.batch_search_errors.clear();
-                self.v.batch_search_queue = new_serials.into();
-
                 self.show_notifications(
-                    format!("Batch import: {} serial(s) queued for search.", self.v.batch_search_total),
+                    format!("Batch import: {queued} serial(s) queued for search."),
                     ToastLevel::Info,
                 );
             }
@@ -359,5 +370,28 @@ impl UpdatesApp {
                 open_folder(&self.settings.pkg_download_path);
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn second_batch_joins_a_running_one() {
+        // A second batch used to replace the first, dropping its queued serials (RPSN-0099).
+        let mut v = VolatileData::default();
+        assert_eq!(v.enqueue_batch_search(["BLES00001".to_string(), "BLES00002".to_string()]), 2);
+
+        // The first serial finishes with an error while the second is still queued.
+        let first = v.batch_search_queue.pop_front().expect("two serials were queued");
+        v.batch_search_completed += 1;
+        v.batch_search_errors.push((first, "no updates available".to_string()));
+
+        assert_eq!(v.enqueue_batch_search(["BLES00003".to_string()]), 1);
+        assert_eq!(v.batch_search_queue, ["BLES00002", "BLES00003"]);
+        assert_eq!(v.batch_search_total, 3);
+        assert_eq!(v.batch_search_completed, 1);
+        assert_eq!(v.batch_search_errors.len(), 1);
     }
 }
