@@ -106,6 +106,16 @@ pub enum DownloadError {
     },
 }
 
+impl From<crate::utils::FileError> for DownloadError {
+    fn from(e: crate::utils::FileError) -> Self {
+        match e {
+            crate::utils::FileError::Io(e) => DownloadError::Tokio(e),
+            crate::utils::FileError::Security(e) => DownloadError::Security(e),
+            crate::utils::FileError::TooShort => DownloadError::HashMismatch(true),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum UpdateError {
     InvalidSerial,

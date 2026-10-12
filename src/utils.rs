@@ -9,8 +9,6 @@ use tokio::fs::{File, OpenOptions};
 
 use tokio::io::{self, AsyncSeekExt, SeekFrom};
 
-use crate::psn::DownloadError;
-
 /// Controls how download directories are organized on disk.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum DirectoryFormat {
@@ -57,6 +55,16 @@ const WINDOWS_RESERVED: &[&str] = &[
     "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3",
     "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 ];
+
+/// Why a Files operation failed. PSN turns it into its own `DownloadError`, so the dependency
+/// runs one way: PSN uses Files, Files does not use PSN.
+#[derive(Debug)]
+pub enum FileError {
+    Io(io::Error),
+    Security(crate::security::SecurityError),
+    /// The file is shorter than the hash suffix it must carry.
+    TooShort,
+}
 
 /// Maximum length for sanitized directory names (in characters).
 /// Keeps well within the 255-byte filesystem limit while leaving room for serial prefixes.
@@ -138,10 +146,10 @@ async fn migrate_existing_dir(
     serial: &str,
     title: &str,
     format: DirectoryFormat,
-) -> Result<PathBuf, DownloadError> {
+) -> Result<PathBuf, FileError> {
     let target = create_pkg_path(&download_path, serial, title, format);
 
-    crate::security::validate_path_containment(&target, download_path).map_err(DownloadError::Security)?;
+    crate::security::validate_path_containment(&target, download_path).map_err(FileError::Security)?;
 
     if target.exists() {
         return Ok(target);
@@ -203,7 +211,7 @@ pub async fn create_pkg_file(
     title: &str,
     pkg_name: &str,
     format: DirectoryFormat,
-) -> Result<(File, PathBuf), DownloadError> {
+) -> Result<(File, PathBuf), FileError> {
     let mut target_path = match migrate_existing_dir(&download_path, serial, title, format).await {
         Ok(path) => path,
         Err(e) => {
@@ -218,7 +226,7 @@ pub async fn create_pkg_file(
     // Validate the target path stays within the download directory.
     if let Err(e) = crate::security::validate_path_containment(&target_path, &download_path) {
         error!("Path containment check failed: {e}");
-        return Err(DownloadError::Security(e));
+        return Err(FileError::Security(e));
     }
 
     if let Some(parent) = target_path.parent() {
@@ -226,11 +234,11 @@ pub async fn create_pkg_file(
             Ok(_) => info!("Created directory for updates"),
             Err(e) => match e.kind() {
                 io::ErrorKind::AlreadyExists => {}
-                _ => return Err(DownloadError::Tokio(e)),
+                _ => return Err(FileError::Io(e)),
             },
         }
     } else {
-        return Err(DownloadError::Tokio(io::Error::other("Target path has no parent directory")));
+        return Err(FileError::Io(io::Error::other("Target path has no parent directory")));
     }
 
     // Using OpenOptions to avoid the file getting truncated if it already exists
@@ -241,7 +249,7 @@ pub async fn create_pkg_file(
         .write(true)
         .open(&target_path)
         .await
-        .map_err(DownloadError::Tokio)?;
+        .map_err(FileError::Io)?;
 
     Ok((file, target_path))
 }
@@ -356,43 +364,41 @@ const CHUNK_SIZE: usize = 1024 * 1024 * 128;
 
 /// Verify a downloaded file's SHA1 hash. Runs the CPU-intensive hashing on the
 /// tokio blocking thread pool so it doesn't starve async I/O tasks.
-pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Result<bool, DownloadError> {
+pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Result<bool, FileError> {
     // Last 0x20 bytes are the SHA1 hash for PS3 updates. PS4 updates don't include hash suffix.
     let suffix_size: u64 = if hash_whole_file { 0 } else { 0x20 };
 
     // If the file size is below the length of the embedded sha1-hash suffix,
     // don't bother hashing the contents. Download's borked.
-    let file_length = file.metadata().await.map_err(DownloadError::Tokio)?.len();
+    let file_length = file.metadata().await.map_err(FileError::Io)?.len();
     if file_length <= suffix_size {
         return Ok(false);
     }
 
     // Reset seek pointer so we read from the start.
-    file.seek(SeekFrom::Start(0)).await.map_err(DownloadError::Tokio)?;
+    file.seek(SeekFrom::Start(0)).await.map_err(FileError::Io)?;
 
     // Clone the handle and convert to a std::fs::File for blocking I/O.
-    let std_file = file.try_clone().await.map_err(DownloadError::Tokio)?.into_std().await;
+    let std_file = file.try_clone().await.map_err(FileError::Io)?.into_std().await;
     let hash_owned = hash.to_string();
 
     tokio::task::spawn_blocking(move || hash_file_blocking(std_file, &hash_owned, file_length, suffix_size))
         .await
-        .map_err(|e| DownloadError::Tokio(std::io::Error::other(format!("hash task panicked: {e}"))))?
+        .map_err(|e| FileError::Io(std::io::Error::other(format!("hash task panicked: {e}"))))?
 }
 
 /// Synchronous SHA1 hashing, designed to run inside `spawn_blocking`.
-fn hash_file_blocking(file: std::fs::File, hash: &str, file_length: u64, suffix_size: u64) -> Result<bool, DownloadError> {
+fn hash_file_blocking(file: std::fs::File, hash: &str, file_length: u64, suffix_size: u64) -> Result<bool, FileError> {
     use std::io::{BufRead, BufReader};
 
     let mut hasher = Sha1::new();
 
-    let file_length_without_suffix: usize = (file_length - suffix_size)
-        .try_into()
-        .map_err(|_| DownloadError::HashMismatch(true))?;
+    let file_length_without_suffix: usize = (file_length - suffix_size).try_into().map_err(|_| FileError::TooShort)?;
 
     let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
     let mut processed_length = 0;
     loop {
-        let chunk_buffer = reader.fill_buf().map_err(DownloadError::Tokio)?;
+        let chunk_buffer = reader.fill_buf().map_err(FileError::Io)?;
         let chunk_length = chunk_buffer.len();
         if chunk_length == 0 {
             break;
@@ -406,7 +412,7 @@ fn hash_file_blocking(file: std::fs::File, hash: &str, file_length: u64, suffix_
         let hashable_buffer = if suffix_part_in_chunk {
             let last_before_suffix = file_length_without_suffix
                 .checked_sub(previously_processed_length)
-                .ok_or_else(|| DownloadError::HashMismatch(true))?;
+                .ok_or(FileError::TooShort)?;
             &chunk_buffer[..last_before_suffix]
         } else {
             chunk_buffer
@@ -454,7 +460,7 @@ mod tests {
 
         let result = create_pkg_file(download_path, "../escape", "Title", "x.pkg", DirectoryFormat::SerialTitle).await;
 
-        assert!(matches!(result, Err(DownloadError::Security(_))));
+        assert!(matches!(result, Err(FileError::Security(_))));
         assert!(outside_old.exists(), "the folder outside the download folder was moved");
         assert!(!root.path().join("escape - Title").exists());
     }

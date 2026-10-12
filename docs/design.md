@@ -41,10 +41,8 @@ on 2026-10-12. The signs it places are in `docs/discovery.md`.
 - **Security uses no other part.** It is the base every check rests on.
 - **Files** may use Security.
 
-**One known exception: Files uses PSN** (it returns PSN's `DownloadError`),
-while PSN uses Files. The two depend on each other. It is allowed until
-the roadmap item that untangles it ships. **No new two-way dependency may be
-added.**
+**No two-way dependency may be added.** Files has its own error type
+(`FileError`), which PSN converts into its `DownloadError`.
 
 **Frontend-only code.** PSN and Files already hold some code compiled only
 for the window app (`#[cfg(feature = "egui")]`). That code may stay, and a
@@ -112,8 +110,7 @@ sets for a second reason to change.
 
 ## Close calls
 
-None recorded as an ADR yet. The two-way dependency above is a known
-exception rather than a decision, and its roadmap item closes it.
+None recorded as an ADR yet.
 
 ## Cold-eyes loop log
 
