@@ -1211,12 +1211,22 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 close-findings sweep.
   Lanes: Docs.
 
-- 📋 [RPSN-0125] **Upgrade every dependency and workflow action to its latest version, clearing the RustSec advisories.**
+- ✅ [RPSN-0125] **Upgrade every dependency and workflow action to its latest version, clearing the RustSec advisories.**
   Owner rule 2026-10-12: every dependency at its latest version; an older one only where a newer one is shown to break a feature, documented with the breaking version (see the standard item below).
   cargo audit 2026-10-12 (local DB, --no-fetch): 12 vulnerabilities, 7 warnings. Advisories: quick-xml 0.37.5/0.38.4/0.39.2 RUSTSEC-2026-0194, -0195 (fixed >=0.41.0; 0.37.5 via notify-rust); rustls 0.23.37 RUSTSEC-2026-0285 (>=0.23.45); rustls-webpki 0.103.10 RUSTSEC-2026-0098, -0099, -0104 (>=0.103.13); quinn-proto 0.11.14 RUSTSEC-2026-0185 (>=0.11.15); webbrowser 1.2.0 RUSTSEC-2026-0257 (>=1.2.2). Warnings: unsafe-libyaml (unmaintained, via serde_yaml_ng), rand 0.9.2, paste, ttf-parser, anyhow, event-listener, memmap2.
   Behind latest (resolved -> latest): dirs 6->7, sha1 0.10->0.11, hmac 0.12->0.13, sha2 0.10->0.11, zip 2.4->9.0, reqwest 0.12->0.13, rfd 0.15->0.17, eframe 0.32->0.36, egui-notify 0.20->0.23, notify-rust 4.12->4.18, tokio 1.50->1.53, plus patch bumps.
   Actions (latest release): actions/checkout v7.0.1, Swatinem/rust-cache v2.9.2, actions/upload-artifact v7.0.2, dawidd6/action-download-artifact v27, softprops/action-gh-release v3.0.3, c-hive/gha-remove-artifacts v1.8.0, mbrobbel/rustfmt-check 0.23.0. Workflows are upstream's; decide with RPSN-0096 and RPSN-0122.
   Re-run check-dependencies first; these figures are a dated snapshot.
+  Resolved (2026-10-12): every crate and workflow action at its latest
+  release, in commits c7ab91e..8dbf8a5, one dependency (or one set that
+  must move together) per commit. cargo audit: 0 vulnerabilities; 2
+  unmaintained warnings left (ttf-parser via egui, unsafe-libyaml via
+  serde_yaml_ng, both at latest). Nothing held back, so no hold to record.
+  Rust stable 1.94 -> 1.99 on this machine (eframe 0.36 needs 1.95).
+  Local gate green: 70 + 71 tests. Not yet verified: the window and its
+  file dialogs by hand on this build; the Windows and macOS CI legs
+  (aws-lc-sys build); every workflow file, which runs only on GitHub
+  (RPSN-0096).
   **Layman:** Bring every library the app uses up to date, including several with known security problems.
   Kind: security.
   Source: user-request-2026-10-12; cargo audit via pressless session 2026-10-12.
