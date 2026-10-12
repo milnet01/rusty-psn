@@ -1,0 +1,109 @@
+# rusty-psn — Design
+
+> **Purpose — so the shape is decided once, and anyone can tell where a
+> new piece of work belongs and what it is allowed to touch.**
+
+**This document is a gate.** Work is not broken into items until it is
+agreed — `~/.claude/workflow.md` § 4 says when it passes.
+
+**Status:** draft, awaiting review and the owner's agreement.
+
+This records the shape the code already has, plus the rules the owner set
+on 2026-10-12. The signs it places are in `docs/discovery.md`.
+
+## The parts
+
+| Part | Responsible for | Files |
+|---|---|---|
+| Entry | Parses arguments, starts logging, hands over to one front end | `src/main.rs` |
+| Window app | The desktop interface: search, downloads, settings, RPCS3 library, content | `src/egui/mod.rs` |
+| Command line | The terminal interface, including batch and silent runs | `src/cli/mod.rs` |
+| PSN | Talking to Sony: building update URLs, parsing replies, downloading, resuming, verifying, merging multi-part PS4 updates, firmware | `src/psn/mod.rs`, `src/psn/parser.rs`, `src/psn/manifest_parser.rs`, `src/psn/utils.rs`, `src/psn/firmware.rs` |
+| RPCS3 | Finding RPCS3, reading its config and game metadata, comparing versions, installing packages | `src/rpcs3/mod.rs`, `src/rpcs3/auto_detect.rs`, `src/rpcs3/config.rs`, `src/rpcs3/sfo.rs` |
+| Content | Scanning a local folder of patches and DLC, and installing DLC zips the user already has | `src/content.rs` |
+| Batch | Reading a list of game IDs from a text file | `src/batch.rs` |
+| Security | Allowed Sony hosts, path containment, game ID validation, redirect policy | `src/security.rs` |
+| Files | Download paths and folder layouts, creating package files, hashing, migrating old layouts | `src/utils.rs` |
+
+## What may depend on what
+
+- **Entry** may use the front ends. Nothing uses Entry.
+- **The front ends** (Window app, Command line) may use every part below
+  them. **No other part may use a front end.**
+- **The front ends never use each other.**
+- **PSN** may use Security and Files.
+- **RPCS3** may use Files. **It must never use PSN**: RPCS3 support has to
+  work on packages that came from anywhere.
+- **Content** may use RPCS3.
+- **Batch** may use PSN and Security.
+- **Security uses no other part.** It is the base every check rests on.
+- **Files** may use Security.
+
+**One known exception: Files uses PSN** (it returns PSN's `DownloadError`),
+while PSN uses Files. The two depend on each other. It is allowed until
+the roadmap item that untangles it ships. **No new two-way dependency may be
+added.**
+
+**Frontend-only code.** PSN and RPCS3 already hold some code compiled only
+for the window app (`#[cfg(feature = "egui")]`). That code may stay. **New
+code used only by one front end goes in that front end's own folder.**
+
+**New screens.** The window app is one large file, and a roadmap item plans
+splitting it by screen. Until then, **a new screen or panel goes in its own
+file under `src/egui/`**, the default `~/.claude/standards/coding.md` § 1.8
+sets for a second reason to change.
+
+## Where each sign of success lives
+
+| Sign | Part that delivers it |
+|---|---|
+| S1 — every listed update downloads in full and matches Sony's checksum | PSN, with Files for hashing |
+| S2 — a dropped connection resumes and still ends verified | PSN |
+| S3 — a multi-part PS4 update ends up as one package | PSN |
+| S4 — downloads land only in the chosen folder, as Title / ID / files | Files, with Security for containment |
+| S5 — PS3, PS4 and PSVita IDs each return their updates | PSN |
+| S6 — a downloaded update installs into RPCS3 and shows the new version | RPCS3 |
+| S7 — a library scan marks every game correctly | RPCS3 |
+| S8 — RPCS3 is found without typing a path, and can be overridden | RPCS3, with the front ends for the setting |
+| S9 — both apps work on Linux, Windows and macOS | the whole |
+| S10 — a DLC zip the user has installs into RPCS3 and the game sees it | Content, with RPCS3 for the install |
+
+## What every part does the same way
+
+- **Errors** — `STANDARDS.md` § 4.3 owns it: one hand-written error enum
+  per area, wrapped with `map_err`.
+- **Logging** — `STANDARDS.md` § 4.6 owns it: the `log` macros, written to
+  file by `flexi_logger`.
+- **State and persistence** — only the window app keeps settings, through
+  eframe's persistence. The command line takes everything from its
+  arguments. The other parts keep no state between runs.
+- **Network** — every request to Sony goes through the one client
+  `psn::build_psn_client` builds. Every package, manifest or firmware URL
+  taken from a Sony reply passes `security::validate_download_url` before
+  it is fetched. Update-lookup URLs are built from fixed Sony hosts in
+  `src/psn/utils.rs`. New network code follows the same rules.
+- **Downloaded files** — the path of every downloaded package or firmware
+  file passes `security::validate_path_containment` before it is written.
+
+## The stack, and what it rules out
+
+- **Rust**, inherited from the upstream project. The upstream project
+  recorded no runner-up.
+- **egui with eframe** for the window app: one Rust codebase for Linux,
+  Windows and macOS. It rules out a native look on each system.
+- **tokio and reqwest (rustls)** for networking, so no system OpenSSL is
+  needed.
+- **Two front ends chosen at build time** by Cargo features (`egui`, `cli`).
+  One binary is one front end, so a single build cannot offer both.
+
+Versions are in `Cargo.toml` and `STANDARDS.md` § 2.3.
+
+## Close calls
+
+None recorded as an ADR yet. The two-way dependency above is a known
+exception rather than a decision, and its roadmap item closes it.
+
+## Cold-eyes loop log
+
+| Loop | Date | Lanes | Q1 | Q2 | Q3 | Q4 | Outcome |
+|------|------|-------|----|----|----|----|---------|

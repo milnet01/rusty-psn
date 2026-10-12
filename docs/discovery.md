@@ -6,7 +6,7 @@
 This is what everything is checked against for the life of the project.
 `~/.claude/workflow.md` § 3 owns what belongs here and how its gate passes.
 
-**Status:** agreed (2026-10-12). The owner confirmed the *never* item on its own.
+**Status:** agreed (2026-10-12). The owner confirmed the *never* item on its own, and agreed S10 the same day.
 
 ## The problem
 
@@ -41,6 +41,8 @@ one at a time, checking them and installing them.
   user can still change it.
 - **S9** — The window app and the command line can each look up, download
   and verify updates on Linux, Windows and macOS.
+- **S10** — A DLC zip file the user already has installs into RPCS3, and the
+  game then sees the DLC.
 
 ## What it deliberately does not do
 

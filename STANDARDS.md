@@ -17,26 +17,10 @@
 
 ### 2.1 Module Structure
 
+The source modules, what each is responsible for, and what each may depend
+on are in `docs/design.md`.
+
 ```
-src/
-  main.rs               # Entry point, CLI arg parsing, logger init
-  utils.rs              # File I/O utilities, path sanitization, SHA1 hashing
-  batch.rs              # Batch file parsing (one serial per line)
-  security.rs           # URL validation, path containment, serial validation, redirect policy
-  psn/
-    mod.rs              # Core domain: UpdateInfo, PackageInfo, download/merge logic
-    parser.rs           # XML parser for Sony's update response
-    manifest_parser.rs  # JSON parser for PS4 multi-part manifests
-    utils.rs            # PSN-specific: platform detection, URL generation, HMAC, file merge
-  rpcs3/
-    mod.rs              # RPCS3 integration: library scan, version comparison, PKG install
-    sfo.rs              # PARAM.SFO binary parser
-    config.rs           # games.yml and vfs.yml parsing
-    auto_detect.rs      # Platform-specific RPCS3 installation detection
-  cli/
-    mod.rs              # CLI frontend (crossterm-based terminal UI)
-  egui/
-    mod.rs              # GUI frontend (egui/eframe desktop application)
 resources/
   NotoSans-Regular.ttf  # Latin font (embedded at compile time)
   NotoSansJP-Regular.otf # Japanese font (embedded at compile time)
