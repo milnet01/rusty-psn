@@ -106,21 +106,29 @@ pub fn validate_path_containment(target: &Path, base_dir: &Path) -> Result<(), S
         }
     };
 
-    // If target exists, canonicalize it for an exact check.
-    if target.exists() {
-        if let Ok(canonical_target) = std::fs::canonicalize(target) {
-            if canonical_target.starts_with(&canonical_base) {
-                return Ok(());
-            }
-            return Err(SecurityError::PathEscape {
-                attempted: target.to_path_buf(),
-                boundary: base_dir.to_path_buf(),
-            });
+    // Canonicalize the deepest part of the target that exists, so a relative path is made
+    // absolute and a linked folder is followed the way the OS will follow it. The part that
+    // does not exist yet holds no links, so it is normalized lexically and appended.
+    let mut existing = target;
+    let mut missing = Vec::new();
+    let resolved = loop {
+        if let Ok(canonical) = std::fs::canonicalize(existing) {
+            break canonical;
         }
-    }
-
-    // Target doesn't exist yet — normalize lexically and check containment.
-    let normalized = normalize_lexical(target);
+        match (existing.parent(), existing.file_name()) {
+            (Some(parent), Some(name)) => {
+                missing.push(name);
+                existing = parent;
+            }
+            // A relative path whose first component does not exist: resolve from the current folder.
+            _ if existing.as_os_str().is_empty() => match std::env::current_dir() {
+                Ok(cwd) => break cwd,
+                Err(_) => break PathBuf::new(),
+            },
+            _ => break PathBuf::new(),
+        }
+    };
+    let normalized = normalize_lexical(&missing.iter().rev().fold(resolved, |path, name| path.join(name)));
 
     if normalized.starts_with(&canonical_base) {
         Ok(())
@@ -252,5 +260,43 @@ mod tests {
         let base = Path::new("/tmp/downloads");
         let target = Path::new("/tmp/downloads/../../etc/passwd");
         assert!(validate_path_containment(target, base).is_err());
+    }
+
+    #[test]
+    fn path_containment_relative_existing_base() {
+        // The command line's default download folder is the relative "pkgs/". Once it
+        // exists, a new file inside it must still pass.
+        // Cargo runs tests from the crate root, so a folder under target/ has a relative form.
+        let dir = tempfile::tempdir_in("target").unwrap();
+        let cwd = std::env::current_dir().unwrap();
+        let relative_base = dir.path().strip_prefix(&cwd).unwrap_or(dir.path());
+        assert!(relative_base.is_relative());
+        assert!(validate_path_containment(&relative_base.join("BLUS31147/x.pkg"), relative_base).is_ok());
+        assert!(validate_path_containment(&relative_base.join("../escape.pkg"), relative_base).is_err());
+    }
+
+    #[cfg(target_family = "unix")]
+    #[test]
+    fn path_escape_via_symlinked_folder_detected() {
+        // A folder inside the base that links elsewhere must not let a new file escape.
+        let root = tempfile::tempdir().unwrap();
+        let base = root.path().join("downloads");
+        let outside = root.path().join("outside");
+        std::fs::create_dir(&base).unwrap();
+        std::fs::create_dir(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, base.join("link")).unwrap();
+        assert!(validate_path_containment(&base.join("link/new.pkg"), &base).is_err());
+    }
+
+    #[cfg(target_family = "unix")]
+    #[test]
+    fn path_containment_symlinked_base() {
+        // A download folder that is itself a link (a common home-folder setup) must still work.
+        let root = tempfile::tempdir().unwrap();
+        let real = root.path().join("real");
+        let link = root.path().join("link");
+        std::fs::create_dir(&real).unwrap();
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        assert!(validate_path_containment(&link.join("BLUS31147/new.pkg"), &link).is_ok());
     }
 }

@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=96 -->
+<!-- ants-roadmap-id-high-water: RPSN=97 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -823,6 +823,19 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   **Layman:** Decide whether to back up your work in your own GitHub copy, and when to note what counts as a breaking change.
   Kind: chore.
   Source: in-session-2026-10-12.
+
+- 🚧 [RPSN-0097] **Make the folder-boundary check accept relative and linked download folders.**
+  `security::validate_path_containment` compared a new file's lexical path
+  with the canonical base. Once a relative base existed (the command line's
+  default `pkgs/`), every new file was refused. A linked download folder was
+  refused the same way, and a linked folder inside the base let a new file
+  escape. Found while working RPSN-0083, whose new checks would have spread
+  it. Fix: canonicalize the target's deepest existing ancestor, then append
+  the missing part.
+  **Layman:** Downloads into a folder named by a short path, or reached through a shortcut link, no longer fail, and a link can't be used to escape the folder.
+  Kind: fix.
+  Source: in-session-2026-10-12.
+  Lanes: Security.
 
 ## 12. Design follow-ups
 
