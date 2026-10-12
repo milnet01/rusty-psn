@@ -292,7 +292,9 @@ struct VolatileData {
     show_about_window: bool,
     show_migration_dialog: bool,
     migration_preview: Vec<(PathBuf, PathBuf)>,
-    migration_promise: Option<Promise<usize>>,
+    /// The download folder the preview was scanned from; the migration checks against this one.
+    migration_scan_root: PathBuf,
+    migration_promise: Option<Promise<(usize, usize)>>,
 
     settings_dirty: bool,
     modified_settings: AppSettings,
@@ -393,6 +395,7 @@ impl Default for VolatileData {
             show_about_window: false,
             show_migration_dialog: false,
             migration_preview: Vec::new(),
+            migration_scan_root: PathBuf::new(),
             migration_promise: None,
 
             settings_dirty: false,

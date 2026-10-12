@@ -83,6 +83,7 @@ impl UpdatesApp {
                             self.settings.directory_format,
                         );
                         self.v.migration_preview = preview;
+                        self.v.migration_scan_root = self.settings.pkg_download_path.clone();
                         self.v.show_migration_dialog = true;
                         ui.close();
                     }

@@ -328,9 +328,9 @@ pub fn detect_migratable_directories(download_path: &Path, target_format: Direct
 }
 
 /// Execute a set of directory migrations (renames).
-/// Returns the number of successful migrations.
+/// Returns (migrated, skipped): a skipped folder was refused or failed, and the log says why.
 #[cfg(feature = "egui")]
-pub async fn migrate_directories(migrations: &[(PathBuf, PathBuf)], download_path: &Path) -> usize {
+pub async fn migrate_directories(migrations: &[(PathBuf, PathBuf)], download_path: &Path) -> (usize, usize) {
     let mut success_count = 0;
     for (old_path, new_path) in migrations {
         let contained = [old_path, new_path]
@@ -357,7 +357,7 @@ pub async fn migrate_directories(migrations: &[(PathBuf, PathBuf)], download_pat
             }
         }
     }
-    success_count
+    (success_count, migrations.len() - success_count)
 }
 
 const CHUNK_SIZE: usize = 1024 * 1024 * 128;
@@ -537,9 +537,10 @@ mod tests {
             (inside_old.clone(), inside_new.clone()),
             (second_old.clone(), outside_new.clone()),
         ];
-        let count = migrate_directories(&migrations, &download_path).await;
+        let outcome = migrate_directories(&migrations, &download_path).await;
 
-        assert_eq!(count, 1);
+        // The refused move is reported, not dropped silently (RPSN-0100).
+        assert_eq!(outcome, (1, 1));
         assert!(inside_new.exists());
         assert!(second_old.exists(), "a folder was moved out of the download folder");
         assert!(!outside_new.exists());

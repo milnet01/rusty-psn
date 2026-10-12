@@ -50,9 +50,16 @@ impl UpdatesApp {
     pub(super) fn draw_migration_dialog(&mut self, ctx: &egui::Context) {
         // Check if a migration operation completed.
         if let Some(promise) = &self.v.migration_promise {
-            if let Some(count) = promise.ready() {
-                let msg = format!("Migration complete: {count} folder(s) migrated.");
-                self.show_notifications(&msg, ToastLevel::Success);
+            if let Some(&(migrated, skipped)) = promise.ready() {
+                if skipped > 0 {
+                    let msg = format!(
+                        "Migration: {migrated} folder(s) migrated, {skipped} skipped. The log file says why each was skipped."
+                    );
+                    self.show_notifications(&msg, ToastLevel::Warning);
+                } else {
+                    let msg = format!("Migration complete: {migrated} folder(s) migrated.");
+                    self.show_notifications(&msg, ToastLevel::Success);
+                }
                 self.v.migration_promise = None;
                 self.v.show_migration_dialog = false;
                 return;
@@ -88,7 +95,7 @@ impl UpdatesApp {
                 egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
                     for (old, new) in &self.v.migration_preview {
                         let old_name = old.file_name().unwrap_or_default().to_string_lossy();
-                        let new_display = new.strip_prefix(&self.settings.pkg_download_path).unwrap_or(new);
+                        let new_display = new.strip_prefix(&self.v.migration_scan_root).unwrap_or(new);
                         ui.label(format!("  {} → {}", old_name, new_display.display()));
                     }
                 });
@@ -98,7 +105,7 @@ impl UpdatesApp {
                 ui.horizontal(|ui| {
                     if ui.button("Migrate").clicked() {
                         let migrations = self.v.migration_preview.clone();
-                        let download_path = self.settings.pkg_download_path.clone();
+                        let download_path = self.v.migration_scan_root.clone();
                         let ctx = ui.ctx().clone();
                         let _guard = self
                             .v
@@ -107,9 +114,9 @@ impl UpdatesApp {
                             .expect("rt_handle set in UpdatesApp::new before any UI code runs")
                             .enter();
                         self.v.migration_promise = Some(Promise::spawn_async(async move {
-                            let count = crate::utils::migrate_directories(&migrations, &download_path).await;
+                            let outcome = crate::utils::migrate_directories(&migrations, &download_path).await;
                             ctx.request_repaint();
-                            count
+                            outcome
                         }));
                     }
                     if ui.button("Cancel").clicked() {

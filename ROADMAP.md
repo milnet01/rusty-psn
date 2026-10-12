@@ -1140,8 +1140,14 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 1 MEDIUM.
   Lanes: Window app.
 
-- 📋 [RPSN-0100] **Report folders the migration refused, and check against the scanned folder.**
+- ✅ [RPSN-0100] **Report folders the migration refused, and check against the scanned folder.**
   src/egui/mod.rs:3081 and :3025 toast only the migrated count; utils::migrate_directories skips refused entries silently. The preview uses the download path at menu time (:2977), the check uses the path at click time. Remedy: return (migrated, skipped), show both, and pass the scanned folder.
+  Resolved 2026-10-12: utils::migrate_directories returns (migrated,
+  skipped); the window app warns when any folder was skipped. The
+  dialog keeps migration_scan_root, the folder the preview scanned, and
+  the migration checks containment against it rather than the folder
+  set at click time. Test: migrate_directories_skips_moves_outside_
+  download_folder now asserts (1, 1).
   **Layman:** The folder-migration message hides folders it skipped.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 1 MEDIUM.
