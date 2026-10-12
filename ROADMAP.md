@@ -333,7 +333,7 @@ Ensure the application has no vulnerabilities and follows security best practice
   Kind: security.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0034] **Input validation.**
+- 🚫 [RPSN-0034] **Input validation.**
   Harden serial input parsing:
     - Enforce maximum length (9 characters after normalization)
     - Allow only alphanumeric characters after normalization
@@ -342,6 +342,14 @@ Ensure the application has no vulnerabilities and follows security best practice
   alphanumeric are enforced (src/security.rs); an unknown prefix only
   warns.
   Former TODO.md task 5.4.
+  Dropped (2026-10-12): the length and alphanumeric checks were
+  already done (security::validate_serial), and they close any
+  injection route. Rejecting unknown prefixes was left out on purpose:
+  VALID_PREFIXES is incomplete (no BLJM, which as far as I know is a
+  Japanese PS3 disc prefix; not confirmed against Sony), so a hard
+  reject would block real games for no security gain. An unknown
+  prefix still logs a warning. Reopen if the owner wants the reject
+  with a researched, complete prefix list.
   **Layman:** Turn away game IDs that don't look like real PlayStation IDs.
   Kind: security.
   Source: todo-md-import-2026-10-12.
@@ -356,22 +364,28 @@ Ensure the application has no vulnerabilities and follows security best practice
   Kind: security.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0036] **Dependency audit.**
+- ✅ [RPSN-0036] **Dependency audit.**
   Add `cargo audit` to CI pipeline to check for known vulnerabilities
   in dependencies
   Checked against the code 2026-10-12: Not done — no cargo audit step
   in .github/workflows.
   Former TODO.md task 5.6.
+  Resolved (2026-10-12): .github/workflows/audit.yml runs cargo audit on
+  push, pull request and weekly; scripts/local-ci.sh runs the same
+  pinned version (a243c4b). The workflow has not run yet: GitHub only.
   **Layman:** Check automatically for known security problems in the app's building blocks.
   Kind: security.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0037] **File permissions.**
+- ✅ [RPSN-0037] **File permissions.**
   On Unix, set downloaded `.pkg` files to `0644` (read-only for
   group/other) rather than inheriting umask
   Checked against the code 2026-10-12: Not done — no permission
   setting on downloaded files.
   Former TODO.md task 5.7.
+  Resolved (2026-10-12): utils::download_file_options creates every
+  download with mode 0644 on Unix (3915020). Test:
+  create_pkg_file_is_not_writable_by_group_or_others.
   **Layman:** Save downloaded files so other users on the computer can read but not change them.
   Kind: security.
   Source: todo-md-import-2026-10-12.
@@ -399,13 +413,17 @@ Ensure the application has no vulnerabilities and follows security best practice
   Kind: security.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0040] **TOCTOU in file operations.**
+- ✅ [RPSN-0040] **TOCTOU in file operations.**
   The check-then-create pattern in `create_pkg_file()` has a
   time-of-check-to-time-of-use gap. Use atomic file operations where
   possible
   Checked against the code 2026-10-12: Not done — no atomic or
   create_new file operations; check-then-create remains.
   Former TODO.md task 5.10.
+  Resolved (2026-10-12): download_file_options opens with O_NOFOLLOW on
+  Unix, so a link swapped in after the containment check is refused
+  (3915020). A swapped folder higher up the path is not covered. Test:
+  download_file_options_refuse_a_link.
   **Layman:** Close a small timing gap when the app creates download files.
   Kind: security.
   Source: todo-md-import-2026-10-12.
