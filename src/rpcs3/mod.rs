@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn title_from_iso_path() {
         assert_eq!(
-            title_from_path(Path::new("/mnt/Games/ROMS/ps3/God of War III (USA).iso")),
+            title_from_path(Path::new("/home/user/roms/ps3/God of War III (USA).iso")),
             "God of War III"
         );
     }
@@ -302,7 +302,7 @@ mod tests {
     #[test]
     fn title_from_ps3_folder_path() {
         assert_eq!(
-            title_from_path(Path::new("/mnt/Games/ROMS/ps3/Rock Band (USA).PS3/")),
+            title_from_path(Path::new("/home/user/roms/ps3/Rock Band (USA).PS3/")),
             "Rock Band"
         );
     }

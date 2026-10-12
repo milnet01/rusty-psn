@@ -804,11 +804,15 @@ Create a unique, recognizable icon for rusty-psn that displays in the taskbar/ta
 
 Gaps noticed while aligning the project to the global workflow on 2026-10-12.
 
-- 📋 [RPSN-0082] **Remove personal filesystem paths from tests and comments.**
+- ✅ [RPSN-0082] **Remove personal filesystem paths from tests and comments.**
   Project rule 6 bars machine-specific paths from source. Seen
   2026-10-12: two test inputs in src/rpcs3/mod.rs and a comment in
   src/rpcs3/auto_detect.rs use paths from the owner's own drives.
   Replace them with neutral example paths.
+  Resolved 2026-10-12: the two title_from_path tests and the auto_detect
+  comment use neutral example paths. A search of every tracked file
+  finds none of the owner's drive paths. The ~/Games search location in
+  auto_detect is a generic default and stays.
   **Layman:** Take the owner's own folder names out of the code.
   Kind: fix.
   Source: in-session-2026-10-12.

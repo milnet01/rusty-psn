@@ -217,7 +217,7 @@ fn scan_for_appimage_config(search_dir: &std::path::Path) -> Option<PathBuf> {
             }
         }
 
-        // Also check one level deeper (e.g., /mnt/Emulators/Sony_PlayStation_3/RPCS3/)
+        // Also check one level deeper (e.g., /opt/emulators/ps3/RPCS3/)
         if let Ok(sub_entries) = std::fs::read_dir(&path) {
             for sub in sub_entries.flatten() {
                 let sub_name = sub.file_name().to_string_lossy().to_string();
