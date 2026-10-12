@@ -53,6 +53,12 @@ fn is_allowed_sony_host(host: &str) -> bool {
     ALLOWED_DOMAINS.iter().any(|d| host.ends_with(d))
 }
 
+/// Drop control characters from text that came from outside the app (Sony's replies, files)
+/// before it is printed: a terminal escape sequence starts with one.
+pub fn strip_control(text: &str) -> String {
+    text.chars().filter(|c| !c.is_control()).collect()
+}
+
 /// Validate that a URL points to an allowed Sony PlayStation domain.
 pub fn validate_download_url(url: &str) -> Result<(), SecurityError> {
     let parsed = match reqwest::Url::parse(url) {

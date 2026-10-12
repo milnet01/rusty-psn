@@ -351,7 +351,7 @@ fn parse_ps3_firmware(body: &str, region: FirmwareRegion) -> Result<Vec<Firmware
         for field in line.split(';') {
             if let Some((key, value)) = field.split_once('=') {
                 match key.trim() {
-                    "SystemSoftwareVersion" => version = Some(value.trim().to_string()),
+                    "SystemSoftwareVersion" => version = Some(crate::security::strip_control(value.trim())),
                     "CDN" => cdn_url = Some(value.trim().to_string()),
                     _ => {}
                 }
@@ -472,7 +472,7 @@ fn parse_xml_firmware(body: &str, console: FirmwareConsole, region: FirmwareRegi
                         entries.push(FirmwareInfo {
                             console,
                             region,
-                            version: current_version.clone(),
+                            version: crate::security::strip_control(&current_version),
                             download_url: url,
                             size: image_size,
                             fw_type: current_fw_type,

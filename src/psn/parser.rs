@@ -68,10 +68,13 @@ fn parse_package_attributes(attributes: Attributes, info: &mut UpdateInfo) -> Re
 
 pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), ParseError> {
     let mut reader = Reader::from_str(&response);
-    reader.config_mut().trim_text(true);
+    // No per-event trimming: a title arrives as several events split at each entity
+    // ("Ratchet ", "&amp;", " Clank"), and trimming each piece would drop the spaces.
+    reader.config_mut().trim_text(false);
 
     let mut depth = 0;
     let mut title_element = false;
+    let mut title_text = String::new();
     let mut event_buf = Vec::new();
 
     let mut err_encountered = false;
@@ -122,12 +125,22 @@ pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), Par
                     _ => {
                         if e.name().as_ref().to_lowercase().starts_with("title") {
                             title_element = true;
+                            title_text.clear();
                         }
                     }
                 }
             }
             Ok(Event::End(_)) => {
                 depth -= 1;
+
+                if title_element {
+                    title_element = false;
+                    // The title is printed to the terminal, so control characters are dropped.
+                    let title = crate::security::strip_control(title_text.trim());
+                    if !title.is_empty() {
+                        info.titles.push(title);
+                    }
+                }
             }
             Ok(Event::Empty(e)) => {
                 if let "package" = e.name().as_ref() {
@@ -136,13 +149,19 @@ pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), Par
             }
             Ok(Event::Text(e)) => {
                 if title_element {
-                    let title = e.xml10_content();
-
-                    title_element = false;
-                    info.titles.push(title.to_string());
+                    title_text.push_str(&e.xml10_content());
                 } else if err_code_encountered {
                     let err_code_text = e.xml10_content();
-                    return Err(ParseError::ErrorCode(err_code_text.into()));
+                    return Err(ParseError::ErrorCode(err_code_text.trim().to_string()));
+                }
+            }
+            Ok(Event::GeneralRef(e)) => {
+                if title_element {
+                    if let Ok(Some(c)) = e.resolve_char_ref() {
+                        title_text.push(c);
+                    } else if let Some(text) = quick_xml::escape::resolve_predefined_entity(&e.xml10_content()) {
+                        title_text.push_str(text);
+                    }
                 }
             }
             Ok(Event::Eof) => break,
@@ -172,5 +191,23 @@ mod tests {
         let xml = r#"<titlepatch titleid="../../evil"><tag name="x"><package version="01.01" size="1" sha1sum="a" url="https://a0.ww.np.dl.playstation.net/x.pkg"/></tag></titlepatch>"#;
         let mut info = UpdateInfo::empty(PlatformVariant::PS3);
         assert!(parse_response(xml.to_string(), &mut info).is_err());
+    }
+
+    #[test]
+    fn parse_response_keeps_a_title_with_an_entity_whole() {
+        // Sony's reply for BCUS98124 carries "Ratchet &amp; Clank Future: A Crack In Time".
+        let xml = r#"<titlepatch titleid="BCUS98124"><tag name="x"><package version="01.01" size="1" sha1sum="a" url="https://a0.ww.np.dl.playstation.net/x.pkg"><paramsfo><TITLE>Ratchet &amp; Clank Future: A Crack In Time</TITLE></paramsfo></package></tag></titlepatch>"#;
+        let mut info = UpdateInfo::empty(PlatformVariant::PS3);
+        parse_response(xml.to_string(), &mut info).unwrap();
+        assert_eq!(info.titles, vec!["Ratchet & Clank Future: A Crack In Time".to_string()]);
+    }
+
+    #[test]
+    fn parse_response_strips_control_characters_from_titles() {
+        // A title is printed to the terminal, so an escape sequence in it must not survive (RPSN-0107).
+        let xml = "<titlepatch titleid=\"BLUS31147\"><tag name=\"x\"><package version=\"01.01\" size=\"1\" sha1sum=\"a\" url=\"https://a0.ww.np.dl.playstation.net/x.pkg\"><paramsfo><TITLE>Evil&#27;[2JGame&#7;</TITLE></paramsfo></package></tag></titlepatch>";
+        let mut info = UpdateInfo::empty(PlatformVariant::PS3);
+        parse_response(xml.to_string(), &mut info).unwrap();
+        assert_eq!(info.titles, vec!["Evil[2JGame".to_string()]);
     }
 }

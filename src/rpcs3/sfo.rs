@@ -108,6 +108,8 @@ pub fn parse_sfo(path: &Path) -> Result<SfoParams, String> {
             None => continue,
         };
 
+        // Values are printed to the terminal, so control characters are dropped.
+        let value = crate::security::strip_control(&value);
         match key.as_str() {
             "TITLE" => title = Some(value),
             "TITLE_ID" => title_id = Some(value),

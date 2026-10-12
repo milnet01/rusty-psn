@@ -70,7 +70,8 @@ pub fn parse_batch_file(path: &Path) -> Result<BatchParseResult, BatchFileError>
 
         // Validate the serial format.
         if let Err(e) = crate::security::validate_serial(&normalized) {
-            warnings.push((line_number, trimmed.to_string(), e.to_string()));
+            // The line is echoed to the terminal, so control characters are dropped.
+            warnings.push((line_number, crate::security::strip_control(trimmed), e.to_string()));
             continue;
         }
 
@@ -96,6 +97,15 @@ mod tests {
         let mut f = tempfile::NamedTempFile::new().unwrap();
         f.write_all(content.as_bytes()).unwrap();
         f
+    }
+
+    #[test]
+    fn warning_text_has_no_control_characters() {
+        // A skipped line is echoed to the terminal, so an escape sequence must not survive (RPSN-0107).
+        let f = write_temp_file("BLUS31147\nBAD\x1b[2JLINE\n");
+        let result = parse_batch_file(f.path()).unwrap();
+        assert_eq!(result.warnings.len(), 1);
+        assert_eq!(result.warnings[0].1, "BAD[2JLINE");
     }
 
     #[test]
