@@ -1349,12 +1349,15 @@ reviewer proposed; check both against the code before fixing.
   Source: user-request-2026-10-12.
   Lanes: Docs.
 
-- 📋 [RPSN-0129] **Draw the arrow shaft in resources/icon.svg.**
+- 🚫 [RPSN-0129] **Draw the arrow shaft in resources/icon.svg.**
   The shaft is a vertical line painted with a gradient in the default
   objectBoundingBox units. A vertical line has a zero-width box, so a
   spec-following renderer (librsvg, checked with rsvg-convert) draws
   nothing. The PNG icons are fine. Fix: gradientUnits="userSpaceOnUse"
   with explicit coordinates, as the site logo does.
+  Superseded (2026-10-12): the icon was redesigned (a game disc with an
+  update badge) at the website session's request; the new icon.svg has
+  no gradient on a zero-width line.
   **Layman:** The app's vector icon is missing the stem of its download arrow in some viewers.
   Kind: fix.
   Source: in-session-2026-10-12 (RPSN-0127 logo work).

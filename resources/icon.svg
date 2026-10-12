@@ -1,21 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- A game disc with an update badge: Rusty PSN fetches game updates. -->
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a1a2e"/>
-      <stop offset="100%" style="stop-color:#16213e"/>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2d2b34"/>
+      <stop offset="1" stop-color="#1b1a20"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#006FCD"/>
-      <stop offset="100%" style="stop-color:#0053a0"/>
+    <linearGradient id="disc" gradientUnits="userSpaceOnUse" x1="40" y1="40" x2="200" y2="200">
+      <stop offset="0" stop-color="#f4f6f8"/>
+      <stop offset="0.55" stop-color="#c9ced5"/>
+      <stop offset="1" stop-color="#9aa2ad"/>
     </linearGradient>
   </defs>
-  <!-- Background rounded square -->
-  <rect x="8" y="8" width="240" height="240" rx="40" ry="40" fill="url(#bg)"/>
-  <!-- PlayStation-style downward arrow (download) -->
-  <path d="M128 55 L128 165" stroke="url(#accent)" stroke-width="22" stroke-linecap="round"/>
-  <path d="M80 130 L128 178 L176 130" stroke="url(#accent)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <!-- Base line (tray/folder) -->
-  <path d="M60 195 L196 195" stroke="#CE422B" stroke-width="16" stroke-linecap="round"/>
-  <!-- Small R for Rust in bottom-right -->
-  <text x="205" y="225" font-family="sans-serif" font-weight="bold" font-size="36" fill="#CE422B" text-anchor="middle">R</text>
+  <rect x="8" y="8" width="240" height="240" rx="44" fill="url(#tile)" stroke="#ffffff" stroke-opacity="0.22" stroke-width="6"/>
+  <circle cx="114" cy="114" r="84" fill="url(#disc)"/>
+  <path d="M114 114 L114 30 A84 84 0 0 1 173.4 54.6 Z" fill="#ffffff" fill-opacity="0.45"/>
+  <path d="M114 114 L114 198 A84 84 0 0 1 54.6 173.4 Z" fill="#ffffff" fill-opacity="0.25"/>
+  <circle cx="114" cy="114" r="58" fill="none" stroke="#1b1a20" stroke-opacity="0.12" stroke-width="3"/>
+  <circle cx="114" cy="114" r="30" fill="#dfe3e8"/>
+  <circle cx="114" cy="114" r="13" fill="#1b1a20"/>
+  <circle cx="186" cy="186" r="52" fill="#e8573a" stroke="#1b1a20" stroke-width="10"/>
+  <path d="M186 212 V162" stroke="#ffffff" stroke-width="15" stroke-linecap="round"/>
+  <path d="M164 182 L186 160 L208 182" fill="none" stroke="#ffffff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
