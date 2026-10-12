@@ -231,3 +231,33 @@ pub async fn install_dlc_zip(rpcs3_exe: &Path, zip_path: &Path, exdata_dir: &Pat
     info!("DLC installation complete");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn extract_dlc_zip_inflates_entries_and_skips_escaping_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("dlc.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
+        let options = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        for (name, body) in [
+            ("game/dlc.pkg", b"pkg body"),
+            ("game/dlc.rap", b"rap body"),
+            ("../escape.pkg", b"bad body"),
+        ] {
+            writer.start_file(name, options).unwrap();
+            writer.write_all(body).unwrap();
+        }
+        writer.finish().unwrap();
+
+        let (pkg, rap, temp_dir) = extract_dlc_zip(&zip_path).unwrap();
+
+        assert_eq!(std::fs::read(&pkg).unwrap(), b"pkg body");
+        assert_eq!(std::fs::read(rap.unwrap()).unwrap(), b"rap body");
+        assert!(pkg.starts_with(temp_dir.path()));
+        assert!(!temp_dir.path().parent().unwrap().join("escape.pkg").exists());
+    }
+}
