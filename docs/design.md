@@ -15,7 +15,7 @@ on 2026-10-12. The signs it places are in `docs/discovery.md`.
 
 | Part | Responsible for | Files |
 |---|---|---|
-| Entry | Parses arguments, starts logging, hands over to one front end | `src/main.rs` |
+| Entry | Parses arguments, starts logging, hands over to each front end the build includes | `src/main.rs` |
 | Window app | The desktop interface: search, downloads, settings, RPCS3 library, content | `src/egui/mod.rs` |
 | Command line | The terminal interface, including batch and silent runs | `src/cli/mod.rs` |
 | PSN | Talking to Sony: building update URLs, parsing replies, downloading, resuming, verifying, merging multi-part PS4 updates, firmware | `src/psn/mod.rs`, `src/psn/parser.rs`, `src/psn/manifest_parser.rs`, `src/psn/utils.rs`, `src/psn/firmware.rs` |
@@ -27,13 +27,15 @@ on 2026-10-12. The signs it places are in `docs/discovery.md`.
 
 ## What may depend on what
 
-- **Entry** may use the front ends. Nothing uses Entry.
+- **Entry** may use the front ends, and hands them its parsed arguments
+  (`Args`). A front end may use `Args` and nothing else of Entry. No other
+  part uses Entry.
 - **The front ends** (Window app, Command line) may use every part below
   them. **No other part may use a front end.**
 - **The front ends never use each other.**
 - **PSN** may use Security and Files.
-- **RPCS3** may use Files. **It must never use PSN**: RPCS3 support has to
-  work on packages that came from anywhere.
+- **RPCS3** may use Files. **It must never use PSN directly**: RPCS3 support
+  has to work on packages that came from anywhere.
 - **Content** may use RPCS3.
 - **Batch** may use PSN and Security.
 - **Security uses no other part.** It is the base every check rests on.
@@ -82,8 +84,11 @@ sets for a second reason to change.
   taken from a Sony reply passes `security::validate_download_url` before
   it is fetched. Update-lookup URLs are built from fixed Sony hosts in
   `src/psn/utils.rs`. New network code follows the same rules.
-- **Downloaded files** — the path of every downloaded package or firmware
-  file passes `security::validate_path_containment` before it is written.
+- **Downloaded files** — a package file opened through
+  `utils::create_pkg_file`, and every firmware file, passes
+  `security::validate_path_containment` before it is written. The merged
+  PS4 package written by `psn::merge_parts` does not yet; a roadmap item
+  covers it. `CLAUDE.md` rule 1 requires the check of every write.
 
 ## The stack, and what it rules out
 
@@ -94,9 +99,9 @@ sets for a second reason to change.
 - **tokio and reqwest (rustls)** for networking, so no system OpenSSL is
   needed.
 - **Two front ends chosen at build time** by Cargo features (`egui`, `cli`).
-  One binary is one front end, so a single build cannot offer both.
+  The default build is the window app.
 
-Versions are in `Cargo.toml` and `STANDARDS.md` § 2.3.
+`Cargo.toml` is the authority on which crates are used, and their versions.
 
 ## Close calls
 
@@ -107,3 +112,4 @@ exception rather than a decision, and its roadmap item closes it.
 
 | Loop | Date | Lanes | Q1 | Q2 | Q3 | Q4 | Outcome |
 |------|------|-------|----|----|----|----|---------|
+| 1 | 2026-10-12 | 2 (both lanes held every question) | 3 | 2 | 0 | — | 5 verified, 5 fixed, 0 dismissed. Both lanes found Entry's `Args` used by the command line. Others: STANDARDS § 2.3 crate list disagrees with `Cargo.toml`; merged PS4 package skips path containment; a both-front-ends build exists; RPCS3's never-use-PSN rule needed "directly". The packet's import grep was lower-case only; corrected. Open questions resolved: the default folder layout is SerialTitle (a queue matter, not design); the window app does not use `Args`. |
