@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# THE CI GATE. One list of steps, run in two places.
+# THE CI GATE, run by the pre-push hook before every push.
 #
-# `.github/workflows/ci.yml` CALLS this file and restates none of it. That is
-# the whole point (`local-gate.md` § 3): two lists of steps drift the first
-# time someone edits one of them, and the drift surfaces as a red build on a
-# push — which is exactly what running locally was meant to prevent. A
-# hand-written mirror is correct on the day it is written and wrong after.
+# The GitHub workflows (.github/workflows/) are the upstream author's and do
+# not call this file. So this file MIRRORS them: the "GitHub mirror" steps run
+# the workflows' own commands, word for word, for every leg that can run on
+# Linux. When a workflow changes, change the matching step here in the same
+# commit — a mirror is only correct while both are edited together.
 #
-# So: to change what CI does, change THIS FILE. Never add a step to the
-# workflow.
+# What GitHub runs that this cannot: main.yml's windows-latest and
+# macos-latest legs (no Windows or Apple toolchain here, and `ring` needs a C
+# cross-compiler). Those are named on every run below, so a pass here is never
+# read as a pass on those platforms.
 #
 # Usage:
 #   ./scripts/local-ci.sh           the full gate
@@ -66,8 +68,9 @@ need() {
 # Anything not needing a compiler or a full environment belongs here.
 
 step 'documentation'
-# e.g. need markdownlint && markdownlint .
-# e.g. check-doc-facts, link checking, spelling
+# GitHub runs no documentation check. main.yml does rebuild on every push,
+# documentation-only ones included, but a documentation change cannot change
+# that build's result, so a documentation-only push mirrors GitHub with no step.
 # SET THIS TO 1 once the documentation step runs a real check. CONFIGURED
 # covers the script as a whole, so a project with lint and tests filled in
 # still had --docs report a pass that checked nothing (Deedbox, 2026-09-28).
@@ -88,18 +91,41 @@ fi
 
 # ── Checks that need a build or a full environment ──────────────────────────
 
-step 'format'
 need cargo
-cargo fmt --check
 
-step 'lint'
+# ── GitHub mirror ───────────────────────────────────────────────────────────
+
+step 'format (rustfmt.yml: nightly rustfmt)'
+# GitHub installs the newest nightly on each run; `rustup update nightly` keeps
+# this one current.
+if ! rustup run nightly rustfmt --version >/dev/null 2>&1; then
+    printf 'local-ci: nightly rustfmt is not installed — that check did NOT run\n' >&2
+    printf 'local-ci: install it: rustup toolchain install nightly --profile minimal --component rustfmt\n' >&2
+    exit 1
+fi
+cargo +nightly fmt --check
+
+for feature in cli egui; do
+    step "lint (clippy.yml, feature $feature)"
+    cargo clippy --no-default-features --features "$feature" -- -D warnings
+done
+
+for feature in cli egui; do
+    step "build (main.yml ubuntu-22.04, feature $feature)"
+    cargo build --release --no-default-features --features "$feature"
+done
+
+printf '\nlocal-ci: NOT RUN here: main.yml windows-latest and macos-latest legs (cli and egui).\n' >&2
+
+# ── Local additions — GitHub runs no tests ──────────────────────────────────
+
+step 'lint (local: all targets, tests included)'
 cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets --no-default-features --features cli -- -D warnings
 
-step 'build'
-cargo build --locked
-
-step 'test'
+step 'test (local: default build, then the cli build)'
 cargo test --locked
+cargo test --locked --no-default-features --features cli
 
 if (( CONFIGURED )); then
     printf '\nlocal-ci: all checks passed.\n' >&2
