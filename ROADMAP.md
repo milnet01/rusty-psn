@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=95 -->
+<!-- ants-roadmap-id-high-water: RPSN=96 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -811,6 +811,17 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   Replace them with neutral example paths.
   **Layman:** Take the owner's own folder names out of the code.
   Kind: fix.
+  Source: in-session-2026-10-12.
+
+- 📋 [RPSN-0096] **Owner to decide: a GitHub fork, and a versioning-overrides note.**
+  Deferred by the owner on 2026-10-12. `origin` points at the upstream
+  author's repository, so the work on branch `local-dev` exists only on
+  this disk; a fork of the owner's own would give it a remote. Pushing
+  there publishes it, so it needs the owner's yes. align-report also lists
+  no `docs/standards/versioning-overrides.md`; recommended to wait until a
+  release is planned.
+  **Layman:** Decide whether to back up your work in your own GitHub copy, and when to note what counts as a breaking change.
+  Kind: chore.
   Source: in-session-2026-10-12.
 
 ## 12. Design follow-ups
