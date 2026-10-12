@@ -1153,8 +1153,16 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 1 MEDIUM.
   Lanes: Window app, Files.
 
-- 📋 [RPSN-0101] **Log and keep stored settings that fail to load instead of resetting them.**
+- ✅ [RPSN-0101] **Log and keep stored settings that fail to load instead of resetting them.**
   src/egui/mod.rs:564 eframe::get_value(...).unwrap_or_default() resets every setting on a deserialize failure (for example after a downgrade meeting a new AppTheme variant), and the next save overwrites the stored copy. Remedy: log the failure; per-field serde defaults or a lenient enum fallback.
+  Resolved 2026-10-12: AppSettings takes #[serde(default)], so a missing
+  field takes its default; theme and directory_format read through
+  default_if_unknown, so an unknown value falls back alone and the rest
+  load. A file that still fails to load is logged at error level. Not
+  done: a backup of a wholly unreadable file, since eframe hands the app
+  read-only storage at startup. Tests: unknown_theme_keeps_the_other_
+  settings, missing_setting_takes_its_default, saved_settings_load_
+  unchanged.
   **Layman:** A settings file the app cannot read silently resets every setting.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 1 MEDIUM.

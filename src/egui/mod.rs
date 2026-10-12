@@ -242,23 +242,44 @@ impl AppTheme {
     }
 }
 
+/// A field missing from the stored settings takes its value from `AppSettings::default()`.
 #[derive(Clone, Deserialize, Serialize)]
+#[serde(default)]
 struct AppSettings {
     pkg_download_path: PathBuf,
     show_toasts: bool,
     show_notifications: bool,
-    #[serde(default)]
+    #[serde(deserialize_with = "default_if_unknown")]
     directory_format: crate::utils::DirectoryFormat,
-    #[serde(default = "default_max_concurrent")]
     max_concurrent_downloads: u32,
-    #[serde(default)]
     rpcs3_config_dir: Option<PathBuf>,
-    #[serde(default)]
     rpcs3_executable: Option<PathBuf>,
-    #[serde(default)]
     content_directory: Option<PathBuf>,
-    #[serde(default)]
+    #[serde(deserialize_with = "default_if_unknown")]
     theme: AppTheme,
+}
+
+/// Reads a stored choice, falling back to its default when the value is one this version does not know,
+/// such as a theme added by a newer version. Without this, one such value fails the whole settings file.
+fn default_if_unknown<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Stored<T> {
+        Known(T),
+        Unknown(serde::de::IgnoredAny),
+    }
+
+    Ok(match Stored::<T>::deserialize(deserializer)? {
+        Stored::Known(value) => value,
+        Stored::Unknown(_) => {
+            warn!("Stored setting has a value this version does not know; using the default");
+            T::default()
+        }
+    })
 }
 
 impl Default for AppSettings {
@@ -578,11 +599,17 @@ impl UpdatesApp {
 
         cc.egui_ctx.set_fonts(fonts);
 
-        let mut app: Self = if let Some(storage) = cc.storage {
-            eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default()
-        } else {
-            Default::default()
-        };
+        let mut app: Self = cc
+            .storage
+            .and_then(|storage| {
+                let app = eframe::get_value(storage, eframe::APP_KEY);
+                if app.is_none() && storage.get_string(eframe::APP_KEY).is_some() {
+                    // The next save overwrites the stored copy, so this log line is the only trace of it.
+                    error!("Stored settings could not be read; starting with the defaults");
+                }
+                app
+            })
+            .unwrap_or_default();
 
         app.v.rt_handle = Some(rt_handle);
         app.v.psn_client = Some(psn_client);
@@ -708,4 +735,51 @@ enum ActiveMergeStatus {
     Merging(f32),
     Merged,
     Failed,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn load(stored: &str) -> Option<AppSettings> {
+        ron::from_str::<UpdatesApp>(stored).ok().map(|app| app.settings)
+    }
+
+    #[test]
+    fn unknown_theme_keeps_the_other_settings() {
+        // One value the app cannot read used to reset every setting (RPSN-0101).
+        let settings =
+            load(r#"(settings:(pkg_download_path:"/games/pkgs",show_toasts:false,show_notifications:true,theme:HighContrast))"#);
+        assert!(settings.is_some(), "settings with an unknown theme did not load");
+        let settings = settings.unwrap(); // Checked just above.
+        assert_eq!(settings.pkg_download_path, PathBuf::from("/games/pkgs"));
+        assert!(!settings.show_toasts);
+        assert_eq!(settings.theme, AppTheme::default());
+    }
+
+    #[test]
+    fn saved_settings_load_unchanged() {
+        let mut app = UpdatesApp::default();
+        app.settings.theme = AppTheme::PlayStation;
+        app.settings.directory_format = crate::utils::DirectoryFormat::TitleSerial;
+        app.settings.max_concurrent_downloads = 7;
+        let stored = ron::ser::to_string(&app).expect("settings serialize");
+
+        let settings = load(&stored);
+        assert!(settings.is_some(), "saved settings did not load: {stored}");
+        let settings = settings.unwrap(); // Checked just above.
+        assert_eq!(settings.theme, AppTheme::PlayStation);
+        assert_eq!(settings.directory_format, crate::utils::DirectoryFormat::TitleSerial);
+        assert_eq!(settings.max_concurrent_downloads, 7);
+    }
+
+    #[test]
+    fn missing_setting_takes_its_default() {
+        let settings = load(r#"(settings:(pkg_download_path:"/games/pkgs",directory_format:Sideways))"#);
+        assert!(settings.is_some(), "settings missing a field did not load");
+        let settings = settings.unwrap(); // Checked just above.
+        assert_eq!(settings.pkg_download_path, PathBuf::from("/games/pkgs"));
+        assert!(settings.show_toasts);
+        assert_eq!(settings.directory_format, crate::utils::DirectoryFormat::default());
+    }
 }
