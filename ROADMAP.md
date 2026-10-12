@@ -1232,9 +1232,14 @@ reviewer proposed; check both against the code before fixing.
   Source: user-request-2026-10-12; cargo audit via pressless session 2026-10-12.
   Lanes: Build, PSN, Content.
 
-- 📋 [RPSN-0126] **Write the dependency-version rule as a standard, with a record of versions known to break.**
+- ✅ [RPSN-0126] **Write the dependency-version rule as a standard, with a record of versions known to break.**
   Owner rule 2026-10-12: always the latest version, for features and security. An older version only when no other way exists and a newer one explicitly breaks a feature; then record which version breaks what, so a later release can be re-tested and the pin lifted.
   First read ~/.claude/standards/dependencies.md: if the machine-wide standard already says this, apply it here; if not, the change belongs to the ~/.claude (claude-config) session, and a project override goes in docs/standards/. A new or changed standard takes CLAUDE.md rule 14's review-contract gate.
+  Resolved (2026-10-12): dependencies.md already states latest-by-default
+  and the broke-at ledger; the owner's rule is stricter on one point (no
+  hold for a migration nobody has time for). Owner chose machine-wide, so
+  that change and a standard ledger path went to claude-config (message
+  612). Project side: docs/dependency-holds.md, the ledger, no rows.
   **Layman:** Write down the rule that libraries stay up to date, and keep a list of versions that broke something.
   Kind: doc.
   Source: user-request-2026-10-12.
