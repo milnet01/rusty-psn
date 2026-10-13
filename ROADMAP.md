@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=133 -->
+<!-- ants-roadmap-id-high-water: RPSN=134 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -110,6 +110,18 @@ Foundational work that should be done before adding new features, as it reduces 
   **Layman:** Maybe change how the window waits for downloads, to make the code simpler.
   Kind: refactor.
   Source: todo-md-import-2026-10-12.
+
+- 📋 [RPSN-0134] **Clear the event buffer in each pass of the update XML parser.**
+  src/psn/parser.rs parse_response never calls event_buf.clear(), so the
+  buffer holds every event of the reply until the parse ends. The
+  firmware parser in src/psn/firmware.rs clears it at the end of each
+  pass. Clear it the same way; the `continue` in the "Code" arm skips the
+  end of the loop, so the clear must run before the match or on that path
+  too.
+  **Layman:** Use less memory while reading Sony's update list.
+  Kind: optimize.
+  Source: in-session-2026-10-13 RPSN-0104 review.
+  Lanes: PSN.
 
 ## 2. Improved Download Directory Structure [P0]
 
