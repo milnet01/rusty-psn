@@ -93,10 +93,20 @@ Foundational work that should be done before adding new features, as it reduces 
   Kind: refactor.
   Source: todo-md-import-2026-10-12.
 
-- 💭 [RPSN-0010] **Consider migrating from `poll-promise` to native `tokio` channels + `eframe`'s `request_repaint_after()` for a cleaner async-UI bridge.**
+- ✅ [RPSN-0010] **Consider migrating from `poll-promise` to native `tokio` channels + `eframe`'s `request_repaint_after()` for a cleaner async-UI bridge.**
   Checked against the code 2026-10-12: Undecided — poll-promise is
   still used; no request_repaint_after.
   Former TODO.md task 1.10.
+  Decided by the owner (2026-10-13): replace poll-promise with a small
+  local helper built on tokio that offers the three calls the code uses
+  (spawn_async, ready, block_and_take). No request_repaint_after: each
+  task already calls request_repaint. poll-promise 0.3.0 has had no
+  push since 2023-09-29.
+  Resolved (2026-10-13): src/promise.rs replaces poll-promise with the
+  same three calls, so call sites changed only their import. tokio now
+  declares rt-multi-thread itself: poll-promise had been enabling it, and
+  Runtime::new needs it. Two new tests; the waiting test went red when
+  block_and_take was broken to not wait.
   **Layman:** Maybe change how the window waits for downloads, to make the code simpler.
   Kind: refactor.
   Source: todo-md-import-2026-10-12.

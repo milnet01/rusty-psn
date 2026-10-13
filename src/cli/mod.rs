@@ -4,9 +4,9 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicU8;
 use std::sync::Arc;
 
+use crate::promise::Promise;
 use bytesize::ByteSize;
 use crossterm::{cursor, terminal};
-use poll_promise::Promise;
 use tokio::runtime::Runtime;
 
 use crate::psn::*;

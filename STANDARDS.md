@@ -186,7 +186,7 @@ PackageInfo {
 ### 4.4 Async Patterns
 
 - **Runtime**: Tokio with minimal features (`rt`, `io-util`, `macros`, `fs`)
-- **UI bridging**: `poll-promise` crate bridges async tasks to synchronous egui/CLI loops
+- **UI bridging**: `Promise` in `src/promise.rs` bridges async tasks to synchronous egui/CLI loops
 - **Channel communication**: `tokio::sync::mpsc` channels relay download/merge progress from async tasks to UI
 - **egui runtime isolation**: Tokio runtime runs in a dedicated thread to prevent egui from blocking async I/O when the window is minimized/suspended
 - **Shared state**: `Arc<Mutex<T>>` (tokio Mutex) for progress status shared between async download tasks and UI rendering

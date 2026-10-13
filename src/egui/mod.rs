@@ -5,13 +5,13 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::promise::Promise;
 use bytesize::ByteSize;
 use copypasta::{ClipboardContext, ClipboardProvider};
 use eframe::egui;
 use egui_notify::{Toast, ToastLevel, Toasts};
 use log::{error, info, warn};
 use notify_rust::Notification;
-use poll_promise::Promise;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
 use tokio::select;

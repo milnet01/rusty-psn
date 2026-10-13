@@ -36,9 +36,8 @@ eframe = { version = "0.36.2", features = ["persistence"], optional = true }
 egui-notify = { version = "0.23.0", optional = true }
 notify-rust = { version = "4.18.2", optional = true }
 
-poll-promise = { version = "0.3.0", features = ["tokio"] }
 serde = { version = "1.0.229", default-features = false, features = ["derive"] }
-tokio = { version = "1.53.2", default-features = false, features = ["rt", "io-util", "macros", "fs", "sync", "process"] }
+tokio = { version = "1.53.2", default-features = false, features = ["rt", "rt-multi-thread", "io-util", "macros", "fs", "sync", "process"] }
 
 [target.'cfg(unix)'.dependencies]
 # O_NOFOLLOW for download files (src/utils.rs, download_file_options).

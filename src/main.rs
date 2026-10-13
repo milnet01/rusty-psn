@@ -19,6 +19,7 @@ mod cli;
 mod content;
 #[cfg(feature = "egui")]
 mod egui;
+mod promise;
 mod psn;
 mod rpcs3;
 mod security;
