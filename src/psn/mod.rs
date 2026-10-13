@@ -91,9 +91,12 @@ pub const CANCEL_ABORT: u8 = 2;
 
 #[derive(Debug)]
 pub enum DownloadError {
-    // bool represents whether we received less data than expected.
-    // Sony's servers like to drop out before the transfer is actually completed.
-    HashMismatch(bool),
+    /// The checksum failed. `short_on_data` says less arrived than expected, which Sony's servers
+    /// cause by dropping out early. `file` is the partial file kept on disk so a retry can resume it.
+    HashMismatch {
+        short_on_data: bool,
+        file: Option<PathBuf>,
+    },
     /// A file with no hash to check (firmware) ended before its stated size.
     Incomplete {
         received: u64,
@@ -116,8 +119,42 @@ impl From<crate::utils::FileError> for DownloadError {
         match e {
             crate::utils::FileError::Io(e) => DownloadError::Tokio(e),
             crate::utils::FileError::Security(e) => DownloadError::Security(e),
-            crate::utils::FileError::TooShort => DownloadError::HashMismatch(true),
+            crate::utils::FileError::TooShort => DownloadError::HashMismatch {
+                short_on_data: true,
+                file: None,
+            },
         }
+    }
+}
+
+impl DownloadError {
+    /// Deletes the partial file a failed download kept for resuming (S1). Call it once no retry will follow.
+    pub fn discard_kept_file(&self) {
+        if let DownloadError::HashMismatch { file: Some(path), .. } = self {
+            match std::fs::remove_file(path) {
+                Ok(()) => info!("Removed {} after its last failed attempt", path.display()),
+                Err(e) => warn!("Could not remove {}: {e}", path.display()),
+            }
+        }
+    }
+}
+
+/// Ends a download whose checksum failed. A file that arrived whole can never verify, so it is deleted now.
+/// A short one is kept so a retry can resume it (S2), and the caller discards it once it stops retrying.
+async fn checksum_failed(path: PathBuf, short_on_data: bool) -> DownloadError {
+    if short_on_data {
+        return DownloadError::HashMismatch {
+            short_on_data,
+            file: Some(path),
+        };
+    }
+    match tokio::fs::remove_file(&path).await {
+        Ok(()) => info!("Removed {}, which arrived whole but failed its checksum", path.display()),
+        Err(e) => warn!("Could not remove {}: {e}", path.display()),
+    }
+    DownloadError::HashMismatch {
+        short_on_data,
+        file: None,
     }
 }
 
@@ -534,14 +571,22 @@ impl PackageInfo {
 
         let _ = tx.send(DownloadStatus::Verifying).await;
 
-        if crate::utils::hash_file(&mut pkg_file, &self.sha1sum, self.hash_whole_file).await? {
+        // A file shorter than the hash suffix it must carry is short on data, and is kept for resume like one.
+        let (verified, too_short) = match crate::utils::hash_file(&mut pkg_file, &self.sha1sum, self.hash_whole_file).await {
+            Ok(verified) => (verified, false),
+            Err(crate::utils::FileError::TooShort) => (false, true),
+            Err(e) => return Err(e.into()),
+        };
+
+        if verified {
             info!("Hash for {serial} {} matched, wrapping up...", self.version);
             let _ = tx.send(DownloadStatus::DownloadSuccess).await;
             Ok(pkg_file_path)
         } else {
             error!("Hash mismatch for {serial} {}!", self.version);
             let _ = tx.send(DownloadStatus::DownloadFailure).await;
-            Err(DownloadError::HashMismatch(received_data < self.size))
+            drop(pkg_file); // Windows cannot delete a file that is still open.
+            Err(checksum_failed(pkg_file_path, too_short || received_data < self.size).await)
         }
     }
 
@@ -566,6 +611,35 @@ impl PackageInfo {
 
 #[cfg(test)]
 mod tests {
+    use super::{checksum_failed, DownloadError};
+
+    #[tokio::test]
+    async fn a_whole_file_that_fails_its_checksum_is_deleted() {
+        // Resuming cannot fix a file that arrived whole, so it must not be kept (S1, RPSN-0116).
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("update.pkg");
+        std::fs::write(&path, b"corrupt").unwrap();
+
+        let err = checksum_failed(path.clone(), false).await;
+
+        assert!(!path.exists());
+        assert!(matches!(err, DownloadError::HashMismatch { file: None, .. }));
+    }
+
+    #[tokio::test]
+    async fn a_short_file_is_kept_for_resume_then_discarded() {
+        // A short file stays for the retry to resume (S2) and goes once retries stop (S1, RPSN-0116).
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("update.pkg");
+        std::fs::write(&path, b"partial").unwrap();
+
+        let err = checksum_failed(path.clone(), true).await;
+        assert!(path.exists());
+
+        err.discard_kept_file();
+        assert!(!path.exists());
+    }
+
     fn test_client() -> reqwest::Client {
         super::build_psn_client().expect("failed to build test client")
     }

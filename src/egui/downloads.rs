@@ -41,7 +41,7 @@ impl UpdatesApp {
                     }
                     Err(e) => {
                         match e {
-                            DownloadError::HashMismatch(short_on_data) => {
+                            DownloadError::HashMismatch { short_on_data, .. } => {
                                 if *short_on_data && download.retry_count < MAX_AUTO_RETRIES {
                                     // Sony dropped the connection. Auto-retry with resume.
                                     info!(
@@ -69,6 +69,7 @@ impl UpdatesApp {
                                     ));
                                 } else {
                                     // True hash mismatch or max retries exceeded.
+                                    e.discard_kept_file();
                                     self.v.failed_downloads.push(FailedDownload {
                                         title_id: download.title_id.clone(),
                                         pkg_id: download.pkg_id.clone(),

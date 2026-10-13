@@ -345,7 +345,7 @@ pub fn start_app(args: Args) -> bool {
                             }
                             if let Err(e) = result {
                                 match e {
-                                    DownloadError::HashMismatch(short_on_data) => {
+                                    DownloadError::HashMismatch { short_on_data, .. } => {
                                         if *short_on_data && attempt <= max_retries {
                                             // Sony dropped the connection. Auto-retry with resume.
                                             info!(
@@ -370,6 +370,7 @@ pub fn start_app(args: Args) -> bool {
                                                 short_on_data
                                             );
                                             println!("Error downloading update: hash mismatch on downloaded file.");
+                                            e.discard_kept_file();
 
                                             if *short_on_data {
                                                 println!("The downloaded file is smaller than expected. Max retries exceeded.");

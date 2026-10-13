@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=134 -->
+<!-- ants-roadmap-id-high-water: RPSN=135 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1359,8 +1359,17 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0116] **Remove a download that fails its checksum, once retries are exhausted.**
+- ✅ [RPSN-0116] **Remove a download that fails its checksum, once retries are exhausted.**
   S1 says a file that fails the check is never kept. Reproduced 2026-10-12: PCSA00007 01.01 failed verification (before F12) and the 13,977,360-byte file stayed. Resume relies on keeping a partial file, so delete only after the final failed attempt; decide whether PSN or the front end owns it (src/cli/mod.rs:336-389).
+  Resolved (2026-10-13): the PSN layer owns a file that arrived whole
+  and failed its checksum, and deletes it at once (checksum_failed),
+  since resuming cannot fix it. A short file is kept for the retry to
+  resume (S2) and carried in HashMismatch { file }; both front ends call
+  DownloadError::discard_kept_file when they stop retrying (S1). A file
+  too short to hold its hash suffix now takes the short path at the
+  final check. Tests: a_whole_file_that_fails_its_checksum_is_deleted
+  and a_short_file_is_kept_for_resume_then_discarded, both red on the
+  old behaviour.
   **Layman:** A download that failed its check stays on disk.
   Kind: fix.
   Source: audit-2026-10-12 verify-delivery VD2 (S1).
@@ -1510,3 +1519,10 @@ reviewer proposed; check both against the code before fixing.
   Kind: doc-fix.
   Source: in-session-2026-10-12 (check-doc-facts over STANDARDS.md).
   Lanes: docs.
+
+- 📋 [RPSN-0135] **Resume a partial download shorter than its hash suffix instead of failing.**
+  PackageInfo::start_download checks an existing file with hash_file before deciding to resume. A file shorter than the hash suffix makes hash_file return FileError::TooShort, and the `?` turns it into a HashMismatch with no file. So the download fails without resuming, every retry repeats it, and discard_kept_file has no path to remove. Remedy: treat TooShort at that first check as "not complete" and carry on to the resume decision, as the final check already does (RPSN-0116).
+  **Layman:** A tiny leftover piece of a download blocks the download from starting again.
+  Kind: fix.
+  Source: in-session-2026-10-13 RPSN-0116.
+  Lanes: PSN.
