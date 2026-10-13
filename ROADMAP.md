@@ -1305,8 +1305,14 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM + check-code.
   Lanes: Build.
 
-- 📋 [RPSN-0110] **Only fall back to an AppImage whose name says rpcs3.**
+- ✅ [RPSN-0110] **Only fall back to an AppImage whose name says rpcs3.**
   src/rpcs3/auto_detect.rs:126-131 returns the first *.AppImage in the folder when the expected one is missing; install_pkg then runs it with --installpkg. Remedy: require rpcs3 in the name (case-insensitive) or return None.
+  Resolved (2026-10-13): the fallback in detect_appimage_executable now
+  takes only an AppImage whose name contains rpcs3 (any case), else
+  None. Tests: appimage_fallback_ignores_an_unrelated_appimage (red on
+  the old code, which returned Krita.AppImage) and
+  appimage_fallback_takes_a_renamed_rpcs3. The owner's own
+  RPCS3.AppImage is found by exact name and never reaches the fallback.
   **Layman:** Auto-detect could pick an unrelated program as RPCS3.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.

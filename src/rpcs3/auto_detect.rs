@@ -111,11 +111,13 @@ fn detect_appimage_executable(config_dir: &std::path::Path) -> Option<PathBuf> {
             if appimage_path.exists() && appimage_path.is_file() {
                 return Some(appimage_path);
             }
-            // Also scan parent for any *.AppImage files
+            // Fall back to a renamed RPCS3 AppImage beside it. The name must say rpcs3, because
+            // install_pkg runs whatever this returns with --installpkg.
             if let Ok(entries) = std::fs::read_dir(parent) {
                 for entry in entries.flatten() {
                     let entry_name = entry.file_name().to_string_lossy().to_string();
-                    if entry_name.ends_with(".AppImage") && entry.path().is_file() {
+                    if entry_name.ends_with(".AppImage") && entry_name.to_lowercase().contains("rpcs3") && entry.path().is_file()
+                    {
                         return Some(entry.path());
                     }
                 }
@@ -221,4 +223,36 @@ fn scan_for_appimage_config(search_dir: &std::path::Path) -> Option<PathBuf> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A folder holding `rpcs3-old.AppImage.home/.config/rpcs3` but not `rpcs3-old.AppImage`, plus `others`.
+    fn appimage_folder(others: &[&str]) -> (tempfile::TempDir, PathBuf) {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let config_dir = dir.path().join("rpcs3-old.AppImage.home/.config/rpcs3");
+        std::fs::create_dir_all(&config_dir).expect("config dir");
+        for name in others {
+            std::fs::write(dir.path().join(name), b"").expect("appimage file");
+        }
+        (dir, config_dir)
+    }
+
+    #[test]
+    fn appimage_fallback_ignores_an_unrelated_appimage() {
+        // Another program's AppImage must never be run with --installpkg (RPSN-0110).
+        let (_dir, config_dir) = appimage_folder(&["Krita.AppImage"]);
+        assert_eq!(detect_appimage_executable(&config_dir), None);
+    }
+
+    #[test]
+    fn appimage_fallback_takes_a_renamed_rpcs3() {
+        let (dir, config_dir) = appimage_folder(&["Krita.AppImage", "RPCS3-v0.0.38.AppImage"]);
+        assert_eq!(
+            detect_appimage_executable(&config_dir),
+            Some(dir.path().join("RPCS3-v0.0.38.AppImage"))
+        );
+    }
 }
