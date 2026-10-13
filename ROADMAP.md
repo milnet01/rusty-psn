@@ -1260,8 +1260,15 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM.
   Lanes: Command line.
 
-- 📋 [RPSN-0106] **Exit non-zero when a command-line run had failures.**
+- ✅ [RPSN-0106] **Exit non-zero when a command-line run had failures.**
   src/cli/mod.rs:157-194, 336-386 and the install path print each failure and exit 0, so --silent batch runs that fail look successful; the same in download_firmware_cli (:574-583, :654-656). Remedy: count failures and exit with a non-zero code.
+  Resolved (2026-10-13): start_app and download_firmware_cli now return
+  whether the run succeeded, and main exits 1 (after flushing the log)
+  when it did not. Counted as failures: a failed search, a download that
+  ended without a file, a failed install, a bad selection typed at a
+  prompt, and every firmware failure. A serial with no updates, or an
+  unanswered prompt, is not one. STANDARDS.md 7.3 states this. Test:
+  tests/cli_exit_code.rs (exit 0 on the old code, 1 after).
   **Layman:** Scripts cannot tell when a silent run failed.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM.

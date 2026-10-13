@@ -339,7 +339,7 @@ Both are independently toggleable in settings.
 
 | Argument | Short | Required | Description |
 |---|---|---|---|
-| `--titles` | `-t` | Conditional | Space-separated serials in quotes |
+| `--titles` | `-t` | Conditional | Space-separated serials in quotes; may be given more than once |
 | `--batch-file` | `-b` | Conditional | Path to text file with serials (one per line) |
 | `--scan-rpcs3` | - | Conditional | Scan RPCS3 library for available updates |
 | `--silent` | `-s` | No | Download all without prompts, print only errors |
@@ -358,6 +358,11 @@ One of `--titles`, `--batch-file`, or `--scan-rpcs3` must be provided.
 4. Prompt user to select packages by index (space-separated), or press Enter for all
 5. Download selected packages with live progress display via crossterm cursor manipulation
 6. 3-second pause between title groups
+
+### 7.3 Exit Code
+
+The command line exits with 1 when any search, download, install or firmware download it was asked for failed, and 0 otherwise.
+A serial with no updates is not a failure, and nor is a prompt left unanswered. A bad selection typed at a prompt is.
 
 ---
 

@@ -94,7 +94,11 @@ fn main() {
     #[cfg(feature = "cli")]
     {
         info!("starting cli app");
-        cli::start_app(args);
+        if !cli::start_app(args) {
+            // process::exit skips destructors, so the log is flushed first.
+            _logger_handle.flush();
+            std::process::exit(1);
+        }
     }
 
     #[cfg(feature = "egui")]

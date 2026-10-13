@@ -24,7 +24,9 @@ fn read_answer(input: &mut impl std::io::BufRead) -> Option<String> {
     }
 }
 
-pub fn start_app(args: Args) {
+/// Runs the command line. Returns `false` when any search, download or install it was asked for failed,
+/// so the caller can exit non-zero. A serial with no updates, or a prompt left unanswered, is not a failure.
+pub fn start_app(args: Args) -> bool {
     let runtime = Runtime::new().expect("Failed to start the async runtime");
 
     let _guard = runtime.enter();
@@ -37,10 +39,7 @@ pub fn start_app(args: Args) {
         let destination = args.destination_path.clone().unwrap_or_else(|| PathBuf::from("pkgs/"));
         let silent = args.silent;
 
-        runtime.block_on(async {
-            download_firmware_cli(&client, console, region, &destination, silent).await;
-        });
-        return;
+        return runtime.block_on(download_firmware_cli(&client, console, region, &destination, silent));
     }
 
     let silent_mode = args.silent;
@@ -130,6 +129,8 @@ pub fn start_app(args: Args) {
     // redundant TLS handshakes and enables connection pooling across requests.
     let client = crate::psn::build_psn_client().expect("Failed to build HTTP client");
 
+    let mut failures = 0usize;
+
     let update_info = {
         let mut info = Vec::new();
 
@@ -158,40 +159,45 @@ pub fn start_app(args: Args) {
                     info!("Successfully search for updates for {id}");
                     info.push(i);
                 }
-                Err(e) => match e {
-                    UpdateError::UnhandledErrorResponse(e) => {
-                        error!("Unexpected error received in response from PSN: {e}");
-                        println!("{id}: PSN returned an unexpected error: {e}.");
+                Err(e) => {
+                    if !matches!(e, UpdateError::NoUpdatesAvailable) {
+                        failures += 1;
                     }
-                    UpdateError::InvalidSerial => {
-                        error!("Invalid serial for updates query {id}");
-                        println!("{id}: The provided serial didn't give any results, double-check your input.");
+                    match e {
+                        UpdateError::UnhandledErrorResponse(e) => {
+                            error!("Unexpected error received in response from PSN: {e}");
+                            println!("{id}: PSN returned an unexpected error: {e}.");
+                        }
+                        UpdateError::InvalidSerial => {
+                            error!("Invalid serial for updates query {id}");
+                            println!("{id}: The provided serial didn't give any results, double-check your input.");
+                        }
+                        UpdateError::NoUpdatesAvailable => {
+                            warn!("No updates available for serial {id}");
+                            println!("{id}: The provided serial doesn't have any available updates.");
+                        }
+                        UpdateError::Reqwest(e) => {
+                            error!("reqwest error on updates query: {e}");
+                            println!("{id}: There was an error on the request: {e}.");
+                        }
+                        UpdateError::XmlParsing(e) => {
+                            error!("Failed to deserialize response for {id}: {e}");
+                            println!("{id}: Error parsing response from PSN, try again later ({e}).");
+                        }
+                        UpdateError::ManifestParsing(e) => {
+                            error!("Failed to deserialize manifest response for {id}: {e}");
+                            println!("{id}: Error parsing manifest response from PSN, try again later ({e}).");
+                        }
+                        UpdateError::Security(e) => {
+                            error!("Security check failed for {id}: {e}");
+                            println!("{id}: Security check failed: {e}.");
+                        }
+                        UpdateError::ResponseTooLarge(size) => {
+                            error!("Response too large for {id}: {size} bytes");
+                            println!("{id}: Server response too large ({size} bytes).");
+                        }
                     }
-                    UpdateError::NoUpdatesAvailable => {
-                        warn!("No updates available for serial {id}");
-                        println!("{id}: The provided serial doesn't have any available updates.");
-                    }
-                    UpdateError::Reqwest(e) => {
-                        error!("reqwest error on updates query: {e}");
-                        println!("{id}: There was an error on the request: {e}.");
-                    }
-                    UpdateError::XmlParsing(e) => {
-                        error!("Failed to deserialize response for {id}: {e}");
-                        println!("{id}: Error parsing response from PSN, try again later ({e}).");
-                    }
-                    UpdateError::ManifestParsing(e) => {
-                        error!("Failed to deserialize manifest response for {id}: {e}");
-                        println!("{id}: Error parsing manifest response from PSN, try again later ({e}).");
-                    }
-                    UpdateError::Security(e) => {
-                        error!("Security check failed for {id}: {e}");
-                        println!("{id}: Security check failed: {e}.");
-                    }
-                    UpdateError::ResponseTooLarge(size) => {
-                        error!("Response too large for {id}: {size} bytes");
-                        println!("{id}: Server response too large ({size} bytes).");
-                    }
-                },
+                }
             }
         }
 
@@ -259,6 +265,7 @@ pub fn start_app(args: Args) {
                 Some(selection) => updates_to_fetch = selection,
                 None => {
                     println!("No valid update numbers in '{response}'; skipping {}.", update.title_id);
+                    failures += 1;
                     continue;
                 }
             }
@@ -480,6 +487,9 @@ pub fn start_app(args: Args) {
                 }
 
                 if !should_retry {
+                    if downloaded_file.is_none() {
+                        failures += 1;
+                    }
                     // If the download succeeded and --install is set, install exactly the file it wrote.
                     if install_mode {
                         if let (Some(exe), Some(path)) = (rpcs3_exe.as_ref(), downloaded_file.as_ref()) {
@@ -495,6 +505,7 @@ pub fn start_app(args: Args) {
                                 Err(e) => {
                                     error!("RPCS3 install failed: {e}");
                                     eprintln!("  Install failed: {e}");
+                                    failures += 1;
                                 }
                             }
                         }
@@ -516,6 +527,8 @@ pub fn start_app(args: Args) {
             );
         }
     }
+
+    failures == 0
 }
 
 fn parse_firmware_console(s: &str) -> crate::psn::firmware::FirmwareConsole {
@@ -553,13 +566,14 @@ fn parse_firmware_region(s: &str) -> crate::psn::firmware::FirmwareRegion {
     }
 }
 
+/// Returns `false` when the firmware was not downloaded. An unanswered prompt is not a failure.
 async fn download_firmware_cli(
     client: &reqwest::Client,
     console: crate::psn::firmware::FirmwareConsole,
     region: crate::psn::firmware::FirmwareRegion,
     destination: &std::path::Path,
     silent: bool,
-) {
+) -> bool {
     if !silent {
         println!("Fetching {} firmware list for {}...", console, region);
     }
@@ -569,13 +583,13 @@ async fn download_firmware_cli(
         Err(e) => {
             error!("Firmware fetch failed: {e}");
             eprintln!("Error: Firmware fetch failed: {e}");
-            return;
+            return false;
         }
     };
 
     if entries.is_empty() {
         eprintln!("No firmware entries found.");
-        return;
+        return false;
     }
 
     if !silent {
@@ -601,7 +615,7 @@ async fn download_firmware_cli(
             Some(answer) => answer,
             None => {
                 println!("No answer read; nothing downloaded.");
-                return;
+                return true;
             }
         };
         let response = response.as_str();
@@ -614,13 +628,13 @@ async fn download_firmware_cli(
             entries.get(idx)
         } else {
             eprintln!("Invalid selection.");
-            return;
+            return false;
         }
     };
 
     let Some(fw) = fw else {
         eprintln!("No firmware entry selected.");
-        return;
+        return false;
     };
 
     if !silent {
@@ -657,7 +671,7 @@ async fn download_firmware_cli(
                 } else if !silent {
                     println!("\nFirmware download completed successfully.");
                 }
-                break;
+                break result.is_ok();
             }
             None => {
                 if let Ok(status) = rx.try_recv() {
