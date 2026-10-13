@@ -962,6 +962,10 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   .ants/project.json holds "repo_root": "rusty-psn-source" (outside this
   repo, so untracked here). roadmap_query from the outer folder now
   resolves to this ROADMAP.md.
+  Superseded (2026-10-13): at the owner's request the repository moved
+  up into the outer rusty-psn folder, so there is no longer an outer
+  folder to point anywhere. The repo_root file was removed, the roadmap
+  store was rerooted, and all local checks pass from the new location.
   **Layman:** Let the terminal tab find this project's roadmap from the folder it opens in.
   Kind: chore.
   Source: ants-terminal session message 2026-10-12 (ANTS-5664, ANTS-5667).
