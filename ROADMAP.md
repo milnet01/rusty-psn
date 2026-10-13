@@ -804,7 +804,7 @@ Lower priority items that would improve the overall experience.
   user's behalf. Deliver into ~/.local/share/claude-handoff/rusty-psn-site-page/,
   then message that session (ants-projects-hub-website). Never edit the
   website repo: every push there publishes the live site. Current page
-  text, read-only: /mnt/Games/Scripts/Linux/Ants_Projects_Hub_Website/src/about/rusty-psn.md
+  text, read-only: src/about/rusty-psn.md in the website repo
   1. Credit: which parts are RainbowCookie32's (upstream author) and which
      are ours; the downloading itself is theirs. One or two sentences.
   2. Licence: confirm the upstream licence file and copyright notice are
@@ -938,7 +938,7 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   Lanes: Security.
 
 - ✅ [RPSN-0128] **Point the outer rusty-psn folder at rusty-psn-source once Ants Terminal ships ANTS-5667.**
-  The tab opens in /mnt/Games/Scripts/Linux/rusty-psn, one level above the
+  The tab opens in the outer rusty-psn folder, one level above the
   repo, so the Roadmap button and MCP verbs find nothing there. Ants
   Terminal's fix (ANTS-5667) adds a key to the OUTER folder's
   .ants/project.json, proposed as { "repo_root": "rusty-psn-source" }.
