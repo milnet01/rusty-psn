@@ -1206,8 +1206,14 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 2 MEDIUM.
   Lanes: PSN.
 
-- 📋 [RPSN-0104] **Return reader errors from the update XML parser.**
+- ✅ [RPSN-0104] **Return reader errors from the update XML parser.**
   src/psn/parser.rs:137 `_ => {}` swallows Err from read_event_into (the firmware parser returns it). Unsettled: whether quick-xml (0.37.5 and 0.38.4 both in Cargo.lock) advances after an error; if not, this loops. Remedy: Err(e) => return Err(ParseError::XmlParsing(e)).
+  Resolved (2026-10-13): parse_response now returns
+  Err(ParseError::XmlParsing(e)) on a reader error, as the firmware parser
+  already did. The project is on quick-xml 0.42 now; the new test
+  (parse_response_returns_reader_errors) failed on its assertion before the
+  fix and did not hang, so the reader moves past an error and the loop could
+  not spin. The return also ends the loop.
   **Layman:** A damaged reply from Sony can give a half-filled update list with no error.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 2 MEDIUM.
