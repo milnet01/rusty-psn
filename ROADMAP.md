@@ -918,6 +918,11 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   there publishes it, so it needs the owner's yes. align-report also lists
   no `docs/standards/versioning-overrides.md`; recommended to wait until a
   release is planned.
+  Progress (2026-10-13): fork done. The owner chose a public fork,
+  https://github.com/milnet01/rusty-psn, added here as the remote `fork`;
+  `local-dev` was pushed and tracks it, and `origin` stays upstream. The
+  owner agreed to publish with their usual commit email. Still open: the
+  versioning-overrides note, to wait for a planned release.
   **Layman:** Decide whether to back up your work in your own GitHub copy, and when to note what counts as a breaking change.
   Kind: chore.
   Source: in-session-2026-10-12.
