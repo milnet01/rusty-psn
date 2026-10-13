@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=141 -->
+<!-- ants-roadmap-id-high-water: RPSN=145 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1044,7 +1044,7 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: design-review-2026-10-12.
   Lanes: docs.
 
-- 💭 [RPSN-0133] **Redesign the window app after the approved mockups.**
+- 📋 [RPSN-0133] **Redesign the window app after the approved mockups.**
   Mockups: https://claude.ai/artifact/PWr5yiihCDzG1JCswamS3m
   (four screens: Search, Downloads, RPCS3 library, Settings).
   Approved by the owner on 2026-10-12 ("I like the new look").
@@ -1055,9 +1055,41 @@ Work named by docs/design.md and its review on 2026-10-12.
   bar, status labels that pair an icon with words, a library
   table with filter buttons, and a Settings page with Save and
   Undo. Stays considered until the owner picks.
+  Owner decision (2026-10-13): build all four parts, in this order:
+  text-size setting, high-contrast theme, status labels pairing an icon
+  with words, then the sidebar with the library table and the Settings
+  page with Save and Undo. Split into RPSN-0142 to RPSN-0145.
   **Layman:** The owner liked a new look for the app; which parts to build, and in what order, is still theirs to choose.
   Kind: ux.
   Source: user-request-2026-10-12.
+
+- 📋 [RPSN-0142] **Add a text-size setting to the window app.**
+  First part of the approved redesign (RPSN-0133). The setting scales all text and is saved with the other settings.
+  **Layman:** Make all text in the app bigger or smaller from Settings.
+  Kind: accessibility.
+  Source: user-request-2026-10-13 RPSN-0133.
+  Lanes: Window app.
+
+- 📋 [RPSN-0143] **Add a high-contrast theme to the window app.**
+  Second part of the approved redesign (RPSN-0133). Relates to RPSN-0059, the theme selector.
+  **Layman:** A stronger-contrast colour scheme that is easier to read.
+  Kind: accessibility.
+  Source: user-request-2026-10-13 RPSN-0133.
+  Lanes: Window app.
+
+- 📋 [RPSN-0144] **Pair every status colour with an icon and words.**
+  Third part of the approved redesign (RPSN-0133), as in the mockups.
+  **Layman:** Each status shows an icon and words, not colour alone.
+  Kind: accessibility.
+  Source: user-request-2026-10-13 RPSN-0133.
+  Lanes: Window app.
+
+- 📋 [RPSN-0145] **Build the redesigned layout: sidebar, library table with filters, Settings with Save and Undo.**
+  Last and largest part of the approved redesign (RPSN-0133); mockups linked there. Spans several screens, so check whether it needs a spec before building (spec-format.md section 1).
+  **Layman:** The new layout from the approved mockups.
+  Kind: ux.
+  Source: user-request-2026-10-13 RPSN-0133.
+  Lanes: Window app.
 
 ## 13. Confirm the signs of success
 
@@ -1294,6 +1326,8 @@ reviewer proposed; check both against the code before fixing.
 
 - 📋 [RPSN-0108] **Decide whether a build with both front ends is supported, then fix main.rs or design.md.**
   src/main.rs:92-96 runs cli::start_app first; with no CLI arguments it exits (cli/mod.rs:104-106), so the window never starts. windows_subsystem also hides CLI output on Windows. Owner decision: compile_error! on cli+egui, or choose the front end at runtime.
+  Owner decision (2026-10-13): refuse a build with both front ends
+  (compile_error! on cli + egui). No runtime choice.
   **Layman:** A build with both the window app and the command line never opens the window.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM.
@@ -1350,6 +1384,11 @@ reviewer proposed; check both against the code before fixing.
   folder and pass that folder to --installpkg, which installs them all.
   That changes docs/design.md's statement that rusty-psn copies the
   licence itself, so it is a direction change for that document.
+  Owner decision (2026-10-13): let RPCS3 place licence files. Hand
+  --installpkg one folder holding the .pkg, .rap and .edat files,
+  instead of copying licences into exdata ourselves. This changes
+  docs/design.md's Writes-outside-the-download-folder line, so that
+  amendment runs through review-contract before the build.
   **Layman:** A DLC can install without its licence and say only that it failed.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
@@ -1598,8 +1637,10 @@ existing item are noted on that item instead.
   Source: rpcs3-source-review-2026-10-13 finding 7.
   Lanes: RPCS3.
 
-- 💭 [RPSN-0141] **Install downloaded firmware into RPCS3 and show its installed version.**
+- 📋 [RPSN-0141] **Install downloaded firmware into RPCS3 and show its installed version.**
   Optional (finding 10). Firmware is only downloaded today. RPCS3 installs it with --installfw <PUP> (not together with --installpkg) and records the installed version in dev_flash/vsh/etc/version.txt (util/sysinfo.cpp at 6fe3c87). Considered, not planned: the owner decides whether it is wanted.
+  Owner decision (2026-10-13): wanted, but after the RPCS3 install fixes
+  (RPSN-0137, RPSN-0138).
   **Layman:** Could install the firmware into RPCS3 for you, not just download it.
   Kind: feature.
   Source: rpcs3-source-review-2026-10-13 finding 10.
