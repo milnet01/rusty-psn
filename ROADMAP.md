@@ -1318,8 +1318,14 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0111] **Install every PKG and licence in a multi-file DLC zip.**
+- ✅ [RPSN-0111] **Install every PKG and licence in a multi-file DLC zip.**
   src/content.rs:198-201 keep only the last .pkg and .rap from a zip, yet return Ok. Remedy: collect all, install or copy each, fail if any step fails.
+  Resolved (2026-10-13): extract_dlc_zip now returns ExtractedDlc with
+  every PKG and RAP in archive order; install_dlc_zip installs each PKG
+  (the first failure stops it) and copies each RAP. Test:
+  extract_dlc_zip_returns_every_pkg_and_rap (red on the old code, which
+  returned only b.PKG). Ordering of licence versus install is left to
+  RPSN-0112.
   **Layman:** DLC bundles install only their last item.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.

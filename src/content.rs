@@ -163,18 +163,25 @@ pub fn scan_content_directory(base_path: &Path) -> ContentLibrary {
     }
 }
 
-/// Extract a DLC ZIP to a temporary directory and return paths to the PKG and RAP files.
-///
-/// The caller is responsible for cleaning up the temp directory (or use `tempfile::TempDir`
-/// which auto-cleans on drop).
-pub fn extract_dlc_zip(zip_path: &Path) -> Result<(PathBuf, Option<PathBuf>, tempfile::TempDir), ContentError> {
+/// The packages and licences extracted from a DLC ZIP, in archive order.
+/// The files live in `temp_dir`, which is removed when this is dropped.
+pub struct ExtractedDlc {
+    pub pkgs: Vec<PathBuf>,
+    pub raps: Vec<PathBuf>,
+    // Held, not read: dropping it deletes the extracted files.
+    #[allow(dead_code)]
+    pub temp_dir: tempfile::TempDir,
+}
+
+/// Extract a DLC ZIP to a temporary directory and return every PKG and RAP file in it.
+pub fn extract_dlc_zip(zip_path: &Path) -> Result<ExtractedDlc, ContentError> {
     let file = std::fs::File::open(zip_path).map_err(ContentError::Io)?;
     let mut archive = zip::ZipArchive::new(file).map_err(ContentError::Zip)?;
 
     let temp_dir = tempfile::tempdir().map_err(ContentError::Io)?;
 
-    let mut pkg_path = None;
-    let mut rap_path = None;
+    let mut pkgs = Vec::new();
+    let mut raps = Vec::new();
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).map_err(ContentError::Zip)?;
@@ -196,15 +203,17 @@ pub fn extract_dlc_zip(zip_path: &Path) -> Result<(PathBuf, Option<PathBuf>, tem
 
             let ext = outpath.extension().and_then(|e| e.to_str()).unwrap_or("");
             if ext.eq_ignore_ascii_case("pkg") {
-                pkg_path = Some(outpath.clone());
+                pkgs.push(outpath);
             } else if ext.eq_ignore_ascii_case("rap") {
-                rap_path = Some(outpath.clone());
+                raps.push(outpath);
             }
         }
     }
 
-    let pkg_path = pkg_path.ok_or(ContentError::NoPkgFound)?;
-    Ok((pkg_path, rap_path, temp_dir))
+    if pkgs.is_empty() {
+        return Err(ContentError::NoPkgFound);
+    }
+    Ok(ExtractedDlc { pkgs, raps, temp_dir })
 }
 
 /// Install a DLC ZIP to RPCS3: extract, install PKG, copy RAP, clean up.
@@ -212,22 +221,24 @@ pub async fn install_dlc_zip(rpcs3_exe: &Path, zip_path: &Path, exdata_dir: &Pat
     info!("Installing DLC from ZIP: {}", zip_path.display());
 
     // Extract (sync, but fast — zips are small)
-    let (pkg_path, rap_path, _temp_dir) = extract_dlc_zip(zip_path)?;
+    let dlc = extract_dlc_zip(zip_path)?;
 
-    // Install PKG via RPCS3
-    crate::rpcs3::install_pkg(rpcs3_exe, &pkg_path)
-        .await
-        .map_err(|e| ContentError::InstallFailed(e.to_string()))?;
+    // Install every PKG via RPCS3; the first failure stops the install.
+    for pkg in &dlc.pkgs {
+        crate::rpcs3::install_pkg(rpcs3_exe, pkg)
+            .await
+            .map_err(|e| ContentError::InstallFailed(e.to_string()))?;
+    }
 
-    // Copy RAP to exdata directory
-    if let Some(rap) = rap_path {
+    // Copy every RAP to the exdata directory
+    for rap in &dlc.raps {
         let rap_filename = rap.file_name().expect("RAP file should have a filename");
         let dest = exdata_dir.join(rap_filename);
-        std::fs::copy(&rap, &dest).map_err(ContentError::Io)?;
+        std::fs::copy(rap, &dest).map_err(ContentError::Io)?;
         info!("Copied RAP license to {}", dest.display());
     }
 
-    // _temp_dir drops here, automatically cleaning up extracted files
+    // dlc.temp_dir drops here, removing the extracted files
     info!("DLC installation complete");
     Ok(())
 }
@@ -253,11 +264,37 @@ mod tests {
         }
         writer.finish().unwrap();
 
-        let (pkg, rap, temp_dir) = extract_dlc_zip(&zip_path).unwrap();
+        let dlc = extract_dlc_zip(&zip_path).unwrap();
 
-        assert_eq!(std::fs::read(&pkg).unwrap(), b"pkg body");
-        assert_eq!(std::fs::read(rap.unwrap()).unwrap(), b"rap body");
-        assert!(pkg.starts_with(temp_dir.path()));
-        assert!(!temp_dir.path().parent().unwrap().join("escape.pkg").exists());
+        assert_eq!(dlc.pkgs.len(), 1);
+        assert_eq!(std::fs::read(&dlc.pkgs[0]).unwrap(), b"pkg body");
+        assert_eq!(std::fs::read(&dlc.raps[0]).unwrap(), b"rap body");
+        assert!(dlc.pkgs[0].starts_with(dlc.temp_dir.path()));
+        assert!(!dlc.temp_dir.path().parent().unwrap().join("escape.pkg").exists());
+    }
+
+    #[test]
+    fn extract_dlc_zip_returns_every_pkg_and_rap() {
+        // A bundle used to install only its last package and licence (RPSN-0111).
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("bundle.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
+        let options = zip::write::SimpleFileOptions::default();
+        for name in ["a.pkg", "a.rap", "b.PKG", "b.rap", "readme.txt"] {
+            writer.start_file(name, options).unwrap();
+            writer.write_all(name.as_bytes()).unwrap();
+        }
+        writer.finish().unwrap();
+
+        let dlc = extract_dlc_zip(&zip_path).unwrap();
+        let names = |paths: &[PathBuf]| -> Vec<String> {
+            paths
+                .iter()
+                .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+                .collect()
+        };
+
+        assert_eq!(names(&dlc.pkgs), ["a.pkg", "b.PKG"]);
+        assert_eq!(names(&dlc.raps), ["a.rap", "b.rap"]);
     }
 }
