@@ -32,7 +32,7 @@ struct Args {
     #[clap(
         short,
         long,
-        help = "The serial(s) you want to search for, in quotes and separated by spaces"
+        help = "The serial(s) you want to search for, in quotes and separated by spaces. Can be given more than once"
     )]
     titles: Vec<String>,
     #[cfg(feature = "cli")]

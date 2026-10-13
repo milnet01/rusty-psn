@@ -104,7 +104,7 @@ pub fn start_app(args: Args) {
             }
         }
     } else if !args.titles.is_empty() {
-        args.titles[0].split(' ').map(|s| s.to_string()).collect()
+        serials_from_titles(&args.titles)
     } else {
         eprintln!("Error: provide --titles (-t), --batch-file (-b), or --scan-rpcs3.");
         std::process::exit(1);
@@ -697,6 +697,18 @@ async fn download_firmware_cli(
     }
 }
 
+/// Collect the serials from every `-t` value, split on any whitespace, normalised and deduplicated
+/// as a batch file's are. Validation stays with the search, which reports a bad serial by name.
+fn serials_from_titles(titles: &[String]) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    titles
+        .iter()
+        .flat_map(|t| t.split_whitespace())
+        .map(crate::psn::parse_title_id)
+        .filter(|serial| seen.insert(serial.clone()))
+        .collect()
+}
+
 /// Parse the update numbers typed at the download prompt. An empty selection means every update.
 /// Returns `None` when any entry is not a listed update number, so a typo never means "everything".
 fn parse_update_selection(input: &str, count: usize) -> Option<Vec<usize>> {
@@ -741,5 +753,12 @@ mod tests {
         assert_eq!(parse_update_selection("n", 3), None);
         assert_eq!(parse_update_selection("5", 3), None);
         assert_eq!(parse_update_selection("1,2", 3), None);
+    }
+
+    #[test]
+    fn serials_from_titles_reads_every_flag_and_any_whitespace() {
+        // `-t A -t B` used to drop B, and a double space gave an empty serial (RPSN-0105).
+        let titles = vec!["bles00001  npeb00002".to_string(), "BLES-00001\tBLUS00003 ".to_string()];
+        assert_eq!(serials_from_titles(&titles), vec!["BLES00001", "NPEB00002", "BLUS00003"]);
     }
 }

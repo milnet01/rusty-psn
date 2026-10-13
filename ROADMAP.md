@@ -1246,8 +1246,15 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 2 MEDIUM.
   Lanes: PSN.
 
-- 📋 [RPSN-0105] **Accept every -t flag and any whitespace between serials.**
+- ✅ [RPSN-0105] **Accept every -t flag and any whitespace between serials.**
   src/cli/mod.rs:103 reads args.titles[0].split(' '): every -t after the first is dropped, and a double space yields an empty serial. Remedy: flat_map over all titles with split_whitespace, then normalise and dedup as batch.rs does.
+  Resolved (2026-10-13): serials_from_titles in src/cli/mod.rs reads
+  every -t value, splits on any whitespace, normalises with
+  parse_title_id and drops repeats. Validation stays with the search,
+  which already reports a bad serial by name. The -t help text now says
+  it can be given more than once. Test:
+  serials_from_titles_reads_every_flag_and_any_whitespace (red on the
+  old code, green after).
   **Layman:** Giving -t twice silently ignores the second game.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM.
