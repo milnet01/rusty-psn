@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=135 -->
+<!-- ants-roadmap-id-high-water: RPSN=141 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -633,6 +633,12 @@ Integrate directly with the RPCS3 emulator to auto-detect games and install upda
   Checked against the code 2026-10-12: Partly done — "Update All
   Outdated" downloads only; nothing installs automatically.
   Former TODO.md task 7.10.
+  RPCS3 source review (2026-10-13, finding 8): for an update package
+  RPCS3 requires its TARGET_APP_VER to equal the installed APP_VER, and
+  a first patch with none must be at least the installed version,
+  compared as decimal numbers (Crypto/unpkg.cpp at 6fe3c87). Install a
+  chain in ascending order and re-read PARAM.SFO between steps. Depends
+  on RPSN-0137 and RPSN-0138.
   **Layman:** Make "Update All Outdated" install the updates into RPCS3 as well as downloading them.
   Kind: feature.
   Source: todo-md-import-2026-10-12.
@@ -1333,6 +1339,17 @@ reviewer proposed; check both against the code before fixing.
 
 - 📋 [RPSN-0112] **Prepare the licence folder before installing a DLC package.**
   src/content.rs:223-226 copy the .rap after the PKG install; a missing exdata folder (fresh RPCS3 profile) fails the copy after the PKG is in. Remedy: create or check the folder first, or name the partial state in the error.
+  RPCS3 source review (2026-10-13, finding 6): RPCS3 writes a licence as
+  <stem>.rap with the extension in lower case, into home/<active
+  user>/exdata, before installing packages, and rejects files under 16
+  bytes (rpcs3qt/main_window.cpp at 6fe3c87). The active user is
+  GuiConfigs/persistent_settings.dat, group Users, key active_user,
+  default 00000001. Lookups find only lower-case .rap, so an upper-case
+  .RAP copied as-is is never found on Linux. .edat files are not handled
+  today. Simplest route: put the .pkg, .rap and .edat files in one
+  folder and pass that folder to --installpkg, which installs them all.
+  That changes docs/design.md's statement that rusty-psn copies the
+  licence itself, so it is a direction change for that document.
   **Layman:** A DLC can install without its licence and say only that it failed.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
@@ -1354,6 +1371,14 @@ reviewer proposed; check both against the code before fixing.
 
 - 📋 [RPSN-0115] **Find portable RPCS3 on Windows.**
   src/rpcs3/auto_detect.rs:172-183 probe %APPDATA%\rpcs3 and Program Files; RPCS3 is portable and keeps its config beside rpcs3.exe. Remedy: probe the folder of an rpcs3.exe found on PATH; say in the UI that Windows usually needs the path set.
+  RPCS3 source review (2026-10-13, finding 4): on Windows RPCS3's base
+  folder is <exe dir>/portable/, else the RPCS3_CONFIG_DIR environment
+  variable, else the exe folder (Utilities/File.cpp at 6fe3c87).
+  games.yml, vfs.yml and config.yml live in base\config\, and
+  $(EmulatorDir), so the default dev_hdd0, is the base folder, not
+  config\. We probe %APPDATA% and %LOCALAPPDATA%, and place dev_hdd0
+  under the config folder. Remedy: model a base folder and a config-file
+  folder.
   **Layman:** On Windows, the app rarely finds RPCS3 by itself.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
@@ -1398,6 +1423,11 @@ reviewer proposed; check both against the code before fixing.
 
 - 📋 [RPSN-0120] **RPCS3 and Content: small review findings from the 2026-10-12 audit.**
   src/rpcs3/sfo.rs:52 and config.rs:22, :40 check size then read unbounded (use take()). auto_detect scans /mnt and spawns which/flatpak on the window thread (egui/mod.rs:2078, :2948 call it synchronously). src/content.rs:215 extracts synchronously inside an async fn (spawn_blocking). src/content.rs:126 comment promises DLC subfolder layouts the code does not scan. src/rpcs3/config.rs:24 one non-string games.yml value fails the whole scan.
+  RPCS3 source review (2026-10-13, finding 9): RPCS3 skips games.yml
+  entries whose value is empty or not a plain value, and creates an
+  empty games.yml on first load (Emu/games_config.cpp at 6fe3c87).
+  Unverified: whether our parser accepts a fully empty file as an empty
+  list.
   **Layman:** Small RPCS3 and DLC fixes: unbounded reads and a blocking scan.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 LOW.
@@ -1526,3 +1556,51 @@ reviewer proposed; check both against the code before fixing.
   Kind: fix.
   Source: in-session-2026-10-13 RPSN-0116.
   Lanes: PSN.
+
+## 15. RPCS3 source review (2026-10-13)
+
+Findings from reading RPCS3's own source (commit 6fe3c87, owner request
+2026-10-13), checked against what rusty-psn does. Findings that sharpen an
+existing item are noted on that item instead.
+
+- 📋 [RPSN-0136] **Find installed PSN games in dev_hdd0/game, not only in games.yml.**
+  scan_library (src/rpcs3/mod.rs) lists games only from games.yml. RPCS3 builds its list from every folder in dev_hdd0/game/ plus games.yml, and writes only disc and external HG games to games.yml (rpcs3/Emu/game_enumeration.h, Emu/System.cpp at 6fe3c87). Checked 2026-10-13 on the owner's RPCS3: 40 NP* folders in dev_hdd0/game, none in games.yml. Remedy: also read dev_hdd0/game/*/PARAM.SFO, skip folders with none (RPCS3 makes TEST12345 and a locks folder there), merge with games.yml. Settles the open question in RPSN-0093.
+  **Layman:** The library scan misses every downloaded (PSN) game.
+  Kind: fix.
+  Source: rpcs3-source-review-2026-10-13 finding 1.
+  Lanes: RPCS3.
+
+- 📋 [RPSN-0137] **Install with RPCS3's headless mode and confirm by reading the installed version.**
+  install_pkg (src/rpcs3/mod.rs) runs `rpcs3 --installpkg <pkg>` and trusts exit 0. In window mode RPCS3 starts the install and keeps running (rpcs3/rpcs3.cpp, checked at 6fe3c87), so the call returns only when the user closes RPCS3, and the exit code says nothing about the install. With --headless it installs with no window and returns 0 regardless; --no-gui refuses. Remedy: pass --headless, then confirm by re-reading dev_hdd0/game/<SERIAL>/PARAM.SFO APP_VER. Not verified: the headless path makes a compatibility network request.
+  **Layman:** Install waits until RPCS3 is closed, and reports success even when nothing installed.
+  Kind: fix.
+  Source: rpcs3-source-review-2026-10-13 finding 2.
+  Lanes: RPCS3.
+
+- 📋 [RPSN-0138] **Run one RPCS3 install at a time, and not while RPCS3 is open.**
+  Each Install button starts its own RPCS3 process (src/egui/results.rs, content_browser.rs). RPCS3 holds a lock on <cache dir>/RPCS3.buf and aborts a second instance with "Another instance of RPCS3 is running" (rpcs3/rpcs3.cpp). Remedy: queue installs one at a time (or pass one folder of packages), and check for a running RPCS3 first and tell the user to close it. RPSN-0058 depends on this.
+  **Layman:** Installing while RPCS3 is open, or two at once, fails.
+  Kind: fix.
+  Source: rpcs3-source-review-2026-10-13 finding 3.
+  Lanes: RPCS3, Window app.
+
+- 📋 [RPSN-0139] **Honour RPCS3's portable folder and XDG_CONFIG_HOME on Linux and macOS.**
+  auto_detect.rs hard-codes ~/.config/rpcs3, the Flatpak path and *.AppImage.home. RPCS3 picks <exe dir>/portable/ first, then $XDG_CONFIG_HOME/rpcs3, then ~/.config/rpcs3 (Utilities/File.cpp). For an AppImage the exe dir is the folder holding the .AppImage; on macOS the folder holding RPCS3.app. Remedy: add those candidates, and take the executable from the parent folder of a portable config. RPSN-0114 covers only the macOS executable.
+  **Layman:** Auto-detect misses RPCS3 set up in portable mode.
+  Kind: fix.
+  Source: rpcs3-source-review-2026-10-13 finding 5.
+  Lanes: RPCS3.
+
+- 📋 [RPSN-0140] **Work out the installed game version the way RPCS3 does.**
+  src/rpcs3/mod.rs uses the dev_hdd0 copy's APP_VER, else the disc's APP_VER, reading the disc only at {path}/PS3_GAME/PARAM.SFO. RPCS3 takes the higher of the disc and update APP_VER, falls back to VERSION when APP_VER is missing, and reads an external HG game's PARAM.SFO at the folder root (game_enumeration.h, gui_game_info.cpp, system_utils.cpp). Remedy: do the same. RPSN-0131 changes only the wording shown when no version is found.
+  **Layman:** The library shows no version for some games that have one.
+  Kind: fix.
+  Source: rpcs3-source-review-2026-10-13 finding 7.
+  Lanes: RPCS3.
+
+- 💭 [RPSN-0141] **Install downloaded firmware into RPCS3 and show its installed version.**
+  Optional (finding 10). Firmware is only downloaded today. RPCS3 installs it with --installfw <PUP> (not together with --installpkg) and records the installed version in dev_flash/vsh/etc/version.txt (util/sysinfo.cpp at 6fe3c87). Considered, not planned: the owner decides whether it is wanted.
+  **Layman:** Could install the firmware into RPCS3 for you, not just download it.
+  Kind: feature.
+  Source: rpcs3-source-review-2026-10-13 finding 10.
+  Lanes: RPCS3, PSN.
