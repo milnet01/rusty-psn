@@ -401,16 +401,20 @@ impl UpdatesApp {
                                             let exe = rpcs3_exe.clone();
                                             let tid = title_id.to_string();
                                             let pid = pkg.id();
+                                            let check = Self::update_install_check(
+                                                self.settings.rpcs3_config_dir.as_deref(),
+                                                title_id,
+                                                Some(pkg.version.clone()),
+                                            );
                                             let rt = self
                                                 .v
                                                 .rt_handle
                                                 .clone()
                                                 .expect("rt_handle set in UpdatesApp::new before any UI code runs");
                                             let _guard = rt.enter();
-                                            let promise =
-                                                Promise::spawn_async(
-                                                    async move { crate::rpcs3::install_pkg(&exe, &pkg_file).await },
-                                                );
+                                            let promise = Promise::spawn_async(async move {
+                                                crate::rpcs3::install_pkg(&exe, &pkg_file, check).await
+                                            });
                                             self.v.rpcs3_install_promises.push((tid, pid, promise));
                                         }
                                     }

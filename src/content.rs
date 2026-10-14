@@ -285,7 +285,7 @@ pub async fn install_dlc_zip(rpcs3_exe: &Path, zip_path: &Path) -> Result<(), Co
         dlc.edats.len()
     );
 
-    crate::rpcs3::install_pkg(rpcs3_exe, dlc.temp_dir.path())
+    crate::rpcs3::install_pkg(rpcs3_exe, dlc.temp_dir.path(), crate::rpcs3::InstallCheck::Unconfirmed)
         .await
         .map_err(|e| ContentError::InstallFailed(e.to_string()))?;
 
@@ -461,7 +461,11 @@ mod tests {
         let fake = dir.path().join("rpcs3");
         std::fs::write(
             &fake,
-            format!("#!/bin/sh\necho \"$2\" >> '{0}'\nls \"$2\" >> '{0}'\n", log.display()),
+            // The path is the last argument, after --headless --installpkg.
+            format!(
+                "#!/bin/sh\nfor p; do :; done\necho \"$p\" >> '{0}'\nls \"$p\" >> '{0}'\n",
+                log.display()
+            ),
         )
         .unwrap();
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();

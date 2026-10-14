@@ -114,15 +114,26 @@ pub fn start_app(args: Args) -> bool {
     }
 
     // Resolve RPCS3 executable for --install mode.
-    let rpcs3_exe = if install_mode {
-        let exe = rpcs3_exe_override.or_else(|| crate::rpcs3::auto_detect::detect_rpcs3().and_then(|i| i.executable));
+    // dev_hdd0, where an install is checked, is auto-detected only together with the executable,
+    // so both belong to one RPCS3 (docs/specs/RPSN-0137-headless-confirmed-install.md § 4.3).
+    let (rpcs3_exe, rpcs3_dev_hdd0) = if install_mode {
+        let detected = if rpcs3_exe_override.is_none() {
+            crate::rpcs3::auto_detect::detect_rpcs3()
+        } else {
+            None
+        };
+        let dev_hdd0 = match &args.rpcs3_config_dir {
+            Some(dir) => Some(crate::rpcs3::config::resolve_dev_hdd0(dir)),
+            None => detected.as_ref().map(|i| i.dev_hdd0_path.clone()),
+        };
+        let exe = rpcs3_exe_override.or_else(|| detected.and_then(|i| i.executable));
         if exe.is_none() {
             eprintln!("Error: --install requires RPCS3. Use --rpcs3-executable or ensure RPCS3 is auto-detectable.");
             std::process::exit(1);
         }
-        exe
+        (exe, dev_hdd0)
     } else {
-        None
+        (None, None)
     };
 
     // Build a single HTTP client for all PSN requests. Reusing the client avoids
@@ -497,10 +508,25 @@ pub fn start_app(args: Args) -> bool {
                             if !silent_mode {
                                 println!("  Installing {} to RPCS3...", path.display());
                             }
-                            match runtime.block_on(crate::rpcs3::install_pkg(exe, path)) {
-                                Ok(()) => {
+                            let check = match &rpcs3_dev_hdd0 {
+                                Some(dev_hdd0) => crate::rpcs3::InstallCheck::AppVersion {
+                                    dev_hdd0: dev_hdd0.clone(),
+                                    serial: update.title_id.clone(),
+                                    version: Some(pkg.version.clone()),
+                                },
+                                None => crate::rpcs3::InstallCheck::Unconfirmed,
+                            };
+                            match runtime.block_on(crate::rpcs3::install_pkg(exe, path, check)) {
+                                Ok(crate::rpcs3::InstallOutcome::Confirmed) => {
                                     if !silent_mode {
                                         println!("  Installed successfully.");
+                                    }
+                                }
+                                Ok(crate::rpcs3::InstallOutcome::Unconfirmed) => {
+                                    if !silent_mode {
+                                        println!(
+                                            "  RPCS3 finished; the install was not checked (pass --rpcs3-config-dir to check it)."
+                                        );
                                     }
                                 }
                                 Err(e) => {

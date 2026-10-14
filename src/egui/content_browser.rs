@@ -82,6 +82,12 @@ impl UpdatesApp {
                                                     self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
                                                 let pkg = patch.pkg_path.clone();
                                                 let key = patch_key.clone();
+                                                // ContentPatch carries no version, so any change of version confirms it.
+                                                let check = Self::update_install_check(
+                                                    self.settings.rpcs3_config_dir.as_deref(),
+                                                    &patch.serial,
+                                                    None,
+                                                );
                                                 let rt = self
                                                     .v
                                                     .rt_handle
@@ -89,7 +95,7 @@ impl UpdatesApp {
                                                     .expect("rt_handle set in UpdatesApp::new before any UI code runs");
                                                 let _guard = rt.enter();
                                                 let promise = Promise::spawn_async(async move {
-                                                    crate::rpcs3::install_pkg(&exe, &pkg)
+                                                    crate::rpcs3::install_pkg(&exe, &pkg, check)
                                                         .await
                                                         .map_err(|e| crate::content::ContentError::InstallFailed(e.to_string()))
                                                 });
@@ -132,7 +138,11 @@ impl UpdatesApp {
                                                     .expect("rt_handle set in UpdatesApp::new before any UI code runs");
                                                 let _guard = rt.enter();
                                                 let promise = Promise::spawn_async(async move {
-                                                    crate::content::install_dlc_zip(&exe, &zip).await
+                                                    // A DLC cannot be checked; a clean exit marks it installed, as before
+                                                    // (docs/specs/RPSN-0137-headless-confirmed-install.md § 3).
+                                                    crate::content::install_dlc_zip(&exe, &zip)
+                                                        .await
+                                                        .map(|()| crate::rpcs3::InstallOutcome::Confirmed)
                                                 });
                                                 self.v.content_install_promises.push((key, promise));
                                             }
@@ -154,14 +164,23 @@ impl UpdatesApp {
             if self.v.content_install_promises[i].1.ready().is_some() {
                 let (key, promise) = self.v.content_install_promises.remove(i);
                 match promise.block_and_take() {
-                    Ok(()) => {
+                    Ok(outcome) => {
                         // Extract a short display name from the key (file path)
                         let display = Path::new(&key)
                             .file_name()
                             .map(|n| n.to_string_lossy().to_string())
                             .unwrap_or_else(|| key.clone());
-                        toasts.push((format!("Installed: {display}"), ToastLevel::Success));
-                        self.v.content_installed_items.insert(key);
+                        if outcome == crate::rpcs3::InstallOutcome::Confirmed {
+                            toasts.push((format!("Installed: {display}"), ToastLevel::Success));
+                            self.v.content_installed_items.insert(key);
+                        } else {
+                            toasts.push((
+                                format!(
+                                    "RPCS3 finished installing {display}, but rusty-psn could not check the result. Set the RPCS3 folder in Settings to check it."
+                                ),
+                                ToastLevel::Warning,
+                            ));
+                        }
                     }
                     Err(e) => {
                         toasts.push((format!("Install failed: {e}"), ToastLevel::Error));

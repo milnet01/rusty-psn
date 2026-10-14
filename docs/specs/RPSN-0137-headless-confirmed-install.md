@@ -114,7 +114,7 @@ Order inside `install_pkg`:
 5. Read APP_VER through `sfo::parse_sfo` and compare.
 
 **Versions compare as trimmed text, not with `compare_versions`.** That
-function reads an unparseable version as 0.0, so two unreadable versions
+function reads an unparsable version as 0.0, so two unreadable versions
 would compare equal and confirm an install that did not happen. Sony's
 package `version` and PARAM.SFO's APP_VER share the `XX.YY` form.
 

@@ -243,16 +243,40 @@ impl UpdatesApp {
         }
     }
 
+    /// The check an update install asks for: the expected version read back from dev_hdd0,
+    /// or nothing when the RPCS3 folder is not set (docs/specs/RPSN-0137-headless-confirmed-install.md § 4.3).
+    pub(super) fn update_install_check(
+        rpcs3_config_dir: Option<&std::path::Path>,
+        serial: &str,
+        version: Option<String>,
+    ) -> crate::rpcs3::InstallCheck {
+        match rpcs3_config_dir {
+            Some(dir) => crate::rpcs3::InstallCheck::AppVersion {
+                dev_hdd0: crate::rpcs3::config::resolve_dev_hdd0(dir),
+                serial: serial.to_string(),
+                version,
+            },
+            None => crate::rpcs3::InstallCheck::Unconfirmed,
+        }
+    }
+
     pub(super) fn handle_rpcs3_install_promises(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
         let mut i = 0;
         while i < self.v.rpcs3_install_promises.len() {
             if self.v.rpcs3_install_promises[i].2.ready().is_some() {
                 let (tid, pid, promise) = self.v.rpcs3_install_promises.remove(i);
                 match promise.block_and_take() {
-                    Ok(()) => {
+                    Ok(crate::rpcs3::InstallOutcome::Confirmed) => {
                         toasts.push((format!("Installed {tid} to RPCS3"), ToastLevel::Success));
                         self.v.rpcs3_installed_pkgs.insert((tid, pid));
                     }
+                    // No pill, so the Install button stays for a retry once the folder is set.
+                    Ok(crate::rpcs3::InstallOutcome::Unconfirmed) => toasts.push((
+                        format!(
+                            "RPCS3 finished installing {tid}, but rusty-psn could not check the result. Set the RPCS3 folder in Settings to check it."
+                        ),
+                        ToastLevel::Warning,
+                    )),
                     Err(e) => {
                         toasts.push((format!("RPCS3 install failed: {e}"), ToastLevel::Error));
                     }

@@ -36,6 +36,12 @@ pub enum Rpcs3Error {
     SfoParseFailed(PathBuf, String),
     YamlParseFailed(String),
     InstallFailed(String),
+    /// RPCS3 exited cleanly but the installed version is not the expected one.
+    /// `found` is the APP_VER read afterwards, `None` where no PARAM.SFO could be read.
+    NotInstalled {
+        serial: String,
+        found: Option<String>,
+    },
     Io(std::io::Error),
 }
 
@@ -47,6 +53,15 @@ impl fmt::Display for Rpcs3Error {
             Rpcs3Error::SfoParseFailed(p, reason) => write!(f, "Failed to parse {}: {reason}", p.display()),
             Rpcs3Error::YamlParseFailed(reason) => write!(f, "Failed to parse RPCS3 config: {reason}"),
             Rpcs3Error::InstallFailed(reason) => write!(f, "RPCS3 installation failed: {reason}"),
+            Rpcs3Error::NotInstalled {
+                serial,
+                found: Some(found),
+            } => {
+                write!(f, "RPCS3 finished, but {serial} still reports version {found}")
+            }
+            Rpcs3Error::NotInstalled { serial, found: None } => {
+                write!(f, "RPCS3 finished, but no installed version of {serial} was found")
+            }
             Rpcs3Error::Io(e) => write!(f, "I/O error: {e}"),
         }
     }
@@ -237,19 +252,56 @@ fn title_from_path(path: &Path) -> String {
     }
 }
 
-/// Install a PKG file via RPCS3's CLI.
+/// What an install should leave behind, read once RPCS3 has exited
+/// (docs/specs/RPSN-0137-headless-confirmed-install.md § 4.2).
+pub enum InstallCheck {
+    /// An update package. `dev_hdd0/game/<serial>/PARAM.SFO` must carry APP_VER equal to
+    /// `version`; with `None`, any APP_VER other than the one there before the install.
+    AppVersion {
+        dev_hdd0: PathBuf,
+        serial: String,
+        version: Option<String>,
+    },
+    /// Nothing rusty-psn can read back: a DLC, or no known dev_hdd0.
+    Unconfirmed,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum InstallOutcome {
+    Confirmed,
+    /// RPCS3 exited cleanly; nothing was checked.
+    Unconfirmed,
+}
+
+/// Install a PKG file, or a folder of PKG, RAP and EDAT files, via RPCS3's headless mode.
 ///
-/// Spawns `rpcs3 --installpkg {pkg_path}`. Note: RPCS3 opens its GUI for installation progress.
+/// Headless RPCS3 installs with no window and exits 0 whatever happened (`main` in
+/// rpcs3/rpcs3.cpp, RPCS3 commit 6fe3c87), so success is decided by `check`, not the exit.
 /// `pkg_path` may also be a folder: RPCS3 then places the RAP and EDAT licences at its top
 /// level and installs every PKG there.
 /// If `rpcs3_executable` is the Flatpak sentinel `flatpak:net.rpcs3.RPCS3`, runs via `flatpak run`.
-pub async fn install_pkg(rpcs3_executable: &Path, pkg_path: &Path) -> Result<(), Rpcs3Error> {
+pub async fn install_pkg(rpcs3_executable: &Path, pkg_path: &Path, check: InstallCheck) -> Result<InstallOutcome, Rpcs3Error> {
     if !pkg_path.exists() {
         return Err(Rpcs3Error::InstallFailed(format!(
             "PKG path not found: {}",
             pkg_path.display()
         )));
     }
+
+    // The serial is joined onto dev_hdd0/game, so it must be a serial before anything runs.
+    if let InstallCheck::AppVersion { serial, .. } = &check {
+        if !looks_like_serial(serial) {
+            return Err(Rpcs3Error::InstallFailed(format!("not a game serial: {serial:?}")));
+        }
+    }
+    let before = match &check {
+        InstallCheck::AppVersion {
+            dev_hdd0,
+            serial,
+            version: None,
+        } => installed_app_ver(dev_hdd0, serial),
+        _ => None,
+    };
 
     let exe_str = rpcs3_executable.to_string_lossy();
     let is_flatpak = exe_str.starts_with("flatpak:");
@@ -262,7 +314,7 @@ pub async fn install_pkg(rpcs3_executable: &Path, pkg_path: &Path) -> Result<(),
     }
 
     info!(
-        "Installing PKG via RPCS3: {} --installpkg {}",
+        "Installing PKG via RPCS3: {} --headless --installpkg {}",
         rpcs3_executable.display(),
         pkg_path.display()
     );
@@ -270,29 +322,66 @@ pub async fn install_pkg(rpcs3_executable: &Path, pkg_path: &Path) -> Result<(),
     let output = if is_flatpak {
         let app_id = exe_str.strip_prefix("flatpak:").unwrap_or("net.rpcs3.RPCS3");
         tokio::process::Command::new("flatpak")
-            .args(["run", app_id, "--installpkg"])
+            .args(["run", app_id, "--headless", "--installpkg"])
             .arg(pkg_path)
             .output()
             .await
     } else {
         tokio::process::Command::new(rpcs3_executable)
-            .arg("--installpkg")
+            .args(["--headless", "--installpkg"])
             .arg(pkg_path)
             .output()
             .await
     }
     .map_err(|e| Rpcs3Error::InstallFailed(format!("failed to launch RPCS3: {e}")))?;
 
-    if output.status.success() {
-        info!("RPCS3 PKG installation completed successfully");
-        Ok(())
-    } else {
+    if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(Rpcs3Error::InstallFailed(format!(
+        return Err(Rpcs3Error::InstallFailed(format!(
             "RPCS3 exited with {}: {}",
             output.status,
             stderr.trim()
-        )))
+        )));
+    }
+
+    let InstallCheck::AppVersion {
+        dev_hdd0,
+        serial,
+        version,
+    } = check
+    else {
+        info!("RPCS3 finished; the install was not checked");
+        return Ok(InstallOutcome::Unconfirmed);
+    };
+
+    // Compared as text: compare_versions reads an unparsable version as 0.0, so two
+    // unreadable versions would compare equal and confirm an install that did not happen.
+    let found = installed_app_ver(&dev_hdd0, &serial);
+    let confirmed = match &version {
+        Some(expected) => found.as_deref() == Some(expected.trim()),
+        None => found.is_some() && found != before,
+    };
+    if confirmed {
+        info!("RPCS3 installed {serial}, now at version {found:?}");
+        Ok(InstallOutcome::Confirmed)
+    } else {
+        warn!("RPCS3 finished but {serial} reports version {found:?}, expected {version:?}");
+        Err(Rpcs3Error::NotInstalled { serial, found })
+    }
+}
+
+/// APP_VER of `dev_hdd0/game/<serial>/PARAM.SFO`, trimmed, or `None` where it cannot be read.
+fn installed_app_ver(dev_hdd0: &Path, serial: &str) -> Option<String> {
+    let sfo_path = dev_hdd0.join("game").join(serial).join("PARAM.SFO");
+    if !sfo_path.is_file() {
+        return None;
+    }
+    match sfo::parse_sfo(&sfo_path) {
+        Ok(sfo) => sfo.app_ver.map(|ver| ver.trim().to_string()),
+        Err(e) => {
+            warn!("Failed to parse {}: {e}", sfo_path.display());
+            None
+        }
     }
 }
 
@@ -417,6 +506,140 @@ mod tests {
 
         assert_eq!(games.len(), 1);
         assert_eq!(games[0].game_path, disc);
+    }
+
+    /// A stand-in RPCS3 for the install tests: a shell script that records its arguments to
+    /// `args`, runs `action`, and exits with `status`. Returns (executable, args file, dev_hdd0, pkg).
+    #[cfg(unix)]
+    fn stand_in_rpcs3(root: &Path, action: &str, status: i32) -> (PathBuf, PathBuf, PathBuf, PathBuf) {
+        use std::os::unix::fs::PermissionsExt;
+
+        let fixture = root.join("fixture.sfo");
+        std::fs::write(&fixture, sfo::tests::make_test_sfo()).unwrap();
+        let dev_hdd0 = root.join("dev_hdd0");
+        let args = root.join("args");
+        let pkg = root.join("update.pkg");
+        std::fs::write(&pkg, b"pkg").unwrap();
+        let exe = root.join("rpcs3");
+        let action = action
+            .replace("{fixture}", &fixture.display().to_string())
+            .replace("{game}", &dev_hdd0.join("game/BCUS99999").display().to_string());
+        std::fs::write(
+            &exe,
+            format!(
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\n{action}\nexit {status}\n",
+                args.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+        (exe, args, dev_hdd0, pkg)
+    }
+
+    #[cfg(unix)]
+    const WRITES_01_05: &str = "mkdir -p '{game}' && cp '{fixture}' '{game}/PARAM.SFO'";
+
+    #[cfg(unix)]
+    fn expect(dev_hdd0: &Path, version: Option<&str>) -> InstallCheck {
+        InstallCheck::AppVersion {
+            dev_hdd0: dev_hdd0.to_path_buf(),
+            serial: "BCUS99999".to_string(),
+            version: version.map(str::to_string),
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn install_runs_rpcs3_headless() {
+        // Without --headless RPCS3 opens its window and the install waits for it to close (RPSN-0137).
+        let root = tempfile::tempdir().unwrap();
+        let (exe, args, _, pkg) = stand_in_rpcs3(root.path(), "", 0);
+
+        install_pkg(&exe, &pkg, InstallCheck::Unconfirmed).await.unwrap();
+
+        let recorded = std::fs::read_to_string(args).unwrap();
+        assert_eq!(recorded, format!("--headless\n--installpkg\n{}\n", pkg.display()));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn install_confirms_the_expected_version() {
+        // Headless RPCS3 exits 0 whatever happened, so the version read back decides (RPSN-0137).
+        let root = tempfile::tempdir().unwrap();
+        let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 0);
+        assert_eq!(
+            install_pkg(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await.unwrap(),
+            InstallOutcome::Confirmed
+        );
+        assert!(matches!(
+            install_pkg(&exe, &pkg, expect(&dev_hdd0, Some("01.06"))).await,
+            Err(Rpcs3Error::NotInstalled { found: Some(ref v), .. }) if v == "01.05"
+        ));
+
+        let root = tempfile::tempdir().unwrap();
+        let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), "", 0);
+        assert!(matches!(
+            install_pkg(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await,
+            Err(Rpcs3Error::NotInstalled { found: None, .. })
+        ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn install_confirms_a_changed_version() {
+        let root = tempfile::tempdir().unwrap();
+        let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 0);
+        assert_eq!(
+            install_pkg(&exe, &pkg, expect(&dev_hdd0, None)).await.unwrap(),
+            InstallOutcome::Confirmed
+        );
+
+        // Now 01.05 is there before the install, and a stand-in that writes nothing changes nothing.
+        let (exe, _, _, _) = stand_in_rpcs3(root.path(), "", 0);
+        assert!(matches!(
+            install_pkg(&exe, &pkg, expect(&dev_hdd0, None)).await,
+            Err(Rpcs3Error::NotInstalled { .. })
+        ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn install_failure_beats_a_matching_version() {
+        let root = tempfile::tempdir().unwrap();
+        let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 1);
+        assert!(matches!(
+            install_pkg(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await,
+            Err(Rpcs3Error::InstallFailed(_))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn install_without_a_check_is_unconfirmed() {
+        let root = tempfile::tempdir().unwrap();
+        let (exe, _, _, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 0);
+        assert_eq!(
+            install_pkg(&exe, &pkg, InstallCheck::Unconfirmed).await.unwrap(),
+            InstallOutcome::Unconfirmed
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn install_refuses_an_unsafe_serial() {
+        let root = tempfile::tempdir().unwrap();
+        let (exe, args, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), "", 0);
+        let check = InstallCheck::AppVersion {
+            dev_hdd0,
+            serial: "../x".to_string(),
+            version: None,
+        };
+
+        assert!(matches!(
+            install_pkg(&exe, &pkg, check).await,
+            Err(Rpcs3Error::InstallFailed(_))
+        ));
+        assert!(!args.exists(), "RPCS3 was launched");
     }
 
     #[test]

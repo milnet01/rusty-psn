@@ -388,7 +388,11 @@ struct VolatileData {
 
     // RPCS3 install state. Key is (title_id, pkg_id).
     #[allow(clippy::type_complexity)]
-    rpcs3_install_promises: Vec<(String, String, Promise<Result<(), crate::rpcs3::Rpcs3Error>>)>,
+    rpcs3_install_promises: Vec<(
+        String,
+        String,
+        Promise<Result<crate::rpcs3::InstallOutcome, crate::rpcs3::Rpcs3Error>>,
+    )>,
     rpcs3_installed_pkgs: HashSet<(String, String)>,
 
     // Content browser state.
@@ -396,7 +400,10 @@ struct VolatileData {
     content_library: Option<crate::content::ContentLibrary>,
     content_filter: String,
     /// Tracks DLC installs in progress: zip filename → promise.
-    content_install_promises: Vec<(String, Promise<Result<(), crate::content::ContentError>>)>,
+    content_install_promises: Vec<(
+        String,
+        Promise<Result<crate::rpcs3::InstallOutcome, crate::content::ContentError>>,
+    )>,
     content_installed_items: HashSet<String>,
 
     /// Cached egui context for use in code paths without direct UI access (e.g., auto-retry).
