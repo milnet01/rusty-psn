@@ -398,6 +398,8 @@ struct VolatileData {
     // Content browser state.
     show_content_browser_window: bool,
     content_library: Option<crate::content::ContentLibrary>,
+    /// A content folder scan running in the background; `None` inside means it panicked.
+    content_scan_promise: Option<Promise<Option<crate::content::ContentLibrary>>>,
     content_filter: String,
     /// Tracks DLC installs in progress: zip filename → promise.
     content_install_promises: Vec<(
@@ -493,6 +495,7 @@ impl Default for VolatileData {
 
             show_content_browser_window: false,
             content_library: None,
+            content_scan_promise: None,
             content_filter: String::new(),
             content_install_promises: Vec::new(),
             content_installed_items: HashSet::new(),
@@ -532,6 +535,7 @@ impl eframe::App for UpdatesApp {
         self.handle_firmware_promises(&mut toasts);
         self.handle_rpcs3_install_promises(&mut toasts);
         self.handle_content_install_promises(&mut toasts);
+        self.handle_content_scan_promise(&mut toasts);
 
         for (msg, level) in toasts {
             self.show_notifications(msg, level);

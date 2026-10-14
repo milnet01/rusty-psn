@@ -101,9 +101,17 @@ impl UpdatesApp {
             .as_ref()
             .expect("rt_handle set in UpdatesApp::new before any UI code runs")
             .enter();
+        let ctx = self.v.egui_ctx.clone();
         self.v.rpcs3_scan_promise = Some(Promise::spawn_async(async move {
-            // scan_library is sync but we wrap it in async for consistency with the promise pattern.
-            crate::rpcs3::scan_library(&installation)
+            // scan_library reads many files, so it runs on a blocking worker, not an async one.
+            let result = tokio::task::spawn_blocking(move || crate::rpcs3::scan_library(&installation))
+                .await
+                .unwrap_or_else(|e| Err(crate::rpcs3::Rpcs3Error::Io(std::io::Error::other(e))));
+            // Show the result now, not at the next mouse move.
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+            result
         }));
     }
 

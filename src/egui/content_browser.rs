@@ -26,9 +26,7 @@ impl UpdatesApp {
                     ui.label("Filter:");
                     ui.text_edit_singleline(&mut self.v.content_filter);
                     if ui.button("Rescan").clicked() {
-                        if let Some(ref dir) = self.settings.content_directory {
-                            self.v.content_library = Some(crate::content::scan_content_directory(dir));
-                        }
+                        self.start_content_scan();
                     }
                 });
                 ui.separator();
@@ -155,6 +153,44 @@ impl UpdatesApp {
             });
         if !show {
             self.v.show_content_browser_window = false;
+        }
+    }
+
+    /// Scan the content folder in the background: it reads every file there, which would
+    /// freeze the window. A second request while one runs is ignored.
+    pub(super) fn start_content_scan(&mut self) {
+        let Some(dir) = self.settings.content_directory.clone() else {
+            return;
+        };
+        if self.v.content_scan_promise.is_some() {
+            return;
+        }
+        let _guard = self
+            .v
+            .rt_handle
+            .as_ref()
+            .expect("rt_handle set in UpdatesApp::new before any UI code runs")
+            .enter();
+        let ctx = self.v.egui_ctx.clone();
+        self.v.content_scan_promise = Some(Promise::spawn_async(async move {
+            let library = tokio::task::spawn_blocking(move || crate::content::scan_content_directory(&dir))
+                .await
+                .ok();
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+            library
+        }));
+    }
+
+    pub(super) fn handle_content_scan_promise(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+        if !self.v.content_scan_promise.as_ref().is_some_and(|p| p.ready().is_some()) {
+            return;
+        }
+        let promise = self.v.content_scan_promise.take().expect("checked above");
+        match promise.block_and_take() {
+            Some(library) => self.v.content_library = Some(library),
+            None => toasts.push(("The content folder scan stopped unexpectedly.".to_string(), ToastLevel::Error)),
         }
     }
 

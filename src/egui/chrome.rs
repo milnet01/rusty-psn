@@ -64,10 +64,7 @@ impl UpdatesApp {
                     }
                     if ui.button("Content Browser...").clicked() {
                         self.v.show_content_browser_window = true;
-                        // Scan content directory on open
-                        if let Some(ref dir) = self.settings.content_directory {
-                            self.v.content_library = Some(crate::content::scan_content_directory(dir));
-                        }
+                        self.start_content_scan();
                         ui.close();
                     }
                     ui.separator();
