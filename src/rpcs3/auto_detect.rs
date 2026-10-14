@@ -92,9 +92,29 @@ fn detect_executable(config_dir: &std::path::Path) -> Option<PathBuf> {
                 }
             }
         }
+        // RPCS3 ships as RPCS3.app, which is not on PATH.
+        let mut app_dirs = vec![PathBuf::from("/Applications")];
+        if let Some(home) = dirs::home_dir() {
+            app_dirs.push(home.join("Applications"));
+        }
+        if let Some(exe) = find_app_bundle_executable(&app_dirs) {
+            return Some(exe);
+        }
     }
 
     None
+}
+
+/// The binary inside the first `RPCS3.app` found in `app_dirs`.
+///
+/// RPCS3's macOS release names the bundle RPCS3.app and its binary rpcs3
+/// (.ci/deploy-mac.sh and rpcs3/rpcs3.plist.in, RPCS3 commit 6fe3c87).
+#[cfg(any(target_os = "macos", test))]
+fn find_app_bundle_executable(app_dirs: &[PathBuf]) -> Option<PathBuf> {
+    app_dirs
+        .iter()
+        .map(|dir| dir.join("RPCS3.app/Contents/MacOS/rpcs3"))
+        .find(|exe| exe.is_file())
 }
 
 /// Detect RPCS3 AppImage executable from a config directory inside `.AppImage.home/`.
@@ -238,6 +258,27 @@ mod tests {
             std::fs::write(dir.path().join(name), b"").expect("appimage file");
         }
         (dir, config_dir)
+    }
+
+    #[test]
+    fn app_bundle_is_found_in_the_second_applications_folder() {
+        // On macOS RPCS3 is an app bundle, not a command on PATH (RPSN-0114).
+        let system = tempfile::tempdir().unwrap();
+        let user = tempfile::tempdir().unwrap();
+        let exe = user.path().join("RPCS3.app/Contents/MacOS/rpcs3");
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::fs::write(&exe, b"").unwrap();
+
+        let found = find_app_bundle_executable(&[system.path().to_path_buf(), user.path().to_path_buf()]);
+
+        assert_eq!(found, Some(exe));
+    }
+
+    #[test]
+    fn app_bundle_is_not_found_where_there_is_none() {
+        let empty = tempfile::tempdir().unwrap();
+
+        assert_eq!(find_app_bundle_executable(&[empty.path().to_path_buf()]), None);
     }
 
     #[test]

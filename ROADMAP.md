@@ -1418,8 +1418,14 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
   Lanes: Content.
 
-- 📋 [RPSN-0114] **Find RPCS3.app on macOS.**
+- ✅ [RPSN-0114] **Find RPCS3.app on macOS.**
   src/rpcs3/auto_detect.rs:96-106 uses `which rpcs3`; RPCS3 ships as RPCS3.app, not on PATH. Remedy: also check /Applications/RPCS3.app/Contents/MacOS/rpcs3 and ~/Applications.
+  Resolved (2026-10-14): on macOS, after `which rpcs3`, detection
+  checks /Applications and ~/Applications for
+  RPCS3.app/Contents/MacOS/rpcs3, the bundle and binary names RPCS3's
+  release uses (.ci/deploy-mac.sh, rpcs3.plist.in at 6fe3c87). The
+  macOS branch compiles only on a Mac: GitHub's macOS build is its
+  first compile.
   **Layman:** On a Mac, the app almost never finds RPCS3 by itself.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
