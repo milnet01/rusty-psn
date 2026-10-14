@@ -97,9 +97,7 @@ sets for a second reason to change.
   (`InstallPackages` in `rpcs3qt/main_window.cpp` and `get_dir_entries` in
   `rpcs3qt/qt_utils.cpp`, RPCS3 commit 6fe3c87). rusty-psn writes nothing
   into RPCS3's folders. Content cannot see whether RPCS3 placed the
-  licences: it reports success when `rpcs3::install_pkg` does. Until RPSN-0112 lands, Content still installs each
-  package on its own, copies each `.rap` into `exdata` itself, and drops
-  `.edat` files.
+  licences: it reports success when `rpcs3::install_pkg` does.
 
 ## The stack, and what it rules out
 

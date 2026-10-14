@@ -190,11 +190,13 @@ fn title_from_path(path: &Path) -> String {
 /// Install a PKG file via RPCS3's CLI.
 ///
 /// Spawns `rpcs3 --installpkg {pkg_path}`. Note: RPCS3 opens its GUI for installation progress.
+/// `pkg_path` may also be a folder: RPCS3 then places the RAP and EDAT licences at its top
+/// level and installs every PKG there.
 /// If `rpcs3_executable` is the Flatpak sentinel `flatpak:net.rpcs3.RPCS3`, runs via `flatpak run`.
 pub async fn install_pkg(rpcs3_executable: &Path, pkg_path: &Path) -> Result<(), Rpcs3Error> {
     if !pkg_path.exists() {
         return Err(Rpcs3Error::InstallFailed(format!(
-            "PKG file not found: {}",
+            "PKG path not found: {}",
             pkg_path.display()
         )));
     }

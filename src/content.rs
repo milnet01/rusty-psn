@@ -8,7 +8,7 @@
 //! │   │   └── SERIAL/
 //! │   │       └── *.pkg
 //! │   └── DLC/
-//! │       └── *.zip  (containing .pkg + .rap)
+//! │       └── *.zip  (containing .pkg + .rap / .edat)
 //! ```
 
 use std::path::{Path, PathBuf};
@@ -49,6 +49,7 @@ pub enum ContentError {
     Io(std::io::Error),
     Zip(zip::result::ZipError),
     NoPkgFound,
+    DuplicateFile(String),
     InstallFailed(String),
 }
 
@@ -58,6 +59,7 @@ impl std::fmt::Display for ContentError {
             ContentError::Io(e) => write!(f, "I/O error: {e}"),
             ContentError::Zip(e) => write!(f, "ZIP error: {e}"),
             ContentError::NoPkgFound => write!(f, "No .pkg file found in ZIP"),
+            ContentError::DuplicateFile(name) => write!(f, "ZIP holds two files named {name}"),
             ContentError::InstallFailed(reason) => write!(f, "Install failed: {reason}"),
         }
     }
@@ -164,16 +166,18 @@ pub fn scan_content_directory(base_path: &Path) -> ContentLibrary {
 }
 
 /// The packages and licences extracted from a DLC ZIP, in archive order.
-/// The files live in `temp_dir`, which is removed when this is dropped.
+/// The files sit directly in `temp_dir`, which is removed when this is dropped.
 pub struct ExtractedDlc {
     pub pkgs: Vec<PathBuf>,
     pub raps: Vec<PathBuf>,
-    // Held, not read: dropping it deletes the extracted files.
-    #[allow(dead_code)]
+    pub edats: Vec<PathBuf>,
     pub temp_dir: tempfile::TempDir,
 }
 
-/// Extract a DLC ZIP to a temporary directory and return every PKG and RAP file in it.
+/// Extract every PKG, RAP and EDAT file in a DLC ZIP into the top of one temporary folder.
+///
+/// RPCS3's `--installpkg` reads only the files at the top of a folder it is given, so
+/// the ZIP's own subfolders are dropped. Two files with the same name are refused.
 pub fn extract_dlc_zip(zip_path: &Path) -> Result<ExtractedDlc, ContentError> {
     let file = std::fs::File::open(zip_path).map_err(ContentError::Io)?;
     let mut archive = zip::ZipArchive::new(file).map_err(ContentError::Zip)?;
@@ -182,61 +186,72 @@ pub fn extract_dlc_zip(zip_path: &Path) -> Result<ExtractedDlc, ContentError> {
 
     let mut pkgs = Vec::new();
     let mut raps = Vec::new();
+    let mut edats = Vec::new();
+    let mut seen = std::collections::HashSet::new();
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).map_err(ContentError::Zip)?;
+        if file.is_dir() {
+            continue;
+        }
         let Some(enclosed_name) = file.enclosed_name() else {
             continue; // Skip entries with suspicious paths
         };
-        let file_name = enclosed_name.to_path_buf();
-
-        let outpath = temp_dir.path().join(&file_name);
-
-        if file.is_dir() {
-            std::fs::create_dir_all(&outpath).map_err(ContentError::Io)?;
+        let Some(file_name) = enclosed_name.file_name() else {
+            continue;
+        };
+        let ext = Path::new(file_name).extension().and_then(|e| e.to_str()).unwrap_or("");
+        let list = if ext.eq_ignore_ascii_case("pkg") {
+            &mut pkgs
+        } else if ext.eq_ignore_ascii_case("rap") {
+            &mut raps
+        } else if ext.eq_ignore_ascii_case("edat") {
+            &mut edats
         } else {
-            if let Some(parent) = outpath.parent() {
-                std::fs::create_dir_all(parent).map_err(ContentError::Io)?;
-            }
-            let mut outfile = std::fs::File::create(&outpath).map_err(ContentError::Io)?;
-            std::io::copy(&mut file, &mut outfile).map_err(ContentError::Io)?;
-
-            let ext = outpath.extension().and_then(|e| e.to_str()).unwrap_or("");
-            if ext.eq_ignore_ascii_case("pkg") {
-                pkgs.push(outpath);
-            } else if ext.eq_ignore_ascii_case("rap") {
-                raps.push(outpath);
-            }
+            continue;
+        };
+        // Case-insensitive, as RPCS3 lower-cases licence extensions and Windows ignores case.
+        if !seen.insert(file_name.to_string_lossy().to_lowercase()) {
+            return Err(ContentError::DuplicateFile(file_name.to_string_lossy().into_owned()));
         }
+
+        let outpath = temp_dir.path().join(file_name);
+        let mut outfile = std::fs::File::create(&outpath).map_err(ContentError::Io)?;
+        std::io::copy(&mut file, &mut outfile).map_err(ContentError::Io)?;
+        list.push(outpath);
     }
 
     if pkgs.is_empty() {
         return Err(ContentError::NoPkgFound);
     }
-    Ok(ExtractedDlc { pkgs, raps, temp_dir })
+    Ok(ExtractedDlc {
+        pkgs,
+        raps,
+        edats,
+        temp_dir,
+    })
 }
 
-/// Install a DLC ZIP to RPCS3: extract, install PKG, copy RAP, clean up.
-pub async fn install_dlc_zip(rpcs3_exe: &Path, zip_path: &Path, exdata_dir: &Path) -> Result<(), ContentError> {
+/// Install a DLC ZIP to RPCS3: extract it, then hand RPCS3 the one folder.
+///
+/// RPCS3 copies the RAP and EDAT licences into its own exdata folder, then installs
+/// every PKG. rusty-psn cannot see whether the licences landed: it reports what
+/// `install_pkg` reports.
+pub async fn install_dlc_zip(rpcs3_exe: &Path, zip_path: &Path) -> Result<(), ContentError> {
     info!("Installing DLC from ZIP: {}", zip_path.display());
 
     // Extract (sync, but fast — zips are small)
     let dlc = extract_dlc_zip(zip_path)?;
+    info!(
+        "Handing RPCS3 {} package(s), {} RAP and {} EDAT licence(s)",
+        dlc.pkgs.len(),
+        dlc.raps.len(),
+        dlc.edats.len()
+    );
 
-    // Install every PKG via RPCS3; the first failure stops the install.
-    for pkg in &dlc.pkgs {
-        crate::rpcs3::install_pkg(rpcs3_exe, pkg)
-            .await
-            .map_err(|e| ContentError::InstallFailed(e.to_string()))?;
-    }
-
-    // Copy every RAP to the exdata directory
-    for rap in &dlc.raps {
-        let rap_filename = rap.file_name().expect("RAP file should have a filename");
-        let dest = exdata_dir.join(rap_filename);
-        std::fs::copy(rap, &dest).map_err(ContentError::Io)?;
-        info!("Copied RAP license to {}", dest.display());
-    }
+    crate::rpcs3::install_pkg(rpcs3_exe, dlc.temp_dir.path())
+        .await
+        .map_err(|e| ContentError::InstallFailed(e.to_string()))?;
 
     // dlc.temp_dir drops here, removing the extracted files
     info!("DLC installation complete");
@@ -296,5 +311,91 @@ mod tests {
 
         assert_eq!(names(&dlc.pkgs), ["a.pkg", "b.PKG"]);
         assert_eq!(names(&dlc.raps), ["a.rap", "b.rap"]);
+    }
+
+    /// The file names directly inside `dir`, sorted; a subfolder is listed with a trailing `/`.
+    fn top_level_names(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if entry.path().is_dir() {
+                    format!("{name}/")
+                } else {
+                    name
+                }
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn extract_dlc_zip_puts_packages_and_licences_at_the_top_of_one_folder() {
+        // RPCS3 reads only the files at the top of the folder it is given (RPSN-0112).
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("dlc.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
+        let options = zip::write::SimpleFileOptions::default();
+        for name in ["game/dlc.pkg", "game/licence/dlc.rap", "game/dlc.EDAT", "game/readme.txt"] {
+            writer.start_file(name, options).unwrap();
+            writer.write_all(name.as_bytes()).unwrap();
+        }
+        writer.finish().unwrap();
+
+        let dlc = extract_dlc_zip(&zip_path).unwrap();
+
+        assert_eq!(top_level_names(dlc.temp_dir.path()), ["dlc.EDAT", "dlc.pkg", "dlc.rap"]);
+    }
+
+    #[test]
+    fn extract_dlc_zip_refuses_two_files_with_one_name() {
+        // Flattening would let the second overwrite the first.
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("dlc.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
+        let options = zip::write::SimpleFileOptions::default();
+        for name in ["a/dlc.pkg", "b/DLC.PKG"] {
+            writer.start_file(name, options).unwrap();
+            writer.write_all(name.as_bytes()).unwrap();
+        }
+        writer.finish().unwrap();
+
+        assert!(matches!(extract_dlc_zip(&zip_path), Err(ContentError::DuplicateFile(name)) if name == "DLC.PKG"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn install_dlc_zip_hands_rpcs3_one_folder_with_every_file() {
+        // RPCS3 places the licences itself when given the folder (RPSN-0112).
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("dlc.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
+        let options = zip::write::SimpleFileOptions::default();
+        for name in ["a.pkg", "a.rap", "b.pkg", "b.edat"] {
+            writer.start_file(name, options).unwrap();
+            writer.write_all(name.as_bytes()).unwrap();
+        }
+        writer.finish().unwrap();
+
+        // A stand-in RPCS3 that records each --installpkg argument and what it held.
+        let log = dir.path().join("calls.log");
+        let fake = dir.path().join("rpcs3");
+        std::fs::write(
+            &fake,
+            format!("#!/bin/sh\necho \"$2\" >> '{0}'\nls \"$2\" >> '{0}'\n", log.display()),
+        )
+        .unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        install_dlc_zip(&fake, &zip_path).await.unwrap();
+
+        let calls = std::fs::read_to_string(&log).unwrap();
+        let lines: Vec<&str> = calls.lines().collect();
+        assert_eq!(lines.len(), 5, "one call naming a folder, then its four files: {calls}");
+        assert_eq!(&lines[1..], ["a.pkg", "a.rap", "b.edat", "b.pkg"]);
     }
 }

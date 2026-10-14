@@ -1375,7 +1375,7 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
   Lanes: Content.
 
-- 📋 [RPSN-0112] **Prepare the licence folder before installing a DLC package.**
+- ✅ [RPSN-0112] **Prepare the licence folder before installing a DLC package.**
   src/content.rs:223-226 copy the .rap after the PKG install; a missing exdata folder (fresh RPCS3 profile) fails the copy after the PKG is in. Remedy: create or check the folder first, or name the partial state in the error.
   RPCS3 source review (2026-10-13, finding 6): RPCS3 writes a licence as
   <stem>.rap with the extension in lower case, into home/<active
@@ -1393,6 +1393,12 @@ reviewer proposed; check both against the code before fixing.
   instead of copying licences into exdata ourselves. This changes
   docs/design.md's Writes-outside-the-download-folder line, so that
   amendment runs through review-contract before the build.
+  Resolved (2026-10-14): install_dlc_zip unpacks every .pkg, .rap and
+  .edat flat into one temporary folder and hands that folder to
+  `rpcs3 --installpkg`; RPCS3 places the licences. rusty-psn no longer
+  writes into exdata, and the window app's DLC Install button no longer
+  needs the RPCS3 config folder. A ZIP holding two files with one name
+  is refused. docs/design.md amended and gated first (loops 4 to 6).
   **Layman:** A DLC can install without its licence and say only that it failed.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
