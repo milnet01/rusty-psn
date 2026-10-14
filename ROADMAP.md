@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=145 -->
+<!-- ants-roadmap-id-high-water: RPSN=146 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1599,6 +1599,20 @@ reviewer proposed; check both against the code before fixing.
   Kind: fix.
   Source: in-session-2026-10-13 RPSN-0116.
   Lanes: PSN.
+
+- 📋 [RPSN-0146] **Say in docs/design.md where window-only Content code lives.**
+  docs/design.md says new code used only by one front end goes in
+  that front end's folder, and names a carve-out for PSN and Files
+  only. Content (src/content.rs) is used only by the window app: the
+  command line calls none of it (grep "content::" src/cli src/main.rs
+  finds nothing). So any new Content code meets both rules. Remedy:
+  add Content to the carve-out, or say Content stays a shared part
+  whichever front ends call it. Found outside the RPSN-0112 change, so
+  filed rather than fixed in that gate.
+  **Layman:** The design document gives two different answers about where code only the window app uses should go.
+  Kind: doc-fix.
+  Source: review-contract design.md 2026-10-14 loop 5 lane 2.
+  Lanes: Content.
 
 ## 15. RPCS3 source review (2026-10-13)
 

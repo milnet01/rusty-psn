@@ -96,7 +96,8 @@ sets for a second reason to change.
   licences into its own `exdata` folder and installs the packages
   (`InstallPackages` in `rpcs3qt/main_window.cpp` and `get_dir_entries` in
   `rpcs3qt/qt_utils.cpp`, RPCS3 commit 6fe3c87). rusty-psn writes nothing
-  into RPCS3's folders. Until RPSN-0112 lands, Content still installs each
+  into RPCS3's folders. Content cannot see whether RPCS3 placed the
+  licences: it reports success when `rpcs3::install_pkg` does. Until RPSN-0112 lands, Content still installs each
   package on its own, copies each `.rap` into `exdata` itself, and drops
   `.edat` files.
 
@@ -125,3 +126,4 @@ None recorded as an ADR yet.
 | 2 | 2026-10-12 | 2 (both lanes held every question) | 2 | 2 | 1 | — | 5 verified, 5 fixed, 0 dismissed. Both lanes found S4's Title / ID layout is not the default, and RPCS3 and Content writes had no stated boundary. Also: layout migration writes before the containment check (`migrate_directories` found while verifying); egui-only code sits in PSN and Files, not RPCS3; a fix inside egui-only `merge_parts` had two possible homes. Open question resolved: `config.rs` writes only in tests. |
 | 3 | 2026-10-12 | 2 (both lanes held every question) | 0 | 3 | 0 | — | 3 verified, 3 fixed, 0 dismissed. S4 narrowed in discovery to Title / ID by default, with the owner's agreement; S7 placed as RPCS3 with PSN, joined in the window app; the error summary no longer says one enum per area. Cap reached (3 for an ADR); these 3 fixes were read by no lane. Calm cap: 1 of 3 findings landed on text this run wrote (the S4 row). The gated span is the whole document, so the share of findings inside it carries no information. Final sweep: no stale wording found. Grouped and `super::` imports checked: all stay inside one part. |
 | 4 | 2026-10-14 | 2 (both lanes held every question) | 1 | 0 | 1 | — | 2 verified, 2 fixed, 1 dismissed. Gate on the RPSN-0112 amendment to the writes-outside-the-download-folder bullet. Both lanes found the bullet read as current code, which still installs each package alone, copies `.rap` itself and drops `.edat`; and that RPCS3 lists only a folder's top-level files while extraction keeps subfolders. Dismissed: how Content learns a licence failed, which the implementer settles and RPSN-0137 confirms. Open questions resolved clean: RPCS3's `init_dirs` defaults on, so `exdata` exists at startup; firmware writes pass `validate_path_containment`. |
+| 5 | 2026-10-14 | 2 (both lanes held every question) | 0 | 1 | 1 | — | 1 verified in radius, 1 fixed; 1 out of radius, filed as RPSN-0146. A lane found the bullet never said how Content learns a licence failed, now stated: it cannot, and reports what `rpcs3::install_pkg` reports. Filed: the window-only-code rule does not name Content, which only the window app calls. Open questions resolved clean: `InstallPackages` defaults `from_boot` to false, so licences are copied; `init_dirs` defaults on. |
