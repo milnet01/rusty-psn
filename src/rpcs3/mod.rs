@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -53,8 +54,9 @@ impl fmt::Display for Rpcs3Error {
 
 /// Scan an RPCS3 installation for all games known to the emulator.
 ///
-/// Uses games.yml as the primary source (contains ALL registered games, including ISOs).
-/// For each game, tries to read PARAM.SFO from multiple locations to get title and version:
+/// Lists games as RPCS3 does (Emu/game_enumeration.h, RPCS3 commit 6fe3c87): every game in
+/// games.yml, which holds disc and external games, plus every folder in `dev_hdd0/game` with a
+/// PARAM.SFO, which is where PSN games live. For a games.yml game, title and version come from:
 /// 1. `dev_hdd0/game/{serial}/PARAM.SFO` — installed game data (has update version)
 /// 2. `{game_path}/PS3_GAME/PARAM.SFO` — for .PS3/ folder-format games
 /// 3. Falls back to extracting the title from the filename for ISO games without game data.
@@ -131,14 +133,62 @@ pub fn scan_library(installation: &Rpcs3Installation) -> Result<Vec<InstalledGam
         });
     }
 
+    let from_games_yml = installed_games.len();
+    let listed: HashSet<String> = installed_games.iter().map(|game| game.serial.clone()).collect();
+    installed_games.extend(
+        hdd0_games(&game_dir)
+            .into_iter()
+            .filter(|game| !listed.contains(&game.serial)),
+    );
+
     installed_games.sort_by(|a, b| a.serial.cmp(&b.serial));
 
     info!(
-        "RPCS3 library scan found {} games ({} from games.yml)",
-        installed_games.len(),
-        games_map.len()
+        "RPCS3 library scan found {} games ({from_games_yml} from games.yml)",
+        installed_games.len()
     );
     Ok(installed_games)
+}
+
+/// Every folder in `dev_hdd0/game` whose PARAM.SFO names a serial, keyed by that serial as RPCS3
+/// keys it, not by the folder name. A folder with no PARAM.SFO is skipped: RPCS3 keeps a lock
+/// folder and TEST12345 there (RPSN-0136).
+fn hdd0_games(game_dir: &Path) -> Vec<InstalledGame> {
+    let entries = match std::fs::read_dir(game_dir) {
+        Ok(entries) => entries,
+        Err(e) => {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                warn!("Cannot list {}: {e}", game_dir.display());
+            }
+            return Vec::new();
+        }
+    };
+
+    let mut games = Vec::new();
+    for entry in entries.flatten() {
+        let game_path = entry.path();
+        let sfo_path = game_path.join("PARAM.SFO");
+        if !game_path.is_dir() || !sfo_path.is_file() {
+            continue;
+        }
+        let sfo = match sfo::parse_sfo(&sfo_path) {
+            Ok(sfo) => sfo,
+            Err(e) => {
+                warn!("Failed to parse {}: {e}", sfo_path.display());
+                continue;
+            }
+        };
+        if !looks_like_serial(&sfo.title_id) {
+            continue;
+        }
+        games.push(InstalledGame {
+            serial: sfo.title_id,
+            title: sfo.title,
+            installed_version: sfo.app_ver,
+            game_path,
+        });
+    }
+    games
 }
 
 /// Extract a human-readable game title from a file path.
@@ -322,6 +372,51 @@ mod tests {
 
         assert_eq!(games.len(), 1);
         assert_eq!(games[0].installed_version.as_deref(), Some("01.05"));
+    }
+
+    fn installation_with(root: &Path, games_yml: &str) -> Rpcs3Installation {
+        let config_dir = root.join("config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join("games.yml"), games_yml).unwrap();
+        Rpcs3Installation {
+            config_dir,
+            dev_hdd0_path: root.join("dev_hdd0"),
+            executable: None,
+        }
+    }
+
+    #[test]
+    fn scan_library_finds_psn_games_in_dev_hdd0() {
+        // RPCS3 writes PSN games to dev_hdd0/game only, never to games.yml (RPSN-0136).
+        let root = tempfile::tempdir().unwrap();
+        let game_dir = root.path().join("dev_hdd0/game");
+        std::fs::create_dir_all(game_dir.join("NPUB30826")).unwrap();
+        std::fs::write(game_dir.join("NPUB30826/PARAM.SFO"), sfo::tests::make_test_sfo()).unwrap();
+        std::fs::create_dir_all(game_dir.join("TEST12345")).unwrap();
+        let installation = installation_with(root.path(), "");
+
+        let games = scan_library(&installation).unwrap();
+
+        assert_eq!(games.len(), 1);
+        // The serial is the one PARAM.SFO names (make_test_sfo's), as RPCS3 keys it.
+        assert_eq!(games[0].serial, "BCUS99999");
+        assert_eq!(games[0].title, "Test Game");
+        assert_eq!(games[0].installed_version.as_deref(), Some("01.05"));
+    }
+
+    #[test]
+    fn scan_library_lists_a_game_in_both_places_once() {
+        let root = tempfile::tempdir().unwrap();
+        let game_dir = root.path().join("dev_hdd0/game");
+        std::fs::create_dir_all(game_dir.join("BCUS99999")).unwrap();
+        std::fs::write(game_dir.join("BCUS99999/PARAM.SFO"), sfo::tests::make_test_sfo()).unwrap();
+        let disc = root.path().join("disc");
+        let installation = installation_with(root.path(), &format!("BCUS99999: {}/\n", disc.display()));
+
+        let games = scan_library(&installation).unwrap();
+
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].game_path, disc);
     }
 
     #[test]
