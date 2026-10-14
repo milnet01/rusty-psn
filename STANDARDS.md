@@ -348,7 +348,8 @@ Both are independently toggleable in settings.
 | `--rpcs3-config-dir` | - | No | Path to RPCS3 config directory (containing games.yml) |
 | `--no-log-file` | - | No | Disable log file output |
 
-One of `--titles`, `--batch-file`, or `--scan-rpcs3` must be provided.
+Exactly one of `--titles`, `--batch-file` or `--scan-rpcs3` must be provided, or `--firmware`
+instead of all three. Clap refuses two of them together, and an unknown `--directory-format` value.
 
 ### 7.2 Interactive Flow
 

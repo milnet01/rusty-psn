@@ -1507,8 +1507,15 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 2 LOW.
   Lanes: PSN, Files, Security.
 
-- 📋 [RPSN-0119] **Command line: small review findings from the 2026-10-12 audit.**
+- ✅ [RPSN-0119] **Command line: small review findings from the 2026-10-12 audit.**
   src/cli/mod.rs:39-43 a misspelt --directory-format silently uses the default (use a ValueEnum). src/main.rs:30-80 contradictory options are silently ranked (use conflicts_with). src/cli/mod.rs: unwrap() calls lack the comment CLAUDE.md rule 4 requires, and crossterm/flush unwraps panic on a closed pipe. scripts/local-ci.sh:74-86 --docs exits 0 verifying nothing. src/cli/mod.rs:513 sleeps 3 s after every title, silent mode included.
+  Resolved (2026-10-14): --directory-format accepts only its three
+  values; --firmware, --scan-rpcs3, --batch-file and --titles refuse
+  each other (and --firmware refuses --install) instead of one winning
+  silently; the 3 s pause before clearing the screen runs only outside
+  silent mode. Already done before this pass: the command line holds no
+  bare unwrap(), and its flushes ignore errors. Moved to RPSN-0123: the
+  local-ci --docs check, which needs typos to run clean first.
   **Layman:** Small command-line fixes: silent defaults and needless waits.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 3 LOW.
@@ -1542,6 +1549,11 @@ reviewer proposed; check both against the code before fixing.
 
 - 📋 [RPSN-0123] **Fix the spelling mistakes typos found.**
   Mergable/Unmergable (src/egui/mod.rs:850, 2316, 2340, 2555, 3208, 3213, 3328; src/psn/mod.rs:64, 248; STANDARDS.md:199) includes the enum variant PackagesUnmergable, so the rename touches every use. Plaform (STANDARDS.md:219; ROADMAP item text), preceeding (src/psn/parser.rs:101), PN (ROADMAP.md:757, 766; check context). ROADMAP text changes go through roadmap_log.
+  Moved here from RPSN-0119 (2026-10-14): once typos runs clean, make
+  it the documentation step in scripts/local-ci.sh and set
+  DOCS_CONFIGURED=1, so --docs checks something instead of exiting 0
+  having verified nothing. typos is installed and _typos.toml exists;
+  today it reports these mistakes and exits 2.
   **Layman:** Correct a handful of misspelt words in the code and docs.
   Kind: chore.
   Source: audit-2026-10-12 check-code typos.

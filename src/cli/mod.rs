@@ -518,9 +518,9 @@ pub fn start_app(args: Args) -> bool {
             }
         }
 
-        std::thread::sleep(std::time::Duration::from_secs(3));
-
         if !silent_mode {
+            // A pause to read this title's results before the screen is cleared.
+            std::thread::sleep(std::time::Duration::from_secs(3));
             let _ = crossterm::execute!(
                 std::io::stdout(),
                 terminal::Clear(terminal::ClearType::All),

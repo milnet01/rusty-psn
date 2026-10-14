@@ -36,7 +36,12 @@ struct Args {
     )]
     titles: Vec<String>,
     #[cfg(feature = "cli")]
-    #[clap(short = 'b', long, help = "Path to a text file with serials (one per line, # for comments)")]
+    #[clap(
+        short = 'b',
+        long,
+        conflicts_with = "titles",
+        help = "Path to a text file with serials (one per line, # for comments)"
+    )]
     batch_file: Option<PathBuf>,
     #[cfg(feature = "cli")]
     #[clap(
@@ -52,6 +57,7 @@ struct Args {
     #[clap(
         long,
         default_value = "serial-title",
+        value_parser = ["serial-only", "serial-title", "title-serial"],
         help = "Directory format: serial-only, serial-title, or title-serial"
     )]
     directory_format: String,
@@ -59,10 +65,18 @@ struct Args {
     #[clap(long, help = "Path to RPCS3 config directory (containing games.yml).")]
     rpcs3_config_dir: Option<PathBuf>,
     #[cfg(feature = "cli")]
-    #[clap(long, help = "Scan RPCS3 library for available updates.")]
+    #[clap(
+        long,
+        conflicts_with_all = ["titles", "batch_file"],
+        help = "Scan RPCS3 library for available updates."
+    )]
     scan_rpcs3: bool,
     #[cfg(feature = "cli")]
-    #[clap(long, help = "Download firmware instead of game updates.")]
+    #[clap(
+        long,
+        conflicts_with_all = ["titles", "batch_file", "scan_rpcs3", "install"],
+        help = "Download firmware instead of game updates."
+    )]
     firmware: bool,
     #[cfg(feature = "cli")]
     #[clap(long, default_value = "PS3", help = "Firmware console: PS3, PS4, PS5, PSVita")]
@@ -203,4 +217,31 @@ fn init_log(no_log_file: bool) -> LoggerHandle {
         .duplicate_to_stdout(flexi_logger::Duplicate::Error)
         .start()
         .expect("Failed to start logger!")
+}
+
+#[cfg(all(test, feature = "cli"))]
+mod tests {
+    use super::Args;
+    use clap::Parser;
+
+    fn parses(args: &[&str]) -> bool {
+        Args::try_parse_from(std::iter::once("rusty-psn").chain(args.iter().copied())).is_ok()
+    }
+
+    #[test]
+    fn a_misspelt_directory_format_is_refused() {
+        // It used to fall back to the default without a word (RPSN-0119).
+        assert!(parses(&["-t", "NPUB30826", "--directory-format", "title-serial"]));
+        assert!(!parses(&["-t", "NPUB30826", "--directory-format", "titel-serial"]));
+    }
+
+    #[test]
+    fn two_sources_of_serials_are_refused() {
+        // One used to win silently, in a fixed order the help never stated (RPSN-0119).
+        assert!(!parses(&["--firmware", "-t", "NPUB30826"]));
+        assert!(!parses(&["--scan-rpcs3", "-t", "NPUB30826"]));
+        assert!(!parses(&["--batch-file", "list.txt", "-t", "NPUB30826"]));
+        assert!(!parses(&["--firmware", "--install"]));
+        assert!(parses(&["--scan-rpcs3", "--install"]));
+    }
 }
