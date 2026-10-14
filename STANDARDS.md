@@ -300,6 +300,7 @@ UpdatesApp (eframe::App)
   |     |-- max_concurrent_downloads: u32
   |     |-- rpcs3_config_dir: Option<PathBuf>
   |     |-- theme: AppTheme (Dark/Light/PlayStation)
+  |     |-- text_size_percent: u32 (100 to 200; scales all text and controls)
   |
   |-- VolatileData (not persisted)
         |-- serial_query, update_results
@@ -326,7 +327,7 @@ UpdatesApp (eframe::App)
 - **Search bar**: Serial input, search button, settings gear, Import Batch, Scan RPCS3, Download All, Clear
 - **Results list**: Vertical scrollable area with collapsible headers per title (aggregate status in header)
 - **Package entries**: Grouped panels with version, size, SHA1, download/pause/abort/resume buttons, progress bar, Copy URL
-- **Settings window**: Fixed-size modal (`420x560`) with Downloads, Appearance (themes), Notifications, RPCS3 Integration
+- **Settings window**: Fixed-size window with Downloads, Appearance (theme, text size), Notifications, RPCS3 Integration and Content Library. Its fields scroll above the Save row, so it fits the screen at a large text size
 - **Status bar**: Bottom panel with batch progress, download counts, speed (EMA), ETA, aggregate progress bar
 - **RPCS3 Library window**: Grid showing serial, title, installed/available versions, update status
 - **Hash mismatch warning**: Fixed-size modal (`550x100`) explaining Sony server reliability issues

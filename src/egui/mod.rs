@@ -268,6 +268,26 @@ struct AppSettings {
     content_directory: Option<PathBuf>,
     #[serde(deserialize_with = "default_if_unknown")]
     theme: AppTheme,
+    /// How large all text and controls are drawn, as a percentage of normal size.
+    #[serde(deserialize_with = "text_size")]
+    text_size_percent: u32,
+}
+
+/// The text sizes the settings window offers, as percentages of normal size.
+const TEXT_SIZES: [u32; 5] = [100, 125, 150, 175, 200];
+
+/// Reads the stored text size into the range the settings window offers.
+fn text_size<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
+    Ok(u32::deserialize(deserializer)?.clamp(TEXT_SIZES[0], TEXT_SIZES[TEXT_SIZES.len() - 1]))
+}
+
+/// The label the settings window shows for a text size.
+fn text_size_label(percent: u32) -> String {
+    if percent == 100 {
+        "100% (normal)".to_string()
+    } else {
+        format!("{percent}%")
+    }
 }
 
 /// Reads the stored download limit into the range the settings slider offers.
@@ -311,7 +331,16 @@ impl Default for AppSettings {
             rpcs3_executable: None,
             content_directory: None,
             theme: AppTheme::default(),
+            text_size_percent: 100,
         }
+    }
+}
+
+impl AppSettings {
+    /// Draws the window with this theme and text size.
+    fn apply_appearance(&self, ctx: &egui::Context) {
+        self.theme.apply(ctx);
+        ctx.set_zoom_factor(self.text_size_percent as f32 / 100.0);
     }
 }
 
@@ -662,8 +691,8 @@ impl UpdatesApp {
             .storage
             .and_then(|storage| eframe::get_value(storage, placement::STORAGE_KEY));
 
-        // Apply the persisted theme on startup.
-        app.settings.theme.apply(&cc.egui_ctx);
+        // Apply the persisted theme and text size on startup.
+        app.settings.apply_appearance(&cc.egui_ctx);
 
         app
     }
@@ -817,6 +846,7 @@ mod tests {
         app.settings.theme = AppTheme::PlayStation;
         app.settings.directory_format = crate::utils::DirectoryFormat::TitleSerial;
         app.settings.max_concurrent_downloads = 7;
+        app.settings.text_size_percent = 150;
         let stored = ron::ser::to_string(&app).expect("settings serialize");
 
         let settings = load(&stored);
@@ -825,6 +855,18 @@ mod tests {
         assert_eq!(settings.theme, AppTheme::PlayStation);
         assert_eq!(settings.directory_format, crate::utils::DirectoryFormat::TitleSerial);
         assert_eq!(settings.max_concurrent_downloads, 7);
+        assert_eq!(settings.text_size_percent, 150);
+    }
+
+    #[test]
+    fn a_stored_text_size_loads_inside_the_offered_range() {
+        // A hand-edited or corrupted size could make the window unreadably small or large (RPSN-0142).
+        for (stored, expected) in [(0, 100), (40, 100), (130, 130), (900, 200)] {
+            let settings = load(&format!("(settings:(text_size_percent:{stored}))"));
+            assert!(settings.is_some(), "settings with text size {stored} did not load");
+            let settings = settings.unwrap(); // Checked just above.
+            assert_eq!(settings.text_size_percent, expected, "stored {stored}");
+        }
     }
 
     #[test]
@@ -849,5 +891,6 @@ mod tests {
         assert_eq!(settings.pkg_download_path, PathBuf::from("/games/pkgs"));
         assert!(settings.show_toasts);
         assert_eq!(settings.directory_format, crate::utils::DirectoryFormat::default());
+        assert_eq!(settings.text_size_percent, 100);
     }
 }
