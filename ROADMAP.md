@@ -676,7 +676,7 @@ Add visual theming support to the egui GUI.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0062] **Add custom accent colors for status indicators.**
+- ✅ [RPSN-0062] **Add custom accent colors for status indicators.**
     - Success: green (keep current)
     - Error: red (keep current)
     - In-progress: accent color from theme (currently hardcoded yellow `1.0, 1.0, 0.6`)
@@ -684,6 +684,11 @@ Add visual theming support to the egui GUI.
   Checked against the code 2026-10-12: Partly done — the
   STATUS_COLOR_* constants are fixed, not taken from the theme.
   Former TODO.md task 8.4.
+  Resolved (2026-10-14, 12deeae): status colours come from
+  StatusKind::color, which picks a darker set on a light theme (test
+  status_colours_follow_the_theme). The colours follow light or dark,
+  not a theme's accent: high contrast and PlayStation are dark themes
+  and use the dark set.
   **Layman:** Make the status colours follow the chosen theme.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -703,10 +708,15 @@ Add visual theming support to the egui GUI.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0065] **Ensure all hardcoded `egui::Rgba::from_rgb(...)` and `egui::Color32` values in `egui/mod.rs` use theme-aware colors instead of fixed values.**
+- ✅ [RPSN-0065] **Ensure all hardcoded `egui::Rgba::from_rgb(...)` and `egui::Color32` values in `egui/mod.rs` use theme-aware colors instead of fixed values.**
   Checked against the code 2026-10-12: Not done — fixed Rgba::from_rgb
   and Color32 values remain in src/egui/mod.rs.
   Former TODO.md task 8.7.
+  Resolved (2026-10-14, 12deeae): the status colours in mod.rs, results,
+  content browser, RPCS3 library, settings and the integrity warning now
+  follow the theme. What stays fixed is the theme definitions themselves
+  and the platform badges, which draw white text on their own solid
+  colour and read the same on any theme.
   **Layman:** Make every colour in the window follow the chosen theme.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -1091,8 +1101,11 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: user-request-2026-10-13 RPSN-0133.
   Lanes: Window app.
 
-- 📋 [RPSN-0144] **Pair every status colour with an icon and words.**
+- ✅ [RPSN-0144] **Pair every status colour with an icon and words.**
   Third part of the approved redesign (RPSN-0133), as in the mockups.
+  Resolved (2026-10-14, 12deeae): every status label draws an icon and
+  words, from one StatusKind list; statuses sharing a colour have
+  different icons (test no_two_statuses_look_the_same).
   **Layman:** Each status shows an icon and words, not colour alone.
   Kind: accessibility.
   Source: user-request-2026-10-13 RPSN-0133.
