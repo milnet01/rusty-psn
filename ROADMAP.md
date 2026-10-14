@@ -1335,10 +1335,14 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM.
   Lanes: Command line.
 
-- 📋 [RPSN-0108] **Decide whether a build with both front ends is supported, then fix main.rs or design.md.**
+- ✅ [RPSN-0108] **Decide whether a build with both front ends is supported, then fix main.rs or design.md.**
   src/main.rs:92-96 runs cli::start_app first; with no CLI arguments it exits (cli/mod.rs:104-106), so the window never starts. windows_subsystem also hides CLI output on Windows. Owner decision: compile_error! on cli+egui, or choose the front end at runtime.
   Owner decision (2026-10-13): refuse a build with both front ends
   (compile_error! on cli + egui). No runtime choice.
+  Resolved (2026-10-14): src/main.rs refuses a cli + egui build with
+  compile_error!, naming the two supported builds. Owner confirmed
+  2026-10-14: the command-line build stays available; the window app is
+  theirs. design.md needed no change.
   **Layman:** A build with both the window app and the command line never opens the window.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 3 MEDIUM.
