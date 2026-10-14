@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=148 -->
+<!-- ants-roadmap-id-high-water: RPSN=150 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1521,13 +1521,23 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 3 LOW.
   Lanes: Command line, Entry, Build.
 
-- 📋 [RPSN-0120] **RPCS3 and Content: small review findings from the 2026-10-12 audit.**
+- ✅ [RPSN-0120] **RPCS3 and Content: small review findings from the 2026-10-12 audit.**
   src/rpcs3/sfo.rs:52 and config.rs:22, :40 check size then read unbounded (use take()). auto_detect scans /mnt and spawns which/flatpak on the window thread (egui/mod.rs:2078, :2948 call it synchronously). src/content.rs:215 extracts synchronously inside an async fn (spawn_blocking). src/content.rs:126 comment promises DLC subfolder layouts the code does not scan. src/rpcs3/config.rs:24 one non-string games.yml value fails the whole scan.
   RPCS3 source review (2026-10-13, finding 9): RPCS3 skips games.yml
   entries whose value is empty or not a plain value, and creates an
   empty games.yml on first load (Emu/games_config.cpp at 6fe3c87).
   Unverified: whether our parser accepts a fully empty file as an empty
   list.
+  Resolved 2026-10-14 (cc802ee). One capped reader (rpcs3::read_capped)
+  for PARAM.SFO, games.yml, vfs.yml. games.yml skips entries RPCS3
+  skips. Auto-detect runs in the background from all three buttons. DLC
+  unpacking uses spawn_blocking. DLC scan comment corrected. Answered:
+  an empty games.yml was already read as an empty library. Tested:
+  read_capped and the games.yml skip (both proven red); empty-file lock;
+  window smoke test under Xvfb (scan auto-detect, Settings not-found
+  warning). Not tested: a Settings result arriving after the window
+  closes (dropped by design); spawn_blocking itself. Window hand test
+  welcome: Scan RPCS3 Library with no path set.
   **Layman:** Small RPCS3 and DLC fixes: unbounded reads and a blocking scan.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 LOW.
@@ -1650,6 +1660,9 @@ reviewer proposed; check both against the code before fixing.
      each get_info() and start_download() call; the client is now built
      once and shared (build_psn_client, passed into UpdatesApp::new).
   Check the rest of that list against the code while there.
+  Also (2026-10-14): § 10.1's unit-test table and the "Total: 48 tests"
+  line are stale counts (the suite runs 111 tests). Replace the counts
+  with test names or drop them, per the no-counts writing rule.
   **Layman:** Two places in the project notes say things that are no longer true.
   Kind: doc-fix.
   Source: in-session-2026-10-12 (check-doc-facts over STANDARDS.md).
@@ -1694,10 +1707,40 @@ reviewer proposed; check both against the code before fixing.
   same scan, else auto-detect, else warn sequence; RPSN-0117 had to
   change both. Only their warning text differs. Remedy: one method in
   src/egui/rpcs3_library.rs that both call.
+  Progress (2026-10-14, RPSN-0120): the detect-and-warn half now lives
+  once, in start_rpcs3_detect / handle_rpcs3_detect_promise
+  (src/egui/rpcs3_library.rs), with one warning text. What is left: the
+  scan-else-detect branch still sits in both search.rs and chrome.rs.
   **Layman:** Two buttons that do the same thing have separate copies of the code, so a fix to one can miss the other.
   Kind: refactor.
   Source: in-session-2026-10-14 RPSN-0117.
   Lanes: Window app.
+
+- 📋 [RPSN-0149] **Cap the batch-file read, not only its reported size.**
+  src/batch.rs checks the file's size with metadata, then calls
+  read_to_string with no limit: the pattern RPSN-0120 fixed in the
+  RPCS3 part. Batch may not use Files or RPCS3 (docs/design.md), so
+  it cannot call rpcs3::read_capped. Remedy: the same take(max + 1)
+  read inside batch.rs, or one capped reader in Security, which every
+  part may reach only if design.md allows it.
+  **Layman:** A batch file that grows while it is being read could still be read whole.
+  Kind: fix.
+  Source: in-session-2026-10-14 RPSN-0120.
+  Lanes: Batch.
+
+- 📋 [RPSN-0150] **Keep folder scans off the window thread, and repaint when the library scan ends.**
+  1. The content browser scans its folder on the window thread
+     (scan_content_directory, called in src/egui/chrome.rs and
+     src/egui/content_browser.rs).
+  2. trigger_rpcs3_scan (src/egui/rpcs3_library.rs) runs the sync
+     scan_library inside an async task, holding an async worker.
+     Use spawn_blocking, as RPSN-0120 did for auto-detect.
+  3. That task never calls request_repaint, so the scan result waits
+     for the next input event. The search task already does this.
+  **Layman:** Opening the content browser or scanning RPCS3 can freeze the window or leave the result unseen until the mouse moves.
+  Kind: perf.
+  Source: in-session-2026-10-14 RPSN-0120.
+  Lanes: Window app, RPCS3, Content.
 
 ## 15. RPCS3 source review (2026-10-13)
 
