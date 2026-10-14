@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=154 -->
+<!-- ants-roadmap-id-high-water: RPSN=155 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1721,7 +1721,7 @@ reviewer proposed; check both against the code before fixing.
   Source: in-session-2026-10-13 RPSN-0116.
   Lanes: PSN.
 
-- 📋 [RPSN-0146] **Say in docs/design.md where window-only Content code lives.**
+- ✅ [RPSN-0146] **Say in docs/design.md where window-only Content code lives.**
   docs/design.md says new code used only by one front end goes in
   that front end's folder, and names a carve-out for PSN and Files
   only. Content (src/content.rs) is used only by the window app: the
@@ -1730,24 +1730,34 @@ reviewer proposed; check both against the code before fixing.
   add Content to the carve-out, or say Content stays a shared part
   whichever front ends call it. Found outside the RPSN-0112 change, so
   filed rather than fixed in that gate.
+  Resolved 2026-10-14 (6c2b0c4): docs/design.md says Content is a part
+  of its own, so new Content code goes in src/content.rs although only
+  the window app calls it today. review-contract converged in one loop;
+  it also corrected RPCS3's allowed parts to Security and Files, and
+  filed RPSN-0155.
   **Layman:** The design document gives two different answers about where code only the window app uses should go.
   Kind: doc-fix.
   Source: review-contract design.md 2026-10-14 loop 5 lane 2.
   Lanes: Content.
 
-- 📋 [RPSN-0147] **Follow XDG_CONFIG_HOME and a portable folder when finding RPCS3 on Linux and macOS.**
+- ✅ [RPSN-0147] **Follow XDG_CONFIG_HOME and a portable folder when finding RPCS3 on Linux and macOS.**
   fs::get_config_dir (Utilities/File.cpp, RPCS3 commit 6fe3c87) uses
   a portable/ folder beside the executable first on every system, and
   on Linux $XDG_CONFIG_HOME/rpcs3/ before ~/.config/rpcs3/.
   get_candidate_paths (src/rpcs3/auto_detect.rs) checks neither.
   Remedy: add $XDG_CONFIG_HOME/rpcs3 ahead of ~/.config/rpcs3, and a
   portable/ folder beside an rpcs3 found on PATH.
+  Resolved 2026-10-14 by RPSN-0139 (d7d4a0d), which this item
+  duplicates: get_candidate_paths tries $XDG_CONFIG_HOME/rpcs3 ahead of
+  ~/.config/rpcs3, and a portable/ folder beside the rpcs3 on PATH,
+  beside each RPCS3 AppImage, and beside RPCS3.app on macOS.
   **Layman:** If RPCS3's settings live somewhere other than the usual folder, the app does not find them.
   Kind: fix.
   Source: in-session-2026-10-14 RPSN-0115 research.
   Lanes: RPCS3.
+  Duplicate-of: RPSN-0139.
 
-- 📋 [RPSN-0148] **Share one scan-or-detect handler between the toolbar button and the menu.**
+- ✅ [RPSN-0148] **Share one scan-or-detect handler between the toolbar button and the menu.**
   The "Scan RPCS3 Library" button (src/egui/search.rs) and the
   "Scan RPCS3 Library..." menu item (src/egui/chrome.rs) each hold the
   same scan, else auto-detect, else warn sequence; RPSN-0117 had to
@@ -1757,18 +1767,23 @@ reviewer proposed; check both against the code before fixing.
   once, in start_rpcs3_detect / handle_rpcs3_detect_promise
   (src/egui/rpcs3_library.rs), with one warning text. What is left: the
   scan-else-detect branch still sits in both search.rs and chrome.rs.
+  Resolved 2026-10-14: the toolbar button and the Tools menu item both
+  call scan_or_detect_rpcs3 in src/egui/rpcs3_library.rs.
   **Layman:** Two buttons that do the same thing have separate copies of the code, so a fix to one can miss the other.
   Kind: refactor.
   Source: in-session-2026-10-14 RPSN-0117.
   Lanes: Window app.
 
-- 📋 [RPSN-0149] **Cap the batch-file read, not only its reported size.**
+- ✅ [RPSN-0149] **Cap the batch-file read, not only its reported size.**
   src/batch.rs checks the file's size with metadata, then calls
   read_to_string with no limit: the pattern RPSN-0120 fixed in the
   RPCS3 part. Batch may not use Files or RPCS3 (docs/design.md), so
   it cannot call rpcs3::read_capped. Remedy: the same take(max + 1)
   read inside batch.rs, or one capped reader in Security, which every
   part may reach only if design.md allows it.
+  Resolved 2026-10-14: parse_batch_file caps the read itself at
+  MAX_BATCH_FILE_SIZE + 1 and refuses a longer read as TooLarge; a
+  named-pipe test proves it.
   **Layman:** A batch file that grows while it is being read could still be read whole.
   Kind: fix.
   Source: in-session-2026-10-14 RPSN-0120.
@@ -1848,6 +1863,13 @@ reviewer proposed; check both against the code before fixing.
   Kind: security.
   Source: in-session-2026-10-14 cargo audit.
   Lanes: Build, Security.
+
+- 📋 [RPSN-0155] **Name the part src/promise.rs belongs to in docs/design.md.**
+  main.rs declares mod promise, and both front ends use it (src/egui/mod.rs, src/cli/mod.rs), but the parts table in docs/design.md lists no part holding src/promise.rs. So the dependency rules say nothing about it, and new code there has no stated home. Remedy: add it to a part, or a row of its own. Found by a review-contract lane on 2026-10-14 (the RPSN-0146 gate), outside that change, so filed.
+  **Layman:** The design document does not say which part owns one shared file.
+  Kind: doc-fix.
+  Source: review-contract design.md 2026-10-14 loop 7 lane 1.
+  Lanes: Entry.
 
 ## 15. RPCS3 source review (2026-10-13)
 
