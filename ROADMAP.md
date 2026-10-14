@@ -1165,6 +1165,10 @@ shipped items that built it.
   981f8ff (regression test
   scan_library_reads_disc_app_ver_when_no_update_installed). Unsettled:
   whether games.yml lists digital games at all.
+  Progress 2026-10-14: the open question is settled. games.yml does not
+  list digital games; RPCS3 finds them in dev_hdd0/game, and since
+  79a9b33 (RPSN-0136) so does scan_library. The hand check on a real
+  library is still owed.
   **Layman:** Check that the library scan correctly shows which games need updates.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -1827,8 +1831,13 @@ Findings from reading RPCS3's own source (commit 6fe3c87, owner request
 2026-10-13), checked against what rusty-psn does. Findings that sharpen an
 existing item are noted on that item instead.
 
-- 📋 [RPSN-0136] **Find installed PSN games in dev_hdd0/game, not only in games.yml.**
+- ✅ [RPSN-0136] **Find installed PSN games in dev_hdd0/game, not only in games.yml.**
   scan_library (src/rpcs3/mod.rs) lists games only from games.yml. RPCS3 builds its list from every folder in dev_hdd0/game/ plus games.yml, and writes only disc and external HG games to games.yml (rpcs3/Emu/game_enumeration.h, Emu/System.cpp at 6fe3c87). Checked 2026-10-13 on the owner's RPCS3: 40 NP* folders in dev_hdd0/game, none in games.yml. Remedy: also read dev_hdd0/game/*/PARAM.SFO, skip folders with none (RPCS3 makes TEST12345 and a locks folder there), merge with games.yml. Settles the open question in RPSN-0093.
+  Resolved (2026-10-14, 79a9b33): scan_library adds every dev_hdd0/game
+  folder with a readable PARAM.SFO naming a valid serial, keyed by its
+  TITLE_ID, skipping serials games.yml already gave. Locked by
+  scan_library_finds_psn_games_in_dev_hdd0 (red without the merge) and
+  scan_library_lists_a_game_in_both_places_once.
   **Layman:** The library scan misses every downloaded (PSN) game.
   Kind: fix.
   Source: rpcs3-source-review-2026-10-13 finding 1.
