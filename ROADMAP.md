@@ -1561,20 +1561,29 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 check-code zizmor.
   Lanes: Build.
 
-- 📋 [RPSN-0122] **Tidy YAML style in the GitHub workflows.**
+- ✅ [RPSN-0122] **Tidy YAML style in the GitHub workflows.**
   yamllint -d relaxed (no project config): trailing-spaces 5, new-line-at-end-of-file 1, line-length 8, indentation 1, across .github/. Style only; adopting a .yamllint is the alternative.
+  Resolved (2026-10-14, 3505a30): whitespace fixed, one steps list
+  re-indented, .yamllint added (extends relaxed, line length off for SHA
+  pins). yamllint and actionlint clean; every workflow parses to the
+  same data as before.
   **Layman:** Formatting clean-up in the build scripts.
   Kind: chore.
   Source: audit-2026-10-12 check-code yamllint.
   Lanes: Build.
 
-- 📋 [RPSN-0123] **Fix the spelling mistakes typos found.**
+- ✅ [RPSN-0123] **Fix the spelling mistakes typos found.**
   Mergable/Unmergable (src/egui/mod.rs:850, 2316, 2340, 2555, 3208, 3213, 3328; src/psn/mod.rs:64, 248; STANDARDS.md:199) includes the enum variant PackagesUnmergable, so the rename touches every use. Plaform (STANDARDS.md:219; ROADMAP item text), preceeding (src/psn/parser.rs:101), PN (ROADMAP.md:757, 766; check context). ROADMAP text changes go through roadmap_log.
   Moved here from RPSN-0119 (2026-10-14): once typos runs clean, make
   it the documentation step in scripts/local-ci.sh and set
   DOCS_CONFIGURED=1, so --docs checks something instead of exiting 0
   having verified nothing. typos is installed and _typos.toml exists;
   today it reports these mistakes and exits 2.
+  Resolved (2026-10-14, 526360b): misspellings fixed in code and
+  STANDARDS.md; _typos.toml allows the test's deliberate titel and
+  excludes ROADMAP.md (generated; items quote old misspellings; PN was
+  PNGs). typos is the local-ci documentation step, DOCS_CONFIGURED=1;
+  --docs proven green and red.
   **Layman:** Correct a handful of misspelt words in the code and docs.
   Kind: chore.
   Source: audit-2026-10-12 check-code typos.
