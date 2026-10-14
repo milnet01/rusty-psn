@@ -2,17 +2,22 @@ on: pull_request
 
 name: Check formatting
 
+permissions: {}
+
 jobs:
   format:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      contents: read # checks out the code
+      pull-requests: write # posts formatting suggestions on the PR
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@f0d5300ba8908d942c808f4d31c08471d7798ba3 # nightly
         with:
           components: rustfmt
-      - uses: mbrobbel/rustfmt-check@0.23.0
+      - uses: mbrobbel/rustfmt-check@345558b33101faacd2fc72233e5e9df2c4cdc98f # 0.23.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           mode: review

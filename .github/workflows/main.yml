@@ -4,6 +4,9 @@ on:
   - push
   - pull_request
 
+permissions:
+  contents: read
+
 jobs:
   build_matrix:
     strategy:
@@ -13,17 +16,19 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: ${{ matrix.feature }}-${{ matrix.os }}
           cache-on-failure: "true"
 
       - name: Get Cargo.toml version
         id: cargo_version
-        uses: dante-signal31/rust-app-version@v1.2.0
+        uses: dante-signal31/rust-app-version@e5fe66723870a5220a960d3152b508232e127e3c # v1.2.0
         if: ${{ matrix.os != 'windows-latest' }}
 
       - name: Install dependencies
@@ -54,13 +59,15 @@ jobs:
 
       - name: Make app bundle (macOS - egui)
         if: ${{ matrix.os == 'macos-latest' && matrix.feature == 'egui' }}
+        env:
+          RPSN_VERSION: ${{ steps.cargo_version.outputs.app_version }}
         run: |
           mkdir rusty-psn.app
           mkdir rusty-psn.app/Contents
           mkdir rusty-psn.app/Contents/MacOS
 
           cp resources/Info.plist rusty-psn.app/Contents
-          sed -i '' -e 's/%RPSN_VERSION%/${{ steps.cargo_version.outputs.app_version }}/g' rusty-psn.app/Contents/Info.plist
+          sed -i '' -e 's/%RPSN_VERSION%/'"$RPSN_VERSION"'/g' rusty-psn.app/Contents/Info.plist
 
           cp target/release/universal/rusty-psn rusty-psn.app/Contents/MacOS
 
@@ -90,21 +97,21 @@ jobs:
 
       - name: Upload artifact (Linux)
         if: ${{ matrix.os == 'ubuntu-22.04' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rusty-psn-${{ matrix.feature }}-linux
           path: result
 
       - name: Upload artifact (MacOS)
         if: ${{ matrix.os == 'macos-latest' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rusty-psn-${{ matrix.feature }}-macos-universal
           path: result
 
       - name: Upload artifact (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rusty-psn-${{ matrix.feature }}-windows
           path: result
@@ -114,17 +121,19 @@ jobs:
     runs-on: macos-latest
     if: github.ref == 'refs/heads/master'
     permissions:
-      contents: write
+      contents: write # creates the release and uploads its files
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       
       - name: Get Cargo.toml version
         id: cargo_version
-        uses: dante-signal31/rust-app-version@v1.2.0
+        uses: dante-signal31/rust-app-version@e5fe66723870a5220a960d3152b508232e127e3c # v1.2.0
 
       - name: Download artifacts
-        uses: dawidd6/action-download-artifact@v27
+        uses: dawidd6/action-download-artifact@eab87c9830c39eff17e5a6eadb20bfb4bc880477 # v27
         with:
           path: artifacts
           skip_unpack: true
@@ -133,7 +142,7 @@ jobs:
         run: ls -R artifacts
 
       - name: Create release
-        uses: softprops/action-gh-release@v3.0.3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           name: "v${{ steps.cargo_version.outputs.app_version }}"
           tag_name: "v${{ steps.cargo_version.outputs.app_version }}"
