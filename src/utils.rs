@@ -451,6 +451,17 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn hash_file_reads_a_file_shorter_than_its_suffix_as_incomplete() {
+        // start_download resumes such a file, so this must not be an error (RPSN-0135).
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("x.pkg");
+        std::fs::write(&path, [0u8; 0x10]).unwrap();
+
+        let mut file = File::open(&path).await.unwrap();
+        assert!(!hash_file(&mut file, "00", false).await.unwrap());
+    }
+
+    #[tokio::test]
     async fn create_pkg_file_does_not_migrate_outside_download_folder() {
         // A serial carrying "../" makes both the old-format folder and the migration target
         // sit outside the download folder. Nothing may be moved there.
