@@ -8,13 +8,14 @@
 **Blocker for:** RPSN-0138, RPSN-0058.
 
 **Layman:** Installing an update into RPCS3 no longer waits until you close
-RPCS3, and rusty-psn says it worked only when it can see the new version.
+RPCS3, and rusty-psn checks the new version went in or says it could not.
 
 ## 1. Goal
 
-An install started from rusty-psn finishes on its own, with no RPCS3 window,
-and rusty-psn reports success only when the installed game's version shows the
-package went in. Where it cannot look, it says so instead of claiming success.
+An install started from rusty-psn finishes on its own, with no RPCS3 window.
+An update is reported installed only when the game's version shows it went
+in; where rusty-psn cannot look at an update, it says so instead of claiming
+success. A DLC is reported as today (§ 3).
 
 ## 2. Problem
 
@@ -123,7 +124,7 @@ package `version` and PARAM.SFO's APP_VER share the `XX.YY` form.
 |---|---|
 | Window app Install (`src/egui/results.rs`) | `AppVersion` with the package's `version`, `dev_hdd0` from `settings.rpcs3_config_dir` through `config::resolve_dev_hdd0`; `Unconfirmed` when that setting is empty |
 | Command line `--install` | `AppVersion` with the package's `version`, `dev_hdd0` from `--rpcs3-config-dir`, else `auto_detect::detect_rpcs3`; `Unconfirmed` when neither gives one |
-| Content browser patch Install | `AppVersion` with `version: None` (`ContentPatch` carries no version) |
+| Content browser patch Install | `AppVersion` with `version: None` (`ContentPatch` carries no version), `dev_hdd0` as for the window app; `Unconfirmed` when `settings.rpcs3_config_dir` is empty |
 | `content::install_dlc_zip` | `Unconfirmed` |
 
 ### 4.4 What the user sees
@@ -136,8 +137,9 @@ package `version` and PARAM.SFO's APP_VER share the `XX.YY` form.
   line saying RPCS3 finished and the install was not checked, naming
   `--rpcs3-config-dir`; not counted as a failure. `Err`: counted as a failure,
   as today.
-- **Content browser and DLC.** `Ok` of either outcome marks the item
-  installed, as today; `Err` shows the error.
+- **Content browser.** A patch is reported as in the window app. A DLC:
+  `Ok` of either outcome marks it installed, as today; `Err` shows the
+  error.
 
 ## 5. Invariants
 
@@ -196,8 +198,8 @@ exists.
 - **INV-7** — Each caller passes the check § 4.3 gives it and reports as
   § 4.4 says.
   *Test:* manual, under Xvfb with a stand-in RPCS3 set as the executable:
-  Install with and without the RPCS3 folder set shows the success toast and
-  the warning toast in turn; `--install` with and without `--rpcs3-config-dir`
+  Install, and the content browser's patch Install, each with and without
+  the RPCS3 folder set, show the success toast and the warning toast in turn; `--install` with and without `--rpcs3-config-dir`
   prints the two § 4.4 lines.
   *Breaks when:* a caller keeps passing `Unconfirmed` where it knows
   `dev_hdd0`, or reports `Unconfirmed` as success without the warning.
@@ -206,10 +208,10 @@ exists.
 
 - **RPCS3 already running.** RPCS3 checks its instance lock
   (`<cache dir>/RPCS3.buf`) before it reads `--headless`, so a second
-  instance shows RPCS3's fatal-error window and kills itself
-  (`report_fatal_error` in `rpcs3/rpcs3.cpp`). `install_pkg` sees a
-  non-success exit and returns `InstallFailed`. RPSN-0138 adds a check before
-  launch.
+  instance shows RPCS3's modal fatal-error window, waits for the user to
+  close it, and then kills itself (`report_fatal_error` in
+  `rpcs3/rpcs3.cpp`). `install_pkg` waits with it, then sees a non-success
+  exit and returns `InstallFailed`. RPSN-0138 adds a check before launch.
 - **Two installs at once.** The same lock; the second fails the same way.
   RPSN-0138.
 - **RPCS3 hangs.** The call never returns, as today. No timeout is added: a
@@ -234,8 +236,8 @@ exists.
 | `install_refuses_an_unsafe_serial` | INV-6 |
 
 Each is `#[cfg(unix)]`, using `sfo::tests::make_test_sfo` for the PARAM.SFO.
-INV-2's test must be seen failing against today's `install_pkg`, which
-returns success on the stand-in that writes nothing. INV-7 is the manual
+INV-2's test must be seen failing with § 4.2 step 5 replaced by
+`Ok(Confirmed)`, which is today's behaviour under the new signature. INV-7 is the manual
 recipe in its clause.
 
 ## 8. Alternatives considered (and rejected)
