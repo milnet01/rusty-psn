@@ -1140,6 +1140,27 @@ Work named by docs/design.md and its review on 2026-10-12.
   part, the Window app, with approved mockups, and each panel can be
   moved in one at a time. The rule is recorded in docs/design.md under
   "Window layout".
+  Progress (2026-10-14): owner chose sidebar pages, as in the mockups,
+  over one long window. docs/design.md "Window layout" holds the rule;
+  its review-contract gate ran loops 8 and 9 (5 verified, all fixed);
+  loop 10, the ADR cap, is owed before building. Build order, each step
+  committed with a screenshot from a private kwin_wayland --virtual
+  display: (1) page shell: an enum of pages, a fixed left sidebar
+  (Search, Downloads, RPCS3 library, Patches and DLC, Firmware, History,
+  Settings at the foot; About goes in Settings), the menu bar removed,
+  each egui::Window body moved into a page; Esc and Ctrl+S re-mapped.
+  (2) Messages panel: a foldable panel at the foot of every page holding
+  a capped message log; show_notifications writes there; egui-notify
+  toasts and the show_toasts setting removed; the File integrity check
+  failed window becomes a message plus a status on the download. (3)
+  Status bar with fixed-width slots, so changing counts do not shift it.
+  (4) Settings page with a fixed Save / Undo bar ("You have unsaved
+  changes"). (5) Downloads page: Needs attention, In progress, Finished
+  sections. (6) RPCS3 library table with filter buttons All, Needs
+  update, Up to date, No updates exist. (7) Larger starting and smallest
+  window sizes. Mockup labels for text size are Normal, Large, Extra
+  large; today's setting offers 100% to 200%, so map them or keep
+  percentages, the owner has not said.
   **Layman:** Nothing pops up and nothing jumps around: every part of the app has its own spot in the main window and can be folded away.
   Kind: ux.
   Source: user-request-2026-10-14.
