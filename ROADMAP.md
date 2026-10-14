@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=155 -->
+<!-- ants-roadmap-id-high-water: RPSN=156 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1789,7 +1789,7 @@ reviewer proposed; check both against the code before fixing.
   Source: in-session-2026-10-14 RPSN-0120.
   Lanes: Batch.
 
-- 📋 [RPSN-0150] **Keep folder scans off the window thread, and repaint when the library scan ends.**
+- ✅ [RPSN-0150] **Keep folder scans off the window thread, and repaint when the library scan ends.**
   1. The content browser scans its folder on the window thread
      (scan_content_directory, called in src/egui/chrome.rs and
      src/egui/content_browser.rs).
@@ -1798,6 +1798,11 @@ reviewer proposed; check both against the code before fixing.
      Use spawn_blocking, as RPSN-0120 did for auto-detect.
   3. That task never calls request_repaint, so the scan result waits
      for the next input event. The search task already does this.
+  Resolved 2026-10-14: the content folder scan runs on a blocking worker
+  behind content_scan_promise; the RPCS3 library scan uses
+  spawn_blocking and repaints when it ends. Hand test owed: open the
+  Content Browser and press Rescan on a large content folder, and scan
+  the RPCS3 library, in the real window app.
   **Layman:** Opening the content browser or scanning RPCS3 can freeze the window or leave the result unseen until the mouse moves.
   Kind: perf.
   Source: in-session-2026-10-14 RPSN-0120.
@@ -1870,6 +1875,13 @@ reviewer proposed; check both against the code before fixing.
   Kind: doc-fix.
   Source: review-contract design.md 2026-10-14 loop 7 lane 1.
   Lanes: Entry.
+
+- 📋 [RPSN-0156] **Remember the window app's position and size between runs.**
+  Owner request 2026-10-14. The window should open where and at the size it was closed. Before designing it, read how two of the owner's other apps got this right: /mnt/Games/Scripts/Linux/OneUp and /mnt/Games/Scripts/Linux/finbreak (search each for window geometry or position saving). eframe has a persist_window option and stores state through its persistence feature, which Cargo.toml already enables; check what src/main.rs passes in NativeOptions, and test that a moved, resized window comes back the same on Linux (X11 and Wayland behave differently for position).
+  **Layman:** The app should reopen where you left it, at the same size.
+  Kind: fix.
+  Source: user-request-2026-10-14.
+  Lanes: Window app.
 
 ## 15. RPCS3 source review (2026-10-13)
 
