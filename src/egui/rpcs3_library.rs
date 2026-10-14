@@ -11,6 +11,62 @@ impl UpdatesApp {
         }
     }
 
+    /// Look for RPCS3 in the background: the search reads folders and runs programs,
+    /// which would freeze the window. A second request while one runs is ignored.
+    pub(super) fn start_rpcs3_detect(&mut self, ctx: &egui::Context, purpose: DetectFor) {
+        if self.v.rpcs3_detect_promise.is_some() {
+            return;
+        }
+        let _guard = self
+            .v
+            .rt_handle
+            .as_ref()
+            .expect("rt_handle set in UpdatesApp::new before any UI code runs")
+            .enter();
+        let ctx = ctx.clone();
+        let promise = Promise::spawn_async(async move {
+            // A panicked search found nothing.
+            let found = tokio::task::spawn_blocking(crate::rpcs3::auto_detect::detect_rpcs3)
+                .await
+                .ok()
+                .flatten();
+            ctx.request_repaint();
+            found
+        });
+        self.v.rpcs3_detect_promise = Some((purpose, promise));
+    }
+
+    pub(super) fn handle_rpcs3_detect_promise(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+        if !self.v.rpcs3_detect_promise.as_ref().is_some_and(|(_, p)| p.ready().is_some()) {
+            return;
+        }
+        let (purpose, promise) = self.v.rpcs3_detect_promise.take().expect("checked above");
+        match (purpose, promise.block_and_take()) {
+            (DetectFor::Scan, Some(installation)) => {
+                self.adopt_detected_rpcs3(installation);
+                self.trigger_rpcs3_scan();
+                toasts.push(("RPCS3 auto-detected and scan started.".to_string(), ToastLevel::Info));
+            }
+            (DetectFor::Scan, None) => toasts.push((
+                "RPCS3 not found. Go to Settings to configure the RPCS3 path.".to_string(),
+                ToastLevel::Warning,
+            )),
+            // The Settings window was shut while the search ran: nothing is waiting for it.
+            (DetectFor::Settings, _) if !self.v.show_settings_window => {}
+            (DetectFor::Settings, Some(installation)) => {
+                self.v.settings_dirty = true;
+                self.v.modified_settings.rpcs3_config_dir = Some(installation.config_dir);
+                if self.v.modified_settings.rpcs3_executable.is_none() {
+                    self.v.modified_settings.rpcs3_executable = installation.executable;
+                }
+            }
+            (DetectFor::Settings, None) => toasts.push((
+                "RPCS3 not found. Please configure the path manually.".to_string(),
+                ToastLevel::Warning,
+            )),
+        }
+    }
+
     pub(super) fn trigger_rpcs3_scan(&mut self) {
         let config_dir = match &self.settings.rpcs3_config_dir {
             Some(dir) => dir.clone(),

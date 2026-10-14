@@ -14,17 +14,36 @@ pub struct Rpcs3VfsConfig {
 /// Parse RPCS3's games.yml file.
 /// Returns a mapping of serial → game path.
 pub fn parse_games_yml(path: &Path) -> Result<HashMap<String, PathBuf>, String> {
-    let metadata = std::fs::metadata(path).map_err(|e| format!("cannot read games.yml: {e}"))?;
-    if metadata.len() > MAX_YAML_SIZE {
-        return Err(format!("games.yml too large: {} bytes", metadata.len()));
-    }
+    let content = read_yaml(path, "games.yml")?;
+    let value: serde_yaml_ng::Value = serde_yaml_ng::from_str(&content).map_err(|e| format!("failed to parse games.yml: {e}"))?;
 
-    let content = std::fs::read_to_string(path).map_err(|e| format!("cannot read games.yml: {e}"))?;
+    // RPCS3 creates games.yml empty, and skips an entry whose serial or path is empty or
+    // not a plain value (games_config::load in Emu/games_config.cpp, RPCS3 commit 6fe3c87).
+    let map = match value {
+        serde_yaml_ng::Value::Null => return Ok(HashMap::new()),
+        serde_yaml_ng::Value::Mapping(map) => map,
+        _ => return Err("games.yml is not a list of games".to_string()),
+    };
+    Ok(map
+        .into_iter()
+        .filter_map(|(serial, game_path)| match (serial, game_path) {
+            (serde_yaml_ng::Value::String(serial), serde_yaml_ng::Value::String(game_path))
+                if !serial.is_empty() && !game_path.is_empty() =>
+            {
+                Some((serial, PathBuf::from(game_path)))
+            }
+            (serial, _) => {
+                warn!("Skipping games.yml entry {serial:?}: not a serial and a path");
+                None
+            }
+        })
+        .collect())
+}
 
-    let map: HashMap<String, String> =
-        serde_yaml_ng::from_str(&content).map_err(|e| format!("failed to parse games.yml: {e}"))?;
-
-    Ok(map.into_iter().map(|(k, v)| (k, PathBuf::from(v))).collect())
+/// A YAML file's text, refusing one over `MAX_YAML_SIZE`.
+fn read_yaml(path: &Path, name: &str) -> Result<String, String> {
+    let data = super::read_capped(path, MAX_YAML_SIZE).map_err(|e| format!("cannot read {name}: {e}"))?;
+    String::from_utf8(data).map_err(|e| format!("cannot read {name}: {e}"))
 }
 
 /// The dev_hdd0 folder for an RPCS3 config folder: the one its vfs.yml sets, or
@@ -67,12 +86,7 @@ fn emulator_dir(config_dir: &Path, windows: bool) -> PathBuf {
 /// `emulator_dir` is RPCS3's own folder — used to resolve `$(EmulatorDir)` when it's
 /// set to an empty string (the default).
 pub fn parse_vfs_yml(path: &Path, emulator_dir: &Path) -> Result<Rpcs3VfsConfig, String> {
-    let metadata = std::fs::metadata(path).map_err(|e| format!("cannot read vfs.yml: {e}"))?;
-    if metadata.len() > MAX_YAML_SIZE {
-        return Err(format!("vfs.yml too large: {} bytes", metadata.len()));
-    }
-
-    let content = std::fs::read_to_string(path).map_err(|e| format!("cannot read vfs.yml: {e}"))?;
+    let content = read_yaml(path, "vfs.yml")?;
 
     let map: HashMap<String, serde_yaml_ng::Value> =
         serde_yaml_ng::from_str(&content).map_err(|e| format!("failed to parse vfs.yml: {e}"))?;
@@ -151,6 +165,27 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result["BCUS98111"], PathBuf::from("/games/God of War III.iso"));
         assert_eq!(result["NPUB30826"], PathBuf::from("/games/AC3.iso"));
+    }
+
+    #[test]
+    fn games_yml_skips_entries_rpcs3_skips() {
+        // One odd entry used to fail the whole scan (RPSN-0120).
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        writeln!(f, "BCUS98111: /games/God of War III.iso").unwrap();
+        writeln!(f, "NPUB30826: [a, list]").unwrap();
+        writeln!(f, "BLES00001: \"\"").unwrap();
+        writeln!(f, "BLES00002: 42").unwrap();
+
+        let result = parse_games_yml(f.path()).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result["BCUS98111"], PathBuf::from("/games/God of War III.iso"));
+    }
+
+    #[test]
+    fn empty_games_yml_is_an_empty_library() {
+        // RPCS3 creates games.yml empty on first start.
+        let f = tempfile::NamedTempFile::new().unwrap();
+        assert!(parse_games_yml(f.path()).unwrap().is_empty());
     }
 
     #[test]

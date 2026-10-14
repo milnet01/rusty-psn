@@ -154,6 +154,15 @@ enum SortDirection {
     Descending,
 }
 
+/// What a background RPCS3 search was started for.
+#[derive(Clone, Copy)]
+enum DetectFor {
+    /// Use what it finds and scan the library.
+    Scan,
+    /// Fill in the Settings window's RPCS3 fields.
+    Settings,
+}
+
 struct DownloadHistoryEntry {
     title_id: String,
     pkg_id: String,
@@ -350,6 +359,7 @@ struct VolatileData {
 
     // RPCS3 integration state
     rpcs3_scan_promise: Option<Promise<Result<Vec<crate::rpcs3::InstalledGame>, crate::rpcs3::Rpcs3Error>>>,
+    rpcs3_detect_promise: Option<(DetectFor, Promise<Option<crate::rpcs3::Rpcs3Installation>>)>,
     rpcs3_installed_games: Vec<crate::rpcs3::InstalledGame>,
     show_rpcs3_library_window: bool,
 
@@ -449,6 +459,7 @@ impl Default for VolatileData {
             batch_search_errors: Vec::new(),
 
             rpcs3_scan_promise: None,
+            rpcs3_detect_promise: None,
             rpcs3_installed_games: Vec::new(),
             show_rpcs3_library_window: false,
 
@@ -509,6 +520,7 @@ impl eframe::App for UpdatesApp {
         // Check in on active downloads.
         self.handle_download_promises(&mut toasts);
         self.handle_merge_promises(&mut toasts);
+        self.handle_rpcs3_detect_promise(&mut toasts);
         self.handle_rpcs3_scan_promise(&mut toasts);
         self.handle_firmware_promises(&mut toasts);
         self.handle_rpcs3_install_promises(&mut toasts);

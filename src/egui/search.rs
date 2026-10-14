@@ -317,17 +317,7 @@ impl UpdatesApp {
                 if self.settings.rpcs3_config_dir.is_some() {
                     self.trigger_rpcs3_scan();
                 } else {
-                    // Try auto-detect first.
-                    if let Some(installation) = crate::rpcs3::auto_detect::detect_rpcs3() {
-                        self.adopt_detected_rpcs3(installation);
-                        self.trigger_rpcs3_scan();
-                        self.show_notifications("RPCS3 auto-detected and scan started.", ToastLevel::Info);
-                    } else {
-                        self.show_notifications(
-                            "RPCS3 not found. Go to Settings (⚙) to configure the RPCS3 path.",
-                            ToastLevel::Warning,
-                        );
-                    }
+                    self.start_rpcs3_detect(ui.ctx(), DetectFor::Scan);
                 }
             }
 

@@ -268,9 +268,38 @@ fn looks_like_serial(name: &str) -> bool {
     crate::utils::looks_like_serial(name)
 }
 
+/// Read a whole file, refusing one larger than `max` bytes.
+///
+/// The limit applies to the bytes read, not to the size the file reports, so a file
+/// that grows after it is opened, or a pipe that reports no size, is still capped.
+fn read_capped(path: &Path, max: u64) -> std::io::Result<Vec<u8>> {
+    use std::io::Read;
+
+    let mut data = Vec::new();
+    std::fs::File::open(path)?.take(max + 1).read_to_end(&mut data)?;
+    if data.len() as u64 > max {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("larger than {max} bytes"),
+        ));
+    }
+    Ok(data)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn read_capped_refuses_a_file_over_the_limit() {
+        // The size check used to come before an unbounded read (RPSN-0120).
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("file");
+        std::fs::write(&path, b"12345").unwrap();
+
+        assert_eq!(read_capped(&path, 5).unwrap(), b"12345");
+        assert!(read_capped(&path, 4).is_err());
+    }
 
     #[test]
     fn scan_library_reads_disc_app_ver_when_no_update_installed() {

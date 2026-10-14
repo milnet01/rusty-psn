@@ -44,12 +44,7 @@ fn read_string(data: &[u8], offset: usize, max_len: usize) -> Option<String> {
 
 /// Parse a PARAM.SFO binary file and extract key metadata fields.
 pub fn parse_sfo(path: &Path) -> Result<SfoParams, String> {
-    let metadata = std::fs::metadata(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-    if metadata.len() > MAX_SFO_SIZE {
-        return Err(format!("SFO file too large: {} bytes", metadata.len()));
-    }
-
-    let data = std::fs::read(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let data = super::read_capped(path, MAX_SFO_SIZE).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
 
     if data.len() < 20 {
         return Err("SFO file too small (< 20 bytes)".to_string());

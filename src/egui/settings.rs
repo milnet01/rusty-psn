@@ -144,15 +144,7 @@ impl UpdatesApp {
                     }
 
                     if ui.button("Auto-detect").clicked() {
-                        if let Some(installation) = crate::rpcs3::auto_detect::detect_rpcs3() {
-                            self.v.settings_dirty = true;
-                            self.v.modified_settings.rpcs3_config_dir = Some(installation.config_dir);
-                            if self.v.modified_settings.rpcs3_executable.is_none() {
-                                self.v.modified_settings.rpcs3_executable = installation.executable;
-                            }
-                        } else {
-                            self.show_notifications("RPCS3 not found. Please configure the path manually.", ToastLevel::Warning);
-                        }
+                        self.start_rpcs3_detect(ui.ctx(), DetectFor::Settings);
                     }
                 });
 

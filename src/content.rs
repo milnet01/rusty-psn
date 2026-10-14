@@ -127,7 +127,7 @@ pub fn scan_content_directory(base_path: &Path) -> ContentLibrary {
             }
         }
 
-        // Scan DLC/ subdirectory: DLC/*.zip or DLC/subfolder/*.zip or DLC/subfolder/{pkg,rap}
+        // Scan DLC/ subdirectory: DLC/*.zip
         if dlc_dir.is_dir() {
             if let Ok(dlc_entries) = std::fs::read_dir(&dlc_dir) {
                 for dlc_entry in dlc_entries.flatten() {
@@ -273,8 +273,11 @@ pub fn extract_dlc_zip(zip_path: &Path) -> Result<ExtractedDlc, ContentError> {
 pub async fn install_dlc_zip(rpcs3_exe: &Path, zip_path: &Path) -> Result<(), ContentError> {
     info!("Installing DLC from ZIP: {}", zip_path.display());
 
-    // Extract (sync, but fast — zips are small)
-    let dlc = extract_dlc_zip(zip_path)?;
+    // A DLC ZIP can run to gigabytes, so it unpacks off the async workers.
+    let owned_zip = zip_path.to_path_buf();
+    let dlc = tokio::task::spawn_blocking(move || extract_dlc_zip(&owned_zip))
+        .await
+        .map_err(|e| ContentError::InstallFailed(format!("unpacking stopped: {e}")))??;
     info!(
         "Handing RPCS3 {} package(s), {} RAP and {} EDAT licence(s)",
         dlc.pkgs.len(),
