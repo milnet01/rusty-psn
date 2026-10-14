@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=153 -->
+<!-- ants-roadmap-id-high-water: RPSN=154 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1906,8 +1906,12 @@ existing item are noted on that item instead.
   Source: rpcs3-source-review-2026-10-13 finding 5.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0140] **Work out the installed game version the way RPCS3 does.**
+- ✅ [RPSN-0140] **Work out the installed game version the way RPCS3 does.**
   src/rpcs3/mod.rs uses the dev_hdd0 copy's APP_VER, else the disc's APP_VER, reading the disc only at {path}/PS3_GAME/PARAM.SFO. RPCS3 takes the higher of the disc and update APP_VER, falls back to VERSION when APP_VER is missing, and reads an external HG game's PARAM.SFO at the folder root (game_enumeration.h, gui_game_info.cpp, system_utils.cpp). Remedy: do the same. RPSN-0131 changes only the wording shown when no version is found.
+  Resolved 2026-10-14: scan_library reads an external game's PARAM.SFO
+  at its root, keeps the higher of a disc's and its patch's APP_VER, and
+  shows VERSION where there is no APP_VER. Not done: a trial game
+  unlocked into C00, which RPCS3 confirms through an EDAT licence check.
   **Layman:** The library shows no version for some games that have one.
   Kind: fix.
   Source: rpcs3-source-review-2026-10-13 finding 7.
@@ -1921,3 +1925,10 @@ existing item are noted on that item instead.
   Kind: feature.
   Source: rpcs3-source-review-2026-10-13 finding 10.
   Lanes: RPCS3, PSN.
+
+- 📋 [RPSN-0154] **Read an unlocked trial game's version from its C00 folder.**
+  RPCS3 reads a trial HG game's full-game PARAM.SFO from <game>/C00 when the user holds the matching EDAT licence (get_sfo_dir_from_game_path and verify_c00_unlock_edat in rpcs3/Emu/system_utils.cpp, RPCS3 commit 6fe3c87). scan_library reads the trial's root PARAM.SFO, so an unlocked trial shows the trial's version. Remedy: find out how verify_c00_unlock_edat checks the licence, then do the same. Left out of RPSN-0140.
+  **Layman:** An unlocked trial game shows the trial's version in the library.
+  Kind: fix.
+  Source: in-session-2026-10-14 RPSN-0140.
+  Lanes: RPCS3.
