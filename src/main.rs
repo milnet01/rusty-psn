@@ -102,8 +102,17 @@ struct Args {
 }
 
 fn main() {
+    // Before anything else, while no other thread can be reading the environment.
+    #[cfg(all(feature = "egui", target_os = "linux"))]
+    let dropped_wayland = drop_unreachable_wayland();
+
     let args = Args::parse();
     let _logger_handle = init_log(args.no_log_file);
+
+    #[cfg(all(feature = "egui", target_os = "linux"))]
+    if dropped_wayland {
+        log::warn!("WAYLAND_DISPLAY names a socket nothing answers on; using X11 instead");
+    }
 
     #[cfg(feature = "cli")]
     {
@@ -175,6 +184,49 @@ fn main() {
     }
 }
 
+/// winit picks Wayland whenever WAYLAND_DISPLAY is set, and once that connection fails it cannot
+/// try X11 (RPSN-0130). So when the socket takes no connection and DISPLAY is set, WAYLAND_DISPLAY
+/// is removed before winit looks. Returns whether it was.
+#[cfg(all(feature = "egui", target_os = "linux"))]
+fn drop_unreachable_wayland() -> bool {
+    let var = |name| std::env::var_os(name).filter(|value| !value.is_empty());
+    let unreachable = wayland_unreachable(
+        var("WAYLAND_DISPLAY").as_deref(),
+        var("WAYLAND_SOCKET").is_some(),
+        var("DISPLAY").is_some(),
+        var("XDG_RUNTIME_DIR").as_deref(),
+    );
+    if unreachable {
+        std::env::remove_var("WAYLAND_DISPLAY");
+    }
+    unreachable
+}
+
+/// Whether winit would choose a Wayland display that takes no connection while X11 is there.
+/// The socket is found as libwayland finds it: WAYLAND_DISPLAY itself when absolute, otherwise
+/// under XDG_RUNTIME_DIR. A WAYLAND_SOCKET handed down by a parent is left alone.
+#[cfg(all(feature = "egui", target_os = "linux"))]
+fn wayland_unreachable(
+    wayland_display: Option<&std::ffi::OsStr>,
+    wayland_socket: bool,
+    x11_display: bool,
+    runtime_dir: Option<&std::ffi::OsStr>,
+) -> bool {
+    let Some(wayland_display) = wayland_display else {
+        return false;
+    };
+    if wayland_socket || !x11_display {
+        return false;
+    }
+    let display = std::path::Path::new(wayland_display);
+    let socket = if display.is_absolute() {
+        Some(display.to_path_buf())
+    } else {
+        runtime_dir.map(|dir| std::path::Path::new(dir).join(display))
+    };
+    !socket.is_some_and(|path| std::os::unix::net::UnixStream::connect(path).is_ok())
+}
+
 #[cfg(target_os = "macos")]
 fn init_log(no_log_file: bool) -> LoggerHandle {
     let mut logger = Logger::try_with_str("info").expect("Failed to create logger");
@@ -243,5 +295,37 @@ mod tests {
         assert!(!parses(&["--batch-file", "list.txt", "-t", "NPUB30826"]));
         assert!(!parses(&["--firmware", "--install"]));
         assert!(parses(&["--scan-rpcs3", "--install"]));
+    }
+}
+
+#[cfg(all(test, feature = "egui", target_os = "linux"))]
+mod wayland_tests {
+    use super::wayland_unreachable;
+    use std::ffi::OsStr;
+    use std::os::unix::net::UnixListener;
+
+    #[test]
+    fn a_dead_wayland_socket_gives_way_to_x11() {
+        // The window app used to panic at start instead (RPSN-0130).
+        let dir = tempfile::tempdir().unwrap();
+        let runtime_dir = Some(dir.path().as_os_str());
+        let _compositor = UnixListener::bind(dir.path().join("wayland-live")).unwrap();
+        let live = Some(OsStr::new("wayland-live"));
+        let dead = Some(OsStr::new("wayland-dead"));
+
+        assert!(wayland_unreachable(dead, false, true, runtime_dir));
+        assert!(!wayland_unreachable(live, false, true, runtime_dir));
+        let absolute = dir.path().join("wayland-live");
+        assert!(!wayland_unreachable(Some(absolute.as_os_str()), false, true, None));
+        // No runtime folder means libwayland finds no socket either.
+        assert!(wayland_unreachable(live, false, true, None));
+    }
+
+    #[test]
+    fn wayland_is_kept_when_there_is_nothing_to_fall_back_to() {
+        let dead = Some(OsStr::new("wayland-dead"));
+        assert!(!wayland_unreachable(dead, false, false, None));
+        assert!(!wayland_unreachable(dead, true, true, None));
+        assert!(!wayland_unreachable(None, false, true, None));
     }
 }
