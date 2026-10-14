@@ -1,0 +1,5 @@
+extends: relaxed
+
+rules:
+  # SHA-pinned actions and one-line shell steps run long; wrapping them helps nobody.
+  line-length: disable
