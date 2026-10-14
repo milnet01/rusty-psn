@@ -10,6 +10,7 @@ pub struct SfoParams {
     pub app_ver: Option<String>,
     pub version: String,
     pub category: String,
+    pub content_id: String,
 }
 
 /// Maximum file size for a PARAM.SFO (1 MB — real files are under 1 KB).
@@ -71,6 +72,7 @@ pub fn parse_sfo(path: &Path) -> Result<SfoParams, String> {
     let mut app_ver = None;
     let mut version = None;
     let mut category = None;
+    let mut content_id = None;
 
     // Index table starts at offset 0x14 (20), each entry is 16 bytes.
     for i in 0..num_entries {
@@ -111,6 +113,7 @@ pub fn parse_sfo(path: &Path) -> Result<SfoParams, String> {
             "APP_VER" => app_ver = Some(value),
             "VERSION" => version = Some(value),
             "CATEGORY" => category = Some(value),
+            "CONTENT_ID" => content_id = Some(value),
             _ => {}
         }
     }
@@ -121,6 +124,7 @@ pub fn parse_sfo(path: &Path) -> Result<SfoParams, String> {
         app_ver,
         version: version.unwrap_or_default(),
         category: category.unwrap_or_default(),
+        content_id: content_id.unwrap_or_default(),
     })
 }
 
@@ -195,6 +199,36 @@ pub(crate) mod tests {
         data.extend_from_slice(val_title_id);
         data.extend_from_slice(val_version);
 
+        data
+    }
+
+    /// A PARAM.SFO holding each (key, value) as a UTF-8 string.
+    pub(crate) fn sfo_bytes(entries: &[(&str, &str)]) -> Vec<u8> {
+        let mut keys = Vec::new();
+        let mut values = Vec::new();
+        let mut index = Vec::new();
+        for (key, value) in entries {
+            let data_len = value.len() as u32 + 1;
+            index.extend_from_slice(&(keys.len() as u16).to_le_bytes());
+            index.extend_from_slice(&DATA_FMT_UTF8.to_le_bytes());
+            index.extend_from_slice(&data_len.to_le_bytes());
+            index.extend_from_slice(&data_len.to_le_bytes());
+            index.extend_from_slice(&(values.len() as u32).to_le_bytes());
+            keys.extend_from_slice(key.as_bytes());
+            keys.push(0);
+            values.extend_from_slice(value.as_bytes());
+            values.push(0);
+        }
+        let key_table_start = 20 + index.len() as u32;
+        let mut data = Vec::new();
+        data.extend_from_slice(&PSF_MAGIC);
+        data.extend_from_slice(&0x00000101u32.to_le_bytes());
+        data.extend_from_slice(&key_table_start.to_le_bytes());
+        data.extend_from_slice(&(key_table_start + keys.len() as u32).to_le_bytes());
+        data.extend_from_slice(&(entries.len() as u32).to_le_bytes());
+        data.extend(index);
+        data.extend(keys);
+        data.extend(values);
         data
     }
 

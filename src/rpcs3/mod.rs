@@ -98,7 +98,7 @@ pub fn scan_library(installation: &Rpcs3Installation) -> Result<Vec<InstalledGam
         // dev_hdd0/game/{serial}/PARAM.SFO holds an installed update's APP_VER.
         let hdd0_sfo = read_sfo(&game_dir.join(serial).join("PARAM.SFO"));
         // The game's own PARAM.SFO; an ISO's is inside the image, which is not read.
-        let game_sfo = read_sfo(&game_sfo_path(game_path));
+        let game_sfo = read_sfo(&game_sfo_path(game_path, &installation.dev_hdd0_path));
 
         // Determine title: prefer hdd0 SFO, then the game's own SFO, then extract from filename.
         let title = if let Some(ref sfo) = hdd0_sfo {
@@ -122,7 +122,7 @@ pub fn scan_library(installation: &Rpcs3Installation) -> Result<Vec<InstalledGam
     let from_games_yml = installed_games.len();
     let listed: HashSet<String> = installed_games.iter().map(|game| game.serial.clone()).collect();
     installed_games.extend(
-        hdd0_games(&game_dir)
+        hdd0_games(&game_dir, &installation.dev_hdd0_path)
             .into_iter()
             .filter(|game| !listed.contains(&game.serial)),
     );
@@ -139,7 +139,7 @@ pub fn scan_library(installation: &Rpcs3Installation) -> Result<Vec<InstalledGam
 /// Every folder in `dev_hdd0/game` whose PARAM.SFO names a serial, keyed by that serial as RPCS3
 /// keys it, not by the folder name. A folder with no PARAM.SFO is skipped: RPCS3 keeps a lock
 /// folder and TEST12345 there (RPSN-0136).
-fn hdd0_games(game_dir: &Path) -> Vec<InstalledGame> {
+fn hdd0_games(game_dir: &Path, dev_hdd0: &Path) -> Vec<InstalledGame> {
     let entries = match std::fs::read_dir(game_dir) {
         Ok(entries) => entries,
         Err(e) => {
@@ -153,10 +153,10 @@ fn hdd0_games(game_dir: &Path) -> Vec<InstalledGame> {
     let mut games = Vec::new();
     for entry in entries.flatten() {
         let game_path = entry.path();
-        let sfo_path = game_path.join("PARAM.SFO");
-        if !game_path.is_dir() || !sfo_path.is_file() {
+        if !game_path.is_dir() || !game_path.join("PARAM.SFO").is_file() {
             continue;
         }
+        let sfo_path = game_sfo_path(&game_path, dev_hdd0);
         let sfo = match sfo::parse_sfo(&sfo_path) {
             Ok(sfo) => sfo,
             Err(e) => {
@@ -188,16 +188,56 @@ fn read_sfo(path: &Path) -> Option<sfo::SfoParams> {
         .ok()
 }
 
-/// Where a games.yml game keeps its own PARAM.SFO, as `get_sfo_dir_from_game_path` in
+/// Where a game keeps the PARAM.SFO RPCS3 reads, as `get_sfo_dir_from_game_path` in
 /// rpcs3/Emu/system_utils.cpp (RPCS3 commit 6fe3c87) finds it: a disc game, marked by
-/// PS3_DISC.SFB, in PS3_GAME; any other game at its root. A folder with neither file falls
+/// PS3_DISC.SFB, in PS3_GAME; a trial (HG) game whose unlock licence is installed in C00,
+/// where the full game is; any other game at its root. A folder with neither file falls
 /// back to PS3_GAME, which RPCS3 would not list at all.
-fn game_sfo_path(game_path: &Path) -> PathBuf {
+fn game_sfo_path(game_path: &Path, dev_hdd0: &Path) -> PathBuf {
     let root_sfo = game_path.join("PARAM.SFO");
-    if !game_path.join("PS3_DISC.SFB").is_file() && root_sfo.is_file() {
-        return root_sfo;
+    if game_path.join("PS3_DISC.SFB").is_file() || !root_sfo.is_file() {
+        return game_path.join("PS3_GAME").join("PARAM.SFO");
     }
-    game_path.join("PS3_GAME").join("PARAM.SFO")
+    let c00_sfo = game_path.join("C00").join("PARAM.SFO");
+    let unlocked = c00_sfo.is_file()
+        && read_sfo(&root_sfo).is_some_and(|sfo| sfo.category == "HG" && c00_unlock_edat_exists(dev_hdd0, &sfo.content_id));
+    if unlocked {
+        c00_sfo
+    } else {
+        root_sfo
+    }
+}
+
+/// Whether the licence that unlocks a trial's full game is installed, as RPCS3's game list
+/// checks it (`verify_c00_unlock_edat` called with `fast`, and `get_c00_unlock_edat_path`, in
+/// rpcs3/Emu/system_utils.cpp, RPCS3 commit 6fe3c87): `{content_id}.edat` in the exdata folder
+/// of any user in dev_hdd0/home. RPCS3's list checks only that the file is there, and so does this.
+fn c00_unlock_edat_exists(dev_hdd0: &Path, content_id: &str) -> bool {
+    // RPCS3's `is_valid_content_id`. It also keeps the ID from naming any other path.
+    let valid = !content_id.is_empty()
+        && content_id.len() <= 0x30
+        && content_id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_');
+    let Ok(users) = std::fs::read_dir(dev_hdd0.join("home")) else {
+        return false;
+    };
+    valid
+        && users.flatten().any(|user| {
+            is_user_folder(&user.file_name())
+                && user.path().is_dir()
+                && user.path().join("exdata").join(format!("{content_id}.edat")).is_file()
+        })
+}
+
+/// `check_user` in rpcs3/Emu/system_utils.cpp: a name eight bytes long whose leading digits,
+/// read as `std::from_chars` reads them, make a number other than zero.
+fn is_user_folder(name: &std::ffi::OsStr) -> bool {
+    let Some(name) = name.to_str() else {
+        return false;
+    };
+    let digits = name.bytes().take_while(u8::is_ascii_digit).count();
+    name.len() == 8 && name[..digits].parse::<u32>().is_ok_and(|id| id != 0)
 }
 
 /// The version RPCS3 shows for a game (`apply_patches` in rpcs3/Emu/game_enumeration.h and
@@ -577,6 +617,7 @@ mod tests {
             app_ver: app_ver.map(str::to_string),
             version: version.to_string(),
             category: category.to_string(),
+            content_id: String::new(),
         }
     }
 
@@ -633,7 +674,10 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("PS3_DISC.SFB"), b"").unwrap();
         std::fs::write(root.path().join("PARAM.SFO"), b"").unwrap();
-        assert_eq!(game_sfo_path(root.path()), root.path().join("PS3_GAME/PARAM.SFO"));
+        assert_eq!(
+            game_sfo_path(root.path(), &root.path().join("dev_hdd0")),
+            root.path().join("PS3_GAME/PARAM.SFO")
+        );
     }
 
     fn installation_with(root: &Path, games_yml: &str) -> Rpcs3Installation {
@@ -664,6 +708,58 @@ mod tests {
         assert_eq!(games[0].serial, "BCUS99999");
         assert_eq!(games[0].title, "Test Game");
         assert_eq!(games[0].installed_version.as_deref(), Some("01.05"));
+    }
+
+    #[test]
+    fn scan_library_reads_an_unlocked_trial_from_c00() {
+        // RPCS3 shows a trial's full game, from C00, once its unlock licence is installed (RPSN-0154).
+        const CONTENT_ID: &str = "UP0001-NPUB12345_00-TRIALGAME0000001";
+        let root = tempfile::tempdir().unwrap();
+        let game = root.path().join("dev_hdd0/game/NPUB12345");
+        std::fs::create_dir_all(game.join("C00")).unwrap();
+        let sfo = |title, app_ver| {
+            sfo::tests::sfo_bytes(&[
+                ("CATEGORY", "HG"),
+                ("CONTENT_ID", CONTENT_ID),
+                ("TITLE", title),
+                ("TITLE_ID", "NPUB12345"),
+                ("APP_VER", app_ver),
+            ])
+        };
+        std::fs::write(game.join("PARAM.SFO"), sfo("Trial", "01.00")).unwrap();
+        std::fs::write(game.join("C00/PARAM.SFO"), sfo("Full Game", "01.02")).unwrap();
+        let installation = installation_with(root.path(), "");
+        let shown = || {
+            let games = scan_library(&installation).unwrap();
+            (games[0].title.clone(), games[0].installed_version.clone().unwrap_or_default())
+        };
+
+        // Still locked: no licence, or one in a folder that is not a user's.
+        assert_eq!(shown(), ("Trial".to_string(), "01.00".to_string()));
+        let not_a_user = root.path().join("dev_hdd0/home/00000000/exdata");
+        std::fs::create_dir_all(&not_a_user).unwrap();
+        std::fs::write(not_a_user.join(format!("{CONTENT_ID}.edat")), b"").unwrap();
+        assert_eq!(shown(), ("Trial".to_string(), "01.00".to_string()));
+
+        let exdata = root.path().join("dev_hdd0/home/00000001/exdata");
+        std::fs::create_dir_all(&exdata).unwrap();
+        std::fs::write(exdata.join(format!("{CONTENT_ID}.edat")), b"").unwrap();
+        assert_eq!(shown(), ("Full Game".to_string(), "01.02".to_string()));
+    }
+
+    #[test]
+    fn user_folders_follow_rpcs3s_check_user() {
+        for (name, is_user) in [
+            ("00000001", true),
+            ("12345678", true),
+            ("0001abcd", true),
+            ("00000000", false),
+            ("abcdefgh", false),
+            ("1234567", false),
+            ("123456789", false),
+        ] {
+            assert_eq!(is_user_folder(std::ffi::OsStr::new(name)), is_user, "{name}");
+        }
     }
 
     #[test]
