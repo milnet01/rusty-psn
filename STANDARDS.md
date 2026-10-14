@@ -299,7 +299,7 @@ UpdatesApp (eframe::App)
   |     |-- directory_format: DirectoryFormat
   |     |-- max_concurrent_downloads: u32
   |     |-- rpcs3_config_dir: Option<PathBuf>
-  |     |-- theme: AppTheme (Dark/Light/PlayStation)
+  |     |-- theme: AppTheme (Dark/Light/PlayStation/HighContrast)
   |     |-- text_size_percent: u32 (100 to 200; scales all text and controls)
   |
   |-- VolatileData (not persisted)

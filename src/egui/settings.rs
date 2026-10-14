@@ -140,7 +140,7 @@ impl UpdatesApp {
             .selected_text(current_theme.label())
             .width(200.0)
             .show_ui(ui, |ui| {
-                for theme in [AppTheme::Dark, AppTheme::Light, AppTheme::PlayStation] {
+                for theme in APP_THEMES {
                     if ui
                         .selectable_value(&mut self.v.modified_settings.theme, theme, theme.label())
                         .changed()

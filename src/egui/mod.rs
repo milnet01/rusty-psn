@@ -198,7 +198,11 @@ enum AppTheme {
     Dark,
     Light,
     PlayStation,
+    HighContrast,
 }
+
+/// Every theme, in the order the settings window lists them.
+const APP_THEMES: [AppTheme; 4] = [AppTheme::Dark, AppTheme::Light, AppTheme::PlayStation, AppTheme::HighContrast];
 
 impl AppTheme {
     fn label(self) -> &'static str {
@@ -206,6 +210,7 @@ impl AppTheme {
             AppTheme::Dark => "Dark",
             AppTheme::Light => "Light",
             AppTheme::PlayStation => "PlayStation",
+            AppTheme::HighContrast => "High contrast",
         }
     }
 
@@ -248,8 +253,61 @@ impl AppTheme {
 
                 ctx.set_visuals(visuals);
             }
+            AppTheme::HighContrast => ctx.set_visuals(high_contrast_visuals()),
         }
     }
+}
+
+/// White text and outlines on black, with yellow marking what is selected, hovered or pressed.
+fn high_contrast_visuals() -> egui::Visuals {
+    let mut visuals = egui::Visuals::dark();
+    let black = egui::Color32::BLACK;
+    let white = egui::Color32::WHITE;
+    let yellow = egui::Color32::from_rgb(255, 221, 0);
+    let outline = egui::Stroke::new(2.0_f32, white);
+
+    // Backgrounds.
+    visuals.panel_fill = black;
+    visuals.window_fill = black;
+    visuals.extreme_bg_color = black;
+    visuals.faint_bg_color = egui::Color32::from_gray(30);
+    visuals.code_bg_color = black;
+    visuals.window_stroke = outline;
+
+    // Text and labels.
+    visuals.weak_text_color = Some(egui::Color32::from_gray(210));
+    visuals.hyperlink_color = egui::Color32::from_rgb(0, 230, 255);
+    visuals.warn_fg_color = yellow;
+    visuals.error_fg_color = egui::Color32::from_rgb(255, 110, 110);
+    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0_f32, white);
+    visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0_f32, white);
+    visuals.widgets.noninteractive.bg_fill = black;
+
+    // Buttons at rest: outlined in white. A slider's track and a checkbox's box are grey, so they show on black.
+    visuals.widgets.inactive.bg_fill = egui::Color32::from_gray(90);
+    visuals.widgets.inactive.weak_bg_fill = black;
+    visuals.slider_trailing_fill = true;
+    visuals.widgets.inactive.bg_stroke = outline;
+    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.5_f32, white);
+
+    // Hovered, pressed and open widgets: outlined in yellow.
+    for state in [
+        &mut visuals.widgets.hovered,
+        &mut visuals.widgets.active,
+        &mut visuals.widgets.open,
+    ] {
+        state.bg_fill = black;
+        state.weak_bg_fill = black;
+        state.bg_stroke = egui::Stroke::new(3.0_f32, yellow);
+        state.fg_stroke = egui::Stroke::new(2.0_f32, yellow);
+    }
+
+    // Selected items and text: black on yellow.
+    visuals.selection.bg_fill = yellow;
+    visuals.selection.stroke = egui::Stroke::new(1.5_f32, black);
+    visuals.text_cursor.stroke = egui::Stroke::new(2.0_f32, yellow);
+
+    visuals
 }
 
 /// A field missing from the stored settings takes its value from `AppSettings::default()`.
@@ -832,7 +890,7 @@ mod tests {
     fn unknown_theme_keeps_the_other_settings() {
         // One value the app cannot read used to reset every setting (RPSN-0101).
         let settings =
-            load(r#"(settings:(pkg_download_path:"/games/pkgs",show_toasts:false,show_notifications:true,theme:HighContrast))"#);
+            load(r#"(settings:(pkg_download_path:"/games/pkgs",show_toasts:false,show_notifications:true,theme:Sepia))"#);
         assert!(settings.is_some(), "settings with an unknown theme did not load");
         let settings = settings.unwrap(); // Checked just above.
         assert_eq!(settings.pkg_download_path, PathBuf::from("/games/pkgs"));
@@ -856,6 +914,21 @@ mod tests {
         assert_eq!(settings.directory_format, crate::utils::DirectoryFormat::TitleSerial);
         assert_eq!(settings.max_concurrent_downloads, 7);
         assert_eq!(settings.text_size_percent, 150);
+    }
+
+    #[test]
+    fn every_theme_is_offered_and_loads_after_saving() {
+        // A theme missing from the list cannot be chosen; one that does not load back resets on restart.
+        for theme in APP_THEMES {
+            let mut app = UpdatesApp::default();
+            app.settings.theme = theme;
+            let stored = ron::ser::to_string(&app).expect("settings serialize");
+            let settings = load(&stored);
+            assert!(settings.is_some(), "saved theme {} did not load", theme.label());
+            let settings = settings.unwrap(); // Checked just above.
+            assert_eq!(settings.theme, theme);
+        }
+        assert!(APP_THEMES.contains(&AppTheme::HighContrast));
     }
 
     #[test]
