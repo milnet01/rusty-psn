@@ -111,13 +111,16 @@ Foundational work that should be done before adding new features, as it reduces 
   Kind: refactor.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0134] **Clear the event buffer in each pass of the update XML parser.**
+- ✅ [RPSN-0134] **Clear the event buffer in each pass of the update XML parser.**
   src/psn/parser.rs parse_response never calls event_buf.clear(), so the
   buffer holds every event of the reply until the parse ends. The
   firmware parser in src/psn/firmware.rs clears it at the end of each
   pass. Clear it the same way; the `continue` in the "Code" arm skips the
   end of the loop, so the clear must run before the match or on that path
   too.
+  Resolved (2026-10-14, 12c1294): event_buf cleared at the top of each
+  pass, so the Code arm's continue clears it too. Parser and live parse
+  tests unchanged and green.
   **Layman:** Use less memory while reading Sony's update list.
   Kind: optimize.
   Source: in-session-2026-10-13 RPSN-0104 review.
@@ -1653,13 +1656,18 @@ reviewer proposed; check both against the code before fixing.
   Source: in-session-2026-10-12 (RPSN-0127 logo work).
   Lanes: Build.
 
-- 📋 [RPSN-0130] **Fall back to X11 when the Wayland connection fails, instead of panicking.**
+- ✅ [RPSN-0130] **Fall back to X11 when the Wayland connection fails, instead of panicking.**
   With WAYLAND_DISPLAY set to a socket that does not exist and DISPLAY
   valid, run_native returns WaylandError(Connection(NoCompositor)) and
   src/main.rs panics on .expect("Failed to run egui app"). Seen under
   demoreel, which points Wayland at nothing on purpose. Research first:
   whether winit has an option to try X11 next, or whether to retry with
   WAYLAND_DISPLAY removed.
+  Resolved (2026-10-14, 8afd6ce): winit cannot retry after a failed
+  Wayland connect (its event loop is marked created first), so main
+  removes WAYLAND_DISPLAY before any thread starts when that socket
+  takes no connection and DISPLAY is set. Proven under Xvfb: panic with
+  the call spliced out, window with it in.
   **Layman:** The window app crashes at start if the Wayland setting points nowhere, even when X11 is available.
   Kind: fix.
   Source: in-session-2026-10-12 (RPSN-0127 screenshots).
@@ -1696,8 +1704,14 @@ reviewer proposed; check both against the code before fixing.
   Source: in-session-2026-10-12 (check-doc-facts over STANDARDS.md).
   Lanes: docs.
 
-- 📋 [RPSN-0135] **Resume a partial download shorter than its hash suffix instead of failing.**
+- 🚫 [RPSN-0135] **Resume a partial download shorter than its hash suffix instead of failing.**
   PackageInfo::start_download checks an existing file with hash_file before deciding to resume. A file shorter than the hash suffix makes hash_file return FileError::TooShort, and the `?` turns it into a HashMismatch with no file. So the download fails without resuming, every retry repeats it, and discard_kept_file has no path to remove. Remedy: treat TooShort at that first check as "not complete" and carry on to the resume decision, as the final check already does (RPSN-0116).
+  Dropped (2026-10-14): premise false. hash_file returns Ok(false), not
+  TooShort, for a file no longer than its suffix (since 656f8b1,
+  2024-09-22), so start_download goes on to resume. A test locking that
+  behaviour landed instead
+  (hash_file_reads_a_file_shorter_than_its_suffix_as_incomplete), proven
+  red without the early return.
   **Layman:** A tiny leftover piece of a download blocks the download from starting again.
   Kind: fix.
   Source: in-session-2026-10-13 RPSN-0116.
