@@ -34,6 +34,14 @@ pub fn detect_rpcs3() -> Option<Rpcs3Installation> {
 
 /// Attempt to find the RPCS3 executable given a detected config directory.
 fn detect_executable(config_dir: &std::path::Path) -> Option<PathBuf> {
+    // A portable config sits in the folder holding RPCS3 (fs::get_config_dir in
+    // Utilities/File.cpp, RPCS3 commit 6fe3c87).
+    if config_dir.file_name().is_some_and(|name| name == "portable") {
+        if let Some(exe) = config_dir.parent().and_then(executable_in) {
+            return Some(exe);
+        }
+    }
+
     // 1. AppImage: config is inside *.AppImage.home/.config/rpcs3/
     //    The executable is the sibling *.AppImage file next to the .home directory.
     if let Some(exe) = detect_appimage_executable(config_dir) {
@@ -50,14 +58,8 @@ fn detect_executable(config_dir: &std::path::Path) -> Option<PathBuf> {
                 return Some(candidate.canonicalize().unwrap_or_else(|_| candidate.clone()));
             }
         }
-        // Check PATH via `which`
-        if let Ok(output) = std::process::Command::new("which").arg("rpcs3").output() {
-            if output.status.success() {
-                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                if !path.is_empty() {
-                    return Some(PathBuf::from(path));
-                }
-            }
+        if let Some(path) = rpcs3_on_path() {
+            return Some(path);
         }
         // Check if Flatpak is available
         if let Ok(output) = std::process::Command::new("flatpak")
@@ -89,25 +91,67 @@ fn detect_executable(config_dir: &std::path::Path) -> Option<PathBuf> {
 
     #[cfg(target_os = "macos")]
     {
-        if let Ok(output) = std::process::Command::new("which").arg("rpcs3").output() {
-            if output.status.success() {
-                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                if !path.is_empty() {
-                    return Some(PathBuf::from(path));
-                }
-            }
+        if let Some(path) = rpcs3_on_path() {
+            return Some(path);
         }
         // RPCS3 ships as RPCS3.app, which is not on PATH.
-        let mut app_dirs = vec![PathBuf::from("/Applications")];
-        if let Some(home) = dirs::home_dir() {
-            app_dirs.push(home.join("Applications"));
-        }
-        if let Some(exe) = find_app_bundle_executable(&app_dirs) {
+        if let Some(exe) = find_app_bundle_executable(&mac_app_dirs()) {
             return Some(exe);
         }
     }
 
     None
+}
+
+/// `which rpcs3`, or `None` where it finds nothing.
+#[cfg(unix)]
+fn rpcs3_on_path() -> Option<PathBuf> {
+    let output = std::process::Command::new("which").arg("rpcs3").output().ok()?;
+    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (output.status.success() && !path.is_empty()).then(|| PathBuf::from(path))
+}
+
+/// The folders macOS keeps applications in, where RPCS3.app lives.
+#[cfg(target_os = "macos")]
+fn mac_app_dirs() -> Vec<PathBuf> {
+    let mut app_dirs = vec![PathBuf::from("/Applications")];
+    if let Some(home) = dirs::home_dir() {
+        app_dirs.push(home.join("Applications"));
+    }
+    app_dirs
+}
+
+/// RPCS3's executable inside `dir`: an `rpcs3` binary or an RPCS3 AppImage.
+#[cfg(not(any(target_os = "macos", windows)))]
+fn executable_in(dir: &std::path::Path) -> Option<PathBuf> {
+    let binary = dir.join("rpcs3");
+    if binary.is_file() {
+        return Some(binary);
+    }
+    rpcs3_appimage_in(dir)
+}
+
+/// RPCS3's executable inside `dir`: the binary inside an RPCS3.app bundle.
+#[cfg(target_os = "macos")]
+fn executable_in(dir: &std::path::Path) -> Option<PathBuf> {
+    find_app_bundle_executable(&[dir.to_path_buf()])
+}
+
+/// Windows finds rpcs3.exe from its own config candidates in `detect_executable`.
+#[cfg(windows)]
+fn executable_in(_dir: &std::path::Path) -> Option<PathBuf> {
+    None
+}
+
+/// An AppImage in `dir` whose name says rpcs3. The name must say so, because install_pkg
+/// runs whatever detection returns with --installpkg.
+fn rpcs3_appimage_in(dir: &std::path::Path) -> Option<PathBuf> {
+    std::fs::read_dir(dir).ok()?.flatten().map(|entry| entry.path()).find(|path| {
+        path.file_name().is_some_and(|name| {
+            let name = name.to_string_lossy();
+            name.ends_with(".AppImage") && name.to_lowercase().contains("rpcs3")
+        }) && path.is_file()
+    })
 }
 
 /// The binary inside the first `RPCS3.app` found in `app_dirs`.
@@ -136,18 +180,8 @@ fn detect_appimage_executable(config_dir: &std::path::Path) -> Option<PathBuf> {
             if appimage_path.exists() && appimage_path.is_file() {
                 return Some(appimage_path);
             }
-            // Fall back to a renamed RPCS3 AppImage beside it. The name must say rpcs3, because
-            // install_pkg runs whatever this returns with --installpkg.
-            if let Ok(entries) = std::fs::read_dir(parent) {
-                for entry in entries.flatten() {
-                    let entry_name = entry.file_name().to_string_lossy().to_string();
-                    if entry_name.ends_with(".AppImage") && entry_name.to_lowercase().contains("rpcs3") && entry.path().is_file()
-                    {
-                        return Some(entry.path());
-                    }
-                }
-            }
-            return None;
+            // Fall back to a renamed RPCS3 AppImage beside it.
+            return rpcs3_appimage_in(parent);
         }
         current = current.parent()?;
     }
@@ -159,30 +193,36 @@ fn get_candidate_paths() -> Vec<PathBuf> {
 
     #[cfg(target_os = "linux")]
     {
-        // Standard Linux config location.
-        if let Some(home) = dirs::home_dir() {
-            paths.push(home.join(".config/rpcs3"));
-        }
+        let home = dirs::home_dir();
+        let appimage_search_dirs = home
+            .as_ref()
+            .map(|home| {
+                vec![
+                    home.join("Applications"),
+                    home.join("Games"),
+                    PathBuf::from("/opt"),
+                    PathBuf::from("/mnt"),
+                ]
+            })
+            .unwrap_or_default();
 
-        // Flatpak installation.
-        if let Some(home) = dirs::home_dir() {
-            paths.push(home.join(".var/app/net.rpcs3.RPCS3/config/rpcs3"));
+        // RPCS3 resolves its own path through /proc/self/exe, so a symlink on PATH counts
+        // as the folder it points into.
+        let mut exe_dirs: Vec<PathBuf> = rpcs3_on_path()
+            .and_then(|exe| exe.canonicalize().ok())
+            .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+            .into_iter()
+            .collect();
+        for search_dir in &appimage_search_dirs {
+            exe_dirs.extend(appimage_dirs(search_dir));
         }
+        let xdg_config = std::env::var_os("XDG_CONFIG_HOME")
+            .filter(|dir| !dir.is_empty())
+            .map(PathBuf::from);
+        paths.extend(linux_config_candidates(&exe_dirs, xdg_config, home));
 
         // AppImage pattern: look for *.AppImage.home/.config/rpcs3/ in common emulator dirs.
-        if let Some(home) = dirs::home_dir() {
-            let appimage_search_dirs = [
-                home.join("Applications"),
-                home.join("Games"),
-                PathBuf::from("/opt"),
-                PathBuf::from("/mnt"),
-            ];
-            for search_dir in &appimage_search_dirs {
-                if let Some(found) = scan_for_appimage_config(search_dir) {
-                    paths.push(found);
-                }
-            }
-        }
+        paths.extend(appimage_search_dirs.iter().filter_map(|dir| scan_for_appimage_config(dir)));
     }
 
     #[cfg(target_os = "windows")]
@@ -196,12 +236,47 @@ fn get_candidate_paths() -> Vec<PathBuf> {
 
     #[cfg(target_os = "macos")]
     {
+        // A portable folder beside RPCS3.app comes first, as RPCS3 chooses it.
+        let app_dirs = mac_app_dirs();
+        paths.extend(
+            app_dirs
+                .iter()
+                .filter(|dir| dir.join("RPCS3.app").is_dir())
+                .map(|dir| dir.join("portable")),
+        );
         if let Some(home) = dirs::home_dir() {
             paths.push(home.join("Library/Application Support/rpcs3"));
         }
     }
 
     paths
+}
+
+/// Linux config folders to try, in the order RPCS3 itself chooses its folder: a `portable`
+/// folder beside the executable, then `$XDG_CONFIG_HOME/rpcs3`, then `~/.config/rpcs3`
+/// (fs::get_config_dir in Utilities/File.cpp, RPCS3 commit 6fe3c87); then the Flatpak's.
+/// `exe_dirs` are the folders holding an RPCS3 binary or AppImage.
+#[cfg(any(target_os = "linux", test))]
+fn linux_config_candidates(exe_dirs: &[PathBuf], xdg_config: Option<PathBuf>, home: Option<PathBuf>) -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = exe_dirs.iter().map(|dir| dir.join("portable")).collect();
+    paths.extend(xdg_config.map(|dir| dir.join("rpcs3")));
+    if let Some(home) = home {
+        paths.push(home.join(".config/rpcs3"));
+        paths.push(home.join(".var/app/net.rpcs3.RPCS3/config/rpcs3"));
+    }
+    paths
+}
+
+/// `search_dir` and each folder directly inside it that holds an RPCS3 AppImage.
+#[cfg(target_os = "linux")]
+fn appimage_dirs(search_dir: &std::path::Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(search_dir) else {
+        return Vec::new();
+    };
+    std::iter::once(search_dir.to_path_buf())
+        .chain(entries.flatten().map(|entry| entry.path()).filter(|path| path.is_dir()))
+        .filter(|dir| rpcs3_appimage_in(dir).is_some())
+        .collect()
 }
 
 /// Windows config folders to try, in the order RPCS3 itself chooses its folder: a
@@ -354,5 +429,48 @@ mod tests {
             detect_appimage_executable(&config_dir),
             Some(dir.path().join("RPCS3-v0.0.38.AppImage"))
         );
+    }
+
+    #[test]
+    fn linux_candidates_follow_rpcs3s_own_order() {
+        // RPCS3 takes a portable folder first, then XDG_CONFIG_HOME, then ~/.config (RPSN-0139).
+        let home = PathBuf::from("/h");
+        assert_eq!(
+            linux_config_candidates(&[PathBuf::from("/a")], Some(PathBuf::from("/x")), Some(home.clone())),
+            [
+                PathBuf::from("/a/portable"),
+                PathBuf::from("/x/rpcs3"),
+                PathBuf::from("/h/.config/rpcs3"),
+                PathBuf::from("/h/.var/app/net.rpcs3.RPCS3/config/rpcs3"),
+            ]
+        );
+        assert_eq!(
+            linux_config_candidates(&[], None, Some(home))[0],
+            PathBuf::from("/h/.config/rpcs3")
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn portable_config_finds_the_rpcs3_beside_it() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let portable = dir.path().join("portable");
+        std::fs::create_dir(&portable).expect("portable dir");
+        std::fs::write(dir.path().join("RPCS3-v0.0.38.AppImage"), b"").expect("appimage file");
+        assert_eq!(detect_executable(&portable), Some(dir.path().join("RPCS3-v0.0.38.AppImage")));
+
+        std::fs::write(dir.path().join("rpcs3"), b"").expect("binary");
+        assert_eq!(detect_executable(&portable), Some(dir.path().join("rpcs3")));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn appimage_dirs_lists_folders_holding_an_rpcs3_appimage() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        for (folder, file) in [("ps3", "rpcs3.AppImage"), ("art", "Krita.AppImage")] {
+            std::fs::create_dir(dir.path().join(folder)).expect("folder");
+            std::fs::write(dir.path().join(folder).join(file), b"").expect("appimage file");
+        }
+        assert_eq!(appimage_dirs(dir.path()), [dir.path().join("ps3")]);
     }
 }
