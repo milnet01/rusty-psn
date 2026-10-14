@@ -1806,7 +1806,7 @@ reviewer proposed; check both against the code before fixing.
   Source: in-session-2026-10-14 upstream PR survey.
   Lanes: PSN.
 
-- 🚧 [RPSN-0152] **Follow the fixes offered to the upstream author.**
+- 🚫 [RPSN-0152] **Follow the fixes offered to the upstream author.**
   Opened 2026-10-14 on RainbowCookie32/rusty-psn, base dev, from fork
   branches: #359 unsafe title id (upstream/title-id), #360 titles with
   an entity (upstream/title-entities), #361 reader errors
@@ -1825,6 +1825,10 @@ reviewer proposed; check both against the code before fixing.
   capped Sony reply reads (RPSN-0151); X11 fallback when the Wayland
   socket is dead (RPSN-0130); dev_hdd0 PSN games in the RPCS3 scan
   (RPSN-0136); headless confirmed install (RPSN-0137).
+  Dropped (2026-10-14, owner decision): the upstream author answered the
+  pull requests and is not interested in this work. Offer no more pull
+  requests upstream; the candidate list above is void. Whether to close
+  the already-open PRs #359-#362 is the owner's call.
   **Layman:** Four fixes were sent to the original author; watch for replies and answer them.
   Kind: chore.
   Source: user-request-2026-10-14 share fixes upstream.
