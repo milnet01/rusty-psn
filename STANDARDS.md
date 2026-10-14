@@ -101,19 +101,34 @@ UpdateInfo ready for download
 PackageInfo::start_download()
     |
     v
-Create/open .pkg file (preserves existing content via OpenOptions::create(true))
+Validate the package URL (security::validate_download_url)
     |
     v
-Hash existing file -> if matches expected SHA1, skip download (already complete)
+HEAD request -> final file name and ETag
     |
     v
-Truncate file, stream HTTP response chunks, write to disk
+Create/open .pkg file (existing content kept)
+    |
+    v
+Hash existing file -> if it matches the expected SHA1, done (already complete)
+    |
+    v
+GET; a file shorter than expected asks for the rest (Range, If-Range: ETag)
+An error status stops here and leaves the file untouched
+    |
+    v
+206 from the resume point -> append; 206 from anywhere else -> GET the whole file;
+200 -> truncate and write from the start
+    |
+    v
+Stream chunks to disk, checking for pause or abort before each one
     |
     v
 Hash downloaded file -> verify SHA1
     |
     v
-DownloadStatus::DownloadSuccess or DownloadError::HashMismatch
+DownloadStatus::DownloadSuccess, or DownloadError::HashMismatch:
+a short file is kept for resume, a whole one is deleted
 ```
 
 ### 3.5 SHA1 Verification
@@ -434,44 +449,32 @@ docker run --rm -v ${PWD}/pkgs:/rusty-psn/pkgs rusty-psn -t "SERIAL1 SERIAL2"
 
 **Integration tests** (psn/mod.rs) that hit Sony's live servers:
 
-| Test | Serial | Platform | Expected |
-|---|---|---|---|
-| `parse_ac3` | NPUB30826 | PS3 | 1 package |
-| `parse_lpb` | BCUS98148 | PS3 | 13 packages |
-| `parse_infamous2` | NPUA80638 | PS3 | 3 packages |
-| `parse_tokyo_jungle` | NPUA80523 | PS3 | 1 package |
-| `parse_vita_hustle_kings` | PCSA00007 | PSVita | >= 1 package |
-| `parse_vita_killzone` | PCSA00107 | PSVita | >= 1 package (or NoUpdatesAvailable) |
-
-**Unit tests** across modules:
-
-| Module | Tests | Coverage |
+| Test | Serial | Platform |
 |---|---|---|
-| `utils` | 12 | Title sanitization (colons, paths, Unicode, Windows reserved names, length) |
-| `security` | 7 | URL validation, serial validation, path containment |
-| `batch` | 7 | Batch file parsing, comments, normalization, dedup, errors |
-| `rpcs3/sfo` | 4 | SFO binary parsing, invalid files |
-| `rpcs3/config` | 4 | games.yml, vfs.yml parsing |
-| `rpcs3` | 8 | Version comparison, serial detection, title extraction |
+| `parse_ac3` | NPUB30826 | PS3 |
+| `parse_lpb` | BCUS98148 | PS3 |
+| `parse_infamous2` | NPUA80638 | PS3 |
+| `parse_tokyo_jungle` | NPUA80523 | PS3 |
+| `parse_vita_hustle_kings` | PCSA00007 | PSVita |
+| `parse_vita_killzone` | PCSA00107 | PSVita |
+
+**Unit tests** sit in a `#[cfg(test)] mod tests` beside the code they cover.
+`cargo test --bin rusty-psn -- --list` lists every test in the window-app build;
+add `--no-default-features --features cli` for the command-line build.
 
 ### 10.2 Test Characteristics
 
 - Integration tests are `#[tokio::test]` async tests requiring network access
-- Unit tests are standard `#[test]` and use `tempfile` for fixtures
+- Unit tests are `#[test]`, or `#[tokio::test]` where they await, and use `tempfile` for fixtures
 - Tests are gated with `#[cfg(test)]` (compiles only in test builds)
 - No mocking framework is used — live server tests verify real Sony API responses
-- Total: 48 tests
 
 ---
 
 ## 11. Known Technical Debt & Quirks
 
-1. **`serde_yaml` deprecated**: The `serde_yaml 0.9` crate is archived by its maintainer. Consider migrating to `serde_yml` (maintained fork with compatible API).
-2. **reqwest Client per-request**: A new `reqwest::Client` is built for each `get_info()` and `start_download()` call. The client should be constructed once and reused (avoids redundant TLS handshakes and connection pool waste).
-3. **`blocking_lock()` in UI thread**: `tokio::sync::Mutex::blocking_lock()` is called in the egui rendering path (status bar, progress display). This can block the UI if an async task holds the lock. Consider `try_lock()` or `std::sync::Mutex` for shared progress state.
-4. **egui frame cloning**: `update_results` and `rpcs3_installed_games` are cloned every frame in `draw_results_list` / `draw_rpcs3_library_window` due to borrow checker constraints. Could be optimized with index-based iteration or `Arc<Vec<T>>`.
-5. **Busy-wait polling in CLI**: The CLI download loop calls `promise.ready()` in a tight loop with a 50ms sleep. Could use a proper event-based approach.
-6. **Newline sanitization**: Special-case handling for BCUS98233 title containing `\n` characters (replaced in `psn/mod.rs` after parsing).
+1. **Busy-wait polling in CLI**: The CLI download loop calls `promise.ready()` in a tight loop with a 50ms sleep. Could use a proper event-based approach.
+2. **Newline sanitization**: Special-case handling for BCUS98233 title containing `\n` characters (replaced in `psn/mod.rs` after parsing).
 
 ---
 
