@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=156 -->
+<!-- ants-roadmap-id-high-water: RPSN=157 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1070,8 +1070,12 @@ Work named by docs/design.md and its review on 2026-10-12.
   Kind: ux.
   Source: user-request-2026-10-12.
 
-- 📋 [RPSN-0142] **Add a text-size setting to the window app.**
+- ✅ [RPSN-0142] **Add a text-size setting to the window app.**
   First part of the approved redesign (RPSN-0133). The setting scales all text and is saved with the other settings.
+  Resolved (2026-10-14, 1d9021e): Settings > Appearance > Text size,
+  100% to 200%, saved with the other settings. At 200% the top button
+  row runs off the right edge; RPSN-0145's sidebar replaces that row.
+  The Settings window will move into the main window under RPSN-0157.
   **Layman:** Make all text in the app bigger or smaller from Settings.
   Kind: accessibility.
   Source: user-request-2026-10-13 RPSN-0133.
@@ -1096,6 +1100,25 @@ Work named by docs/design.md and its review on 2026-10-12.
   **Layman:** The new layout from the approved mockups.
   Kind: ux.
   Source: user-request-2026-10-13 RPSN-0133.
+  Lanes: Window app.
+
+- 📋 [RPSN-0157] **Give every panel and message a fixed, foldable place in the main window; no pop-up windows.**
+  Owner's words (2026-10-14): "The current app brings up modals for
+  various tasks. I don't want this. Everything that provides feedback
+  to the user should have a place on the app window and be collapsable.
+  Apart from the collapsable part too, no updates should move anything
+  else on the Window either. Everything should have its place and not
+  move from it. If the window has to be made bigger to cater for all
+  the info, so be it."
+  Reaches every floating window the app opens (Settings, RPCS3 Library,
+  Content Browser, Download Firmware, Download History, About, File
+  integrity check failed, Migrate Downloads) and the toasts. The
+  desktop's own folder and file pickers stay: they are the system's,
+  not the app's. Shapes RPSN-0145's layout, so the two are specced
+  together before either is built.
+  **Layman:** Nothing pops up and nothing jumps around: every part of the app has its own spot in the main window and can be folded away.
+  Kind: ux.
+  Source: user-request-2026-10-14.
   Lanes: Window app.
 
 ## 13. Confirm the signs of success
