@@ -49,6 +49,7 @@ pub enum ContentError {
     Io(std::io::Error),
     Zip(zip::result::ZipError),
     NoPkgFound,
+    TooLarge,
     DuplicateFile(String),
     InstallFailed(String),
 }
@@ -59,6 +60,7 @@ impl std::fmt::Display for ContentError {
             ContentError::Io(e) => write!(f, "I/O error: {e}"),
             ContentError::Zip(e) => write!(f, "ZIP error: {e}"),
             ContentError::NoPkgFound => write!(f, "No .pkg file found in ZIP"),
+            ContentError::TooLarge => write!(f, "ZIP unpacks to far more than its own size"),
             ContentError::DuplicateFile(name) => write!(f, "ZIP holds two files named {name}"),
             ContentError::InstallFailed(reason) => write!(f, "Install failed: {reason}"),
         }
@@ -174,15 +176,38 @@ pub struct ExtractedDlc {
     pub temp_dir: tempfile::TempDir,
 }
 
+/// How far past its own size a DLC ZIP may unpack. Packages and licences are encrypted,
+/// so they barely compress; the fixed part covers small or stored archives.
+const DLC_UNPACK_RATIO: u64 = 4;
+const DLC_UNPACK_SLACK: u64 = 16 * 1024 * 1024;
+
 /// Extract every PKG, RAP and EDAT file in a DLC ZIP into the top of one temporary folder.
 ///
 /// RPCS3's `--installpkg` reads only the files at the top of a folder it is given, so
 /// the ZIP's own subfolders are dropped. Two files with the same name are refused.
+/// The folder sits beside the ZIP: the system temp folder is RAM on many systems, and a
+/// Flatpak RPCS3 cannot see it. A ZIP that unpacks far past its own size is refused.
 pub fn extract_dlc_zip(zip_path: &Path) -> Result<ExtractedDlc, ContentError> {
     let file = std::fs::File::open(zip_path).map_err(ContentError::Io)?;
+    let zip_size = file.metadata().map_err(ContentError::Io)?.len();
+    let mut budget = zip_size.saturating_mul(DLC_UNPACK_RATIO).saturating_add(DLC_UNPACK_SLACK);
     let mut archive = zip::ZipArchive::new(file).map_err(ContentError::Zip)?;
 
-    let temp_dir = tempfile::tempdir().map_err(ContentError::Io)?;
+    let temp_dir = match zip_path
+        .parent()
+        .map(|dir| tempfile::Builder::new().prefix(".rusty-psn-dlc-").tempdir_in(dir))
+    {
+        Some(Ok(dir)) => dir,
+        other => {
+            if let Some(Err(e)) = other {
+                warn!(
+                    "Cannot unpack beside {}: {e}; using the system temp folder",
+                    zip_path.display()
+                );
+            }
+            tempfile::tempdir().map_err(ContentError::Io)?
+        }
+    };
 
     let mut pkgs = Vec::new();
     let mut raps = Vec::new();
@@ -215,9 +240,17 @@ pub fn extract_dlc_zip(zip_path: &Path) -> Result<ExtractedDlc, ContentError> {
             return Err(ContentError::DuplicateFile(file_name.to_string_lossy().into_owned()));
         }
 
+        // The header's size can lie, so the copy itself is bounded too.
+        if file.size() > budget {
+            return Err(ContentError::TooLarge);
+        }
         let outpath = temp_dir.path().join(file_name);
         let mut outfile = std::fs::File::create(&outpath).map_err(ContentError::Io)?;
-        std::io::copy(&mut file, &mut outfile).map_err(ContentError::Io)?;
+        let written = std::io::copy(&mut std::io::Read::take(&mut file, budget + 1), &mut outfile).map_err(ContentError::Io)?;
+        if written > budget {
+            return Err(ContentError::TooLarge);
+        }
+        budget -= written;
         list.push(outpath);
     }
 
@@ -347,6 +380,45 @@ mod tests {
         let dlc = extract_dlc_zip(&zip_path).unwrap();
 
         assert_eq!(top_level_names(dlc.temp_dir.path()), ["dlc.EDAT", "dlc.pkg", "dlc.rap"]);
+    }
+
+    #[test]
+    fn extract_dlc_zip_unpacks_beside_the_zip() {
+        // The system temp folder is RAM on many systems, and Flatpak RPCS3 cannot see it (RPSN-0113).
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("dlc.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
+        writer
+            .start_file("dlc.pkg", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(b"pkg body").unwrap();
+        writer.finish().unwrap();
+
+        let dlc = extract_dlc_zip(&zip_path).unwrap();
+
+        assert_eq!(dlc.temp_dir.path().parent(), Some(dir.path()));
+    }
+
+    #[test]
+    fn extract_dlc_zip_refuses_a_zip_that_unpacks_far_past_its_own_size() {
+        // Encrypted packages barely compress, so a large expansion is not a DLC zip (RPSN-0113).
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("bomb.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
+        let options = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        writer.start_file("bomb.pkg", options).unwrap();
+        let zeros = vec![0u8; 1024 * 1024];
+        for _ in 0..20 {
+            writer.write_all(&zeros).unwrap();
+        }
+        writer.finish().unwrap();
+
+        let result = extract_dlc_zip(&zip_path);
+
+        assert!(
+            matches!(result, Err(ContentError::TooLarge)),
+            "a 20 MiB expansion of a tiny zip was unpacked"
+        );
     }
 
     #[test]

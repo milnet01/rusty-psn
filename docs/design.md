@@ -89,7 +89,8 @@ sets for a second reason to change.
   `utils::migrate_existing_dir` and `utils::migrate_directories`.
   `CLAUDE.md` rule 1 requires the check.
 - **Writes outside the download folder** — Content unpacks a DLC zip only
-  into a temporary folder, through the zip crate's `enclosed_name`. It
+  into a temporary folder beside the zip, or the system temp folder where
+  that folder cannot be written, through the zip crate's `enclosed_name`. It
   hands RPCS3's `--installpkg` one folder holding the packages and their
   `.rap` and `.edat` licence files directly, with no subfolders: RPCS3 reads
   only the files at the top of a folder it is given. RPCS3 copies the

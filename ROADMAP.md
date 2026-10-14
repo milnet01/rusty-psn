@@ -1404,8 +1404,15 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
   Lanes: Content.
 
-- 📋 [RPSN-0113] **Bound DLC zip extraction and extract outside the system temp folder.**
+- ✅ [RPSN-0113] **Bound DLC zip extraction and extract outside the system temp folder.**
   src/content.rs:174 and :195 extract with no size limit into the system temp folder (RAM-backed on many systems). Unsettled: Flatpak RPCS3 may not see host /tmp. Remedy: extract beside the downloads and cap the total uncompressed size from the zip headers.
+  Resolved (2026-10-14): extract_dlc_zip unpacks into a hidden
+  temporary folder beside the ZIP, falling back to the system temp
+  folder only when that folder cannot be written. Unpacking stops with
+  TooLarge past 4 times the ZIP's size plus 16 MiB, checked against the
+  header and against the bytes actually copied. Beside the ZIP rather
+  than the download folder: Content may not use Security, and Flathub's
+  RPCS3 can read home, /media and /run/media but not /tmp.
   **Layman:** A large or hostile DLC zip can fill memory.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
