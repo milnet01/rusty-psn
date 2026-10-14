@@ -24,6 +24,7 @@ mod dialogs;
 mod downloads;
 mod firmware;
 mod history;
+mod placement;
 mod results;
 mod rpcs3_library;
 mod search;
@@ -414,6 +415,11 @@ struct VolatileData {
     /// Shared HTTP client for all PSN requests. Constructed once, reused across all
     /// searches and downloads. reqwest::Client is cheaply cloneable (Arc internally).
     psn_client: Option<reqwest::Client>,
+
+    /// Where KWin last had the window frame, on Wayland only; see `placement`.
+    frame_position: Option<(i32, i32)>,
+    /// Whether the saved position has been handed to KWin this run.
+    placement_restored: bool,
 }
 
 impl Default for VolatileData {
@@ -503,6 +509,9 @@ impl Default for VolatileData {
             egui_ctx: None,
 
             psn_client: None,
+
+            frame_position: None,
+            placement_restored: false,
         }
     }
 }
@@ -517,6 +526,9 @@ pub struct UpdatesApp {
 impl eframe::App for UpdatesApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
+        if let Some(position) = self.v.frame_position {
+            eframe::set_value(storage, placement::STORAGE_KEY, &position);
+        }
     }
 
     // Runs before every `ui` call, and also while the window is hidden, so downloads keep moving when minimised.
@@ -550,6 +562,7 @@ impl eframe::App for UpdatesApp {
 
         // Handle global keyboard shortcuts.
         self.handle_keyboard_shortcuts(ctx);
+        self.handle_window_placement(ctx);
 
         // Menu bar must come before CentralPanel.
         self.draw_menu_bar(ui);
@@ -645,6 +658,9 @@ impl UpdatesApp {
         app.v.rt_handle = Some(rt_handle);
         app.v.psn_client = Some(psn_client);
         app.v.egui_ctx = Some(cc.egui_ctx.clone());
+        app.v.frame_position = cc
+            .storage
+            .and_then(|storage| eframe::get_value(storage, placement::STORAGE_KEY));
 
         // Apply the persisted theme on startup.
         app.settings.theme.apply(&cc.egui_ctx);
