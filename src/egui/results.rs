@@ -187,7 +187,7 @@ impl UpdatesApp {
                             .packages
                             .iter()
                             .all(|pkg| self.cached_download_info(title_id, pkg).status == ActiveDownloadStatus::Completed);
-                        let is_mergable = is_multipart && all_pkgs_completed;
+                        let is_mergeable = is_multipart && all_pkgs_completed;
                         let hover_text = if is_multipart {
                             "All parts need to be completed for merge to be available"
                         } else {
@@ -211,7 +211,7 @@ impl UpdatesApp {
                         }
 
                         let merge_btn = ui
-                            .add_enabled(is_mergable, egui::Button::new("Merge parts"))
+                            .add_enabled(is_mergeable, egui::Button::new("Merge parts"))
                             .on_disabled_hover_text(hover_text);
                         if merge_btn.clicked() {
                             self.v.merge_queue.push(self.start_merge_parts(update.clone(), ui));
@@ -448,7 +448,7 @@ impl UpdatesApp {
 
                     // Per-package merge status (only meaningful for PS4 multipart entries).
                     match self.pkg_merge_status(title_id, pkg) {
-                        ActiveMergeStatus::NotMergable | ActiveMergeStatus::NotStarted => {}
+                        ActiveMergeStatus::NotMergeable | ActiveMergeStatus::NotStarted => {}
                         ActiveMergeStatus::Failed => status_pill(ui, "Merge failed", STATUS_COLOR_FAILED),
                         ActiveMergeStatus::Merged => status_pill(ui, "Merged", STATUS_COLOR_DONE),
                         ActiveMergeStatus::Merging(_) => status_pill(ui, "Merging…", STATUS_COLOR_PAUSED),

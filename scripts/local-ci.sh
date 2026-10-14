@@ -75,7 +75,11 @@ step 'documentation'
 # SET THIS TO 1 once the documentation step runs a real check. CONFIGURED
 # covers the script as a whole, so a project with lint and tests filled in
 # still had --docs report a pass that checked nothing (Deedbox, 2026-09-28).
-DOCS_CONFIGURED=0
+DOCS_CONFIGURED=1
+
+# Spelling across code and documents; _typos.toml holds the exceptions.
+need typos
+typos
 
 if (( DOCS_ONLY )); then
     if (( CONFIGURED && DOCS_CONFIGURED )); then

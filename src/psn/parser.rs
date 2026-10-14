@@ -116,7 +116,7 @@ pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), Par
                     }
                     "Code" => {
                         if !err_encountered {
-                            warn!("Code tag encountered without a preceeding Error tag, skipping it");
+                            warn!("Code tag encountered without a preceding Error tag, skipping it");
                             continue;
                         }
 

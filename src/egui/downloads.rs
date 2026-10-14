@@ -219,7 +219,7 @@ impl UpdatesApp {
                         self.v.failed_merges.push(merge.title_id.clone());
 
                         match e {
-                            MergeError::FilepathMismatch(reason) | MergeError::PackagesUnmergable(reason) => {
+                            MergeError::FilepathMismatch(reason) | MergeError::PackagesUnmergeable(reason) => {
                                 toasts.push((format!("Failed to merge {}: {reason}", merge.title_id), ToastLevel::Error));
                             }
                             MergeError::FileMergeFailure => {
@@ -563,12 +563,12 @@ impl UpdatesApp {
 
     pub(super) fn pkg_merge_status(&self, title_id: &str, pkg: &PackageInfo) -> ActiveMergeStatus {
         if pkg.part_number.is_none() {
-            return ActiveMergeStatus::NotMergable;
+            return ActiveMergeStatus::NotMergeable;
         }
 
         let part_number = match pkg.part_number {
             Some(part_num) => part_num,
-            None => return ActiveMergeStatus::NotMergable,
+            None => return ActiveMergeStatus::NotMergeable,
         };
 
         if let Some(active_merge) = self.get_active_merge(title_id) {

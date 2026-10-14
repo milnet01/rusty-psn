@@ -77,7 +77,7 @@ pub enum MergeStatus {
 pub enum MergeError {
     FilepathMismatch(String),
     FileMergeFailure,
-    PackagesUnmergable(String),
+    PackagesUnmergeable(String),
     Security(crate::security::SecurityError),
 }
 
@@ -303,7 +303,7 @@ impl UpdateInfo {
         format: DirectoryFormat,
     ) -> Result<(), MergeError> {
         if !self.packages.iter().all(|pkg| pkg.part_number.is_some()) {
-            return Err(MergeError::PackagesUnmergable(String::from(
+            return Err(MergeError::PackagesUnmergeable(String::from(
                 "some packages for the update are not a partial package",
             )));
         }

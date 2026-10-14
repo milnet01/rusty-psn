@@ -1,3 +1,9 @@
+[files]
+# Generated from the roadmap store; its items quote the misspellings they fixed.
+extend-exclude = ["ROADMAP.md"]
+
 [default.extend-words]
 # Part of Sony's real firmware file name, PS3UPDAT.PUP (src/psn/firmware.rs).
 UPDAT = "UPDAT"
+# A deliberately misspelt option, which a test checks is refused (src/main.rs).
+titel = "titel"

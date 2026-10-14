@@ -757,7 +757,7 @@ enum ActiveDownloadStatus {
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum ActiveMergeStatus {
-    NotMergable,
+    NotMergeable,
     NotStarted,
     Merging(f32),
     Merged,

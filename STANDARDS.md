@@ -176,7 +176,7 @@ PackageInfo {
   - `UpdateError` - update query failures (invalid serial, network, parsing)
   - `DownloadError` - download failures (hash mismatch, a firmware file short of its stated size, I/O, network)
   - `utils::FileError` - Files failures (I/O, path containment, a file too short to verify); PSN converts it into `DownloadError`
-  - `MergeError` - merge failures (filepath issues, unmergable packages)
+  - `MergeError` - merge failures (filepath issues, unmergeable packages)
   - `parser::ParseError` - XML parsing errors
   - `manifest_parser::ParseError` - JSON parsing errors
 - Errors are propagated with `map_err()` to wrap library errors in domain-specific variants
@@ -196,7 +196,7 @@ PackageInfo {
 | Element | Convention | Example |
 |---|---|---|
 | Structs | PascalCase | `UpdateInfo`, `PackageInfo`, `ActiveDownload` |
-| Enums | PascalCase | `DownloadStatus`, `PlaformVariant` |
+| Enums | PascalCase | `DownloadStatus`, `PlatformVariant` |
 | Enum variants | PascalCase | `DownloadStatus::Progress(u64)` |
 | Functions | snake_case | `get_update_info_url()`, `parse_title_id()` |
 | Constants | SCREAMING_SNAKE | `CHUNK_SIZE`, `MERGE_CHUNK_SIZE`, `INVALID_CHARS` |
