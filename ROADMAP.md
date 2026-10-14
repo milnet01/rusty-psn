@@ -1490,8 +1490,18 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 1 LOW.
   Lanes: Window app.
 
-- 📋 [RPSN-0118] **PSN and Files: small review findings from the 2026-10-12 audit.**
+- ✅ [RPSN-0118] **PSN and Files: small review findings from the 2026-10-12 audit.**
   src/psn/firmware.rs:184 creates the Firmware folder before the containment check at :190; move the check first. src/psn/mod.rs:416 a 206 is not checked against Content-Range. src/psn/mod.rs:256 merge_parts uses create_pkg_path, but a failed migration leaves downloads in the old folder (utils.rs return Ok(alt.clone())); share one resolver. src/utils.rs:166/175 check-then-rename window. src/psn/mod.rs:35: document beside hash_file that the SHA-1 arrives over the same unauthenticated channel as the URL.
+  Resolved (2026-10-14): firmware checks containment before creating
+  its folders; a 206 whose Content-Range does not start at the resume
+  point is replaced by a whole-file request; merge_parts finds its
+  folder with migrate_existing_dir, the lookup the download used, so a
+  folder a failed migration left in place is merged; a migrated folder
+  is checked again after the rename and moved back if it leads outside;
+  hash_file says a match proves an intact file, not an unaltered reply.
+  Tests: firmware folder and merge folder red first; the Content-Range
+  reader has a unit test, but the re-request and the post-rename check
+  have none (no HTTP stub, and the swap is a race).
   **Layman:** Small download and file-handling fixes.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 2 LOW.

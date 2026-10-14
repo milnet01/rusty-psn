@@ -19,8 +19,6 @@ use tokio::sync::mpsc::Sender;
 use utils::copy_pkg_file;
 use utils::{get_platform_variant, get_update_info_url, PlatformVariant};
 
-#[cfg(feature = "egui")]
-use crate::utils::create_pkg_path;
 use crate::utils::DirectoryFormat;
 
 /// Build a reqwest client configured for Sony PSN servers.
@@ -313,7 +311,7 @@ impl UpdateInfo {
     pub async fn merge_parts(
         &self,
         tx: Sender<MergeStatus>,
-        download_path: &PathBuf,
+        download_path: &std::path::Path,
         format: DirectoryFormat,
     ) -> Result<(), MergeError> {
         if !self.packages.iter().all(|pkg| pkg.part_number.is_some()) {
@@ -325,7 +323,16 @@ impl UpdateInfo {
         let mut packages_sorted_by_part_number = self.packages.clone();
         // Safe: the all() check above guarantees every package has a part_number.
         packages_sorted_by_part_number.sort_by_key(|pkg| pkg.part_number.unwrap());
-        let package_download_path = create_pkg_path(&download_path, &self.title_id, &self.title(), format);
+        // The same lookup the download used, so a folder a failed migration left in place is found.
+        let package_download_path = crate::utils::migrate_existing_dir(download_path, &self.title_id, &self.title(), format)
+            .await
+            .map_err(|e| match e {
+                crate::utils::FileError::Security(e) => MergeError::Security(e),
+                other => {
+                    error!("could not find the download folder: {other:?}");
+                    MergeError::FileMergeFailure
+                }
+            })?;
 
         info!("Starting merge for {}", self.title());
 
@@ -490,6 +497,26 @@ impl PackageInfo {
             .error_for_status()
             .map_err(DownloadError::Reqwest)?;
 
+        // A 206 that starts anywhere but the resume point would be appended at the wrong place,
+        // so the file is fetched whole instead.
+        if resume_offset > 0
+            && response.status() == reqwest::StatusCode::PARTIAL_CONTENT
+            && content_range_start(response.headers()) != Some(resume_offset)
+        {
+            warn!(
+                "Server resumed {serial} {} at {:?} instead of byte {resume_offset}; starting fresh",
+                self.version,
+                response.headers().get(reqwest::header::CONTENT_RANGE)
+            );
+            response = client
+                .get(&self.url)
+                .send()
+                .await
+                .map_err(DownloadError::Reqwest)?
+                .error_for_status()
+                .map_err(DownloadError::Reqwest)?;
+        }
+
         // Determine actual write offset based on server response.
         let actual_offset = if resume_offset > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT {
             // 206: server honored the Range request. Seek to end and append.
@@ -609,9 +636,34 @@ impl PackageInfo {
     }
 }
 
+/// The first byte a 206 reply's `Content-Range: bytes START-END/TOTAL` says it carries.
+fn content_range_start(headers: &reqwest::header::HeaderMap) -> Option<u64> {
+    let value = headers.get(reqwest::header::CONTENT_RANGE)?.to_str().ok()?;
+    let (unit, range) = value.trim().split_once(' ')?;
+    if !unit.eq_ignore_ascii_case("bytes") {
+        return None;
+    }
+    range.split_once('-')?.0.trim().parse().ok()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{checksum_failed, DownloadError};
+    use super::{checksum_failed, content_range_start, DownloadError};
+
+    #[test]
+    fn content_range_start_reads_the_first_byte() {
+        // A 206 at the wrong offset used to be appended as if it resumed (RPSN-0118).
+        let range = |value: &str| {
+            let mut headers = reqwest::header::HeaderMap::new();
+            headers.insert(reqwest::header::CONTENT_RANGE, value.parse().unwrap());
+            content_range_start(&headers)
+        };
+        assert_eq!(range("bytes 100-199/200"), Some(100));
+        assert_eq!(range("Bytes 0-9/*"), Some(0));
+        assert_eq!(range("bytes */200"), None);
+        assert_eq!(range("items 1-2/3"), None);
+        assert_eq!(content_range_start(&reqwest::header::HeaderMap::new()), None);
+    }
 
     #[tokio::test]
     async fn a_whole_file_that_fails_its_checksum_is_deleted() {
@@ -683,6 +735,38 @@ mod tests {
             !outside.join("UP0000-CUSA00001_00-PART.pkg").exists(),
             "a merged file was written outside"
         );
+    }
+
+    #[cfg(feature = "egui")]
+    #[tokio::test]
+    async fn merge_parts_finds_parts_where_a_failed_migration_left_them() {
+        // The download fell back to the old folder; the merge looked only in the new one (RPSN-0118).
+        let root = tempfile::tempdir().unwrap();
+        let download_path = root.path().join("downloads");
+        let old_folder = download_path.join("CUSA00001 - Title");
+        std::fs::create_dir_all(&old_folder).unwrap();
+        std::fs::write(old_folder.join("UP0000-CUSA00001_00-PART_0.pkg"), b"part").unwrap();
+        // A file where the Title / ID layout needs its Title folder makes the migration fail.
+        std::fs::write(download_path.join("Title"), b"").unwrap();
+
+        let mut package = super::PackageInfo::empty();
+        package.url = "https://gs2.ww.prod.dl.playstation.net/ppkg/UP0000-CUSA00001_00-PART_0.pkg".to_string();
+        package.part_number = Some(1);
+        let info = super::UpdateInfo {
+            title_id: "CUSA00001".to_string(),
+            tag_name: String::new(),
+            titles: vec!["Title".to_string()],
+            packages: vec![package],
+            platform_variant: super::PlatformVariant::PS4,
+        };
+        let (tx, _rx) = tokio::sync::mpsc::channel(10);
+
+        let result = info
+            .merge_parts(tx, &download_path, crate::utils::DirectoryFormat::TitleSerial)
+            .await;
+
+        assert!(matches!(result, Ok(())), "the merge did not find the downloaded part");
+        assert!(old_folder.join("UP0000-CUSA00001_00-PART.pkg").exists());
     }
 
     #[tokio::test]

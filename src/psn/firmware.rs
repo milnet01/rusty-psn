@@ -193,13 +193,13 @@ impl FirmwareInfo {
         crate::security::validate_download_url(&self.download_url).map_err(DownloadError::Security)?;
 
         let fw_dir = download_path.join("Firmware").join(self.console.short_name());
-        tokio::fs::create_dir_all(&fw_dir).await.map_err(DownloadError::Tokio)?;
-
         let pup_name = self.pup_filename();
         let output_filename = format!("v{} {}", self.version, pup_name);
         let output_path = fw_dir.join(&output_filename);
 
+        // Checked before any folder is created, so a linked folder cannot place one outside.
         crate::security::validate_path_containment(&output_path, &download_path).map_err(DownloadError::Security)?;
+        tokio::fs::create_dir_all(&fw_dir).await.map_err(DownloadError::Tokio)?;
 
         // If file already exists at expected size, skip download.
         if output_path.exists() {
@@ -538,6 +538,37 @@ mod tests {
 
     fn test_client() -> reqwest::Client {
         crate::psn::build_psn_client().expect("failed to build test client")
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn firmware_download_creates_no_folder_outside_the_download_folder() {
+        // The containment check used to run after the Firmware folders were created (RPSN-0118).
+        let root = tempfile::tempdir().unwrap();
+        let downloads = root.path().join("downloads");
+        let outside = root.path().join("outside");
+        std::fs::create_dir_all(&downloads).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, downloads.join("Firmware")).unwrap();
+        let info = FirmwareInfo {
+            console: FirmwareConsole::PS3,
+            region: FirmwareRegion::US,
+            version: "4.92".to_string(),
+            download_url: "http://dus01.ps3.update.playstation.net/update/ps3/image/us/PS3UPDAT.PUP".to_string(),
+            size: None,
+            fw_type: FirmwareType::Full,
+        };
+        let (tx, _rx) = tokio::sync::mpsc::channel(8);
+
+        let result = info
+            .start_download(tx, downloads, Arc::new(AtomicU8::new(CANCEL_NONE)), &test_client())
+            .await;
+
+        assert!(matches!(result, Err(DownloadError::Security(_))), "{result:?}");
+        assert!(
+            !outside.join("PS3").exists(),
+            "a folder was created outside the download folder"
+        );
     }
 
     #[tokio::test]

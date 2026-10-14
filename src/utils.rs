@@ -141,7 +141,7 @@ where
 /// Try to find and migrate an existing download directory from any historical format
 /// to the currently selected format. Returns the target path (possibly after renaming).
 /// Refuses a target outside the download folder, and never moves a folder from outside it.
-async fn migrate_existing_dir(
+pub async fn migrate_existing_dir(
     download_path: &Path,
     serial: &str,
     title: &str,
@@ -183,6 +183,12 @@ async fn migrate_existing_dir(
             if let Err(e) = fs::rename(alt, &target).await {
                 error!("Failed to migrate folder: {e}");
                 return Ok(alt.clone()); // Fall back to old path
+            }
+            // The old folder could have been swapped for a link between the check and the
+            // rename, so the moved folder is checked again and moved back if it leads outside.
+            if let Err(e) = crate::security::validate_path_containment(&target, download_path) {
+                let _ = fs::rename(&target, alt).await;
+                return Err(FileError::Security(e));
             }
             return Ok(target);
         }
@@ -356,6 +362,10 @@ const CHUNK_SIZE: usize = 1024 * 1024 * 128;
 
 /// Verify a downloaded file's SHA1 hash. Runs the CPU-intensive hashing on the
 /// tokio blocking thread pool so it doesn't starve async I/O tasks.
+///
+/// The expected hash comes from Sony's update reply, over the same client as the package
+/// URL, and that client does not verify Sony's certificates (`psn::build_psn_client`).
+/// So a match proves the file arrived intact, not that nobody altered the reply.
 pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Result<bool, FileError> {
     // Last 0x20 bytes are the SHA1 hash for PS3 updates. PS4 updates don't include hash suffix.
     let suffix_size: u64 = if hash_whole_file { 0 } else { 0x20 };
