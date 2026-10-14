@@ -11,6 +11,16 @@ impl UpdatesApp {
         }
     }
 
+    /// What "Scan RPCS3 Library" does, from the toolbar or the Tools menu: scan the
+    /// configured RPCS3, else look for one and scan it when found.
+    pub(super) fn scan_or_detect_rpcs3(&mut self, ctx: &egui::Context) {
+        if self.settings.rpcs3_config_dir.is_some() {
+            self.trigger_rpcs3_scan();
+        } else {
+            self.start_rpcs3_detect(ctx, DetectFor::Scan);
+        }
+    }
+
     /// Look for RPCS3 in the background: the search reads folders and runs programs,
     /// which would freeze the window. A second request while one runs is ignored.
     pub(super) fn start_rpcs3_detect(&mut self, ctx: &egui::Context, purpose: DetectFor) {

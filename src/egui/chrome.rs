@@ -52,11 +52,7 @@ impl UpdatesApp {
                     }
                     if ui.button("Scan RPCS3 Library...").clicked() {
                         ui.close();
-                        if self.settings.rpcs3_config_dir.is_some() {
-                            self.trigger_rpcs3_scan();
-                        } else {
-                            self.start_rpcs3_detect(ui.ctx(), DetectFor::Scan);
-                        }
+                        self.scan_or_detect_rpcs3(ui.ctx());
                     }
                     if ui.button("Download Firmware...").clicked() {
                         self.v.show_firmware_window = true;
