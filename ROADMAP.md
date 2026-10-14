@@ -1753,7 +1753,7 @@ reviewer proposed; check both against the code before fixing.
   Source: in-session-2026-10-14 RPSN-0120.
   Lanes: Window app, RPCS3, Content.
 
-- 📋 [RPSN-0151] **Cap Sony replies while reading them, not after.**
+- ✅ [RPSN-0151] **Cap Sony replies while reading them, not after.**
   UpdateInfo::get_info (update XML and manifest, src/psn/mod.rs) and
   the firmware list fetch (src/psn/firmware.rs) check Content-Length,
   then call response.text(), then check the length. A chunked reply
@@ -1761,6 +1761,11 @@ reviewer proposed; check both against the code before fixing.
   MAX_METADATA_SIZE and MAX_FIRMWARE_LIST_SIZE bound nothing there.
   Remedy: read the body in chunks (response.chunk()) and stop past
   the cap.
+  Resolved (2026-10-14, 69e0695): psn::utils::read_capped_text checks
+  Content-Length, then counts the body as it arrives and stops past the
+  cap. Used by the update XML, PS4 manifest and firmware list fetches.
+  Locked by a_chunked_reply_stops_being_read_past_the_cap (red against
+  the old logic).
   **Layman:** A reply from Sony with no stated size is read whole into memory before its size is checked.
   Kind: security.
   Source: in-session-2026-10-14 upstream PR survey.
