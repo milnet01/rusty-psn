@@ -47,8 +47,8 @@ impl UpdatesApp {
         }
     }
 
-    pub(super) fn draw_migration_dialog(&mut self, ctx: &egui::Context) {
-        // Check if a migration operation completed.
+    /// Report a finished migration, even when its dialog was closed while it ran.
+    pub(super) fn poll_migration(&mut self) {
         if let Some(promise) = &self.v.migration_promise {
             if let Some(&(migrated, skipped)) = promise.ready() {
                 if skipped > 0 {
@@ -62,10 +62,11 @@ impl UpdatesApp {
                 }
                 self.v.migration_promise = None;
                 self.v.show_migration_dialog = false;
-                return;
             }
         }
+    }
 
+    pub(super) fn draw_migration_dialog(&mut self, ctx: &egui::Context) {
         let mut show = self.v.show_migration_dialog;
         egui::Window::new("Migrate Downloads")
             .open(&mut show)

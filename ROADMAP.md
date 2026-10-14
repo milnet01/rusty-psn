@@ -1471,8 +1471,20 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 verify-delivery VD2 (S1).
   Lanes: PSN, Command line.
 
-- 📋 [RPSN-0117] **Window app: small review findings from the 2026-10-12 audit.**
+- ✅ [RPSN-0117] **Window app: small review findings from the 2026-10-12 audit.**
   src/egui/mod.rs: :2812 says the executable is auto-detected, but scan sets only the config dir. :803-806 and :2546-2547 retries bypass max_concurrent_downloads. :1541-1549 and :2899 Escape or X keeps a previewed theme. :3023-3031 Escape mid-migration skips the completion check. :2587, :2595, :3302-3310 ignore clipboard and xdg-open errors. :929 expect() panics if the client failed to build (only logged at :440). :823-824 a stored max of 0 is not clamped. :3281 default pkgs/ is relative to the current folder. :859-865 logs the Security error twice.
+  Resolved (2026-10-14), re-located after the per-screen split: a scan
+  that auto-detects RPCS3 now also takes its executable when none is set;
+  the Retry button queues through the download limit; Escape or the X
+  on Settings undoes a previewed theme; a finished migration is reported
+  even when its dialog was closed; clipboard and file-manager failures
+  are logged and shown; a stored download limit loads clamped to 1-10;
+  the default download folder is Downloads/rusty-psn/pkgs (home when
+  there is no Downloads folder) on every system; create_pkg_file no
+  longer logs errors its callers log. Already fixed before this pass:
+  the expect() on a failed HTTP client (main.rs now stops with a dialog).
+  Theme, Escape, migration and clipboard changes have no unit test; a
+  hidden-screen start ran clean; hand test in the real app still owed.
   **Layman:** Small window-app fixes: wrong hints, ignored errors, unclamped limits.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 1 LOW.

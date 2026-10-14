@@ -212,22 +212,14 @@ pub async fn create_pkg_file(
     pkg_name: &str,
     format: DirectoryFormat,
 ) -> Result<(File, PathBuf), FileError> {
-    let mut target_path = match migrate_existing_dir(&download_path, serial, title, format).await {
-        Ok(path) => path,
-        Err(e) => {
-            error!("Path containment check failed before migration: {e:?}");
-            return Err(e);
-        }
-    };
+    // The caller logs a returned error, so none is logged here.
+    let mut target_path = migrate_existing_dir(&download_path, serial, title, format).await?;
 
     target_path.push(pkg_name);
     info!("Creating file for pkg at path {:?}", target_path);
 
     // Validate the target path stays within the download directory.
-    if let Err(e) = crate::security::validate_path_containment(&target_path, &download_path) {
-        error!("Path containment check failed: {e}");
-        return Err(FileError::Security(e));
-    }
+    crate::security::validate_path_containment(&target_path, &download_path).map_err(FileError::Security)?;
 
     if let Some(parent) = target_path.parent() {
         match fs::create_dir_all(parent).await {

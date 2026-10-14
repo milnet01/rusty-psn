@@ -251,12 +251,19 @@ struct AppSettings {
     show_notifications: bool,
     #[serde(deserialize_with = "default_if_unknown")]
     directory_format: crate::utils::DirectoryFormat,
+    #[serde(deserialize_with = "download_limit")]
     max_concurrent_downloads: u32,
     rpcs3_config_dir: Option<PathBuf>,
     rpcs3_executable: Option<PathBuf>,
     content_directory: Option<PathBuf>,
     #[serde(deserialize_with = "default_if_unknown")]
     theme: AppTheme,
+}
+
+/// Reads the stored download limit into the range the settings slider offers.
+/// A stored 0 would leave every download waiting in the queue.
+fn download_limit<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
+    Ok(u32::deserialize(deserializer)?.clamp(1, 10))
 }
 
 /// Reads a stored choice, falling back to its default when the value is one this version does not know,
@@ -544,6 +551,7 @@ impl eframe::App for UpdatesApp {
             self.draw_about_window(ctx);
         }
 
+        self.poll_migration();
         if self.v.show_migration_dialog {
             self.draw_migration_dialog(ctx);
         }
@@ -685,34 +693,41 @@ fn status_pill(ui: &mut egui::Ui, text: &str, color: egui::Color32) {
     });
 }
 
-/// Platform-specific default download path.
-#[cfg(target_os = "macos")]
+/// The default download path: `rusty-psn/pkgs` in the user's Downloads folder, or in
+/// their home folder where there is none. Relative only when neither is known.
 fn default_download_path() -> PathBuf {
-    let mut p = dirs::download_dir().unwrap_or_else(|| PathBuf::from("pkgs"));
-    p.push("rusty-psn");
-    p.push("pkgs");
-    p
+    dirs::download_dir()
+        .or_else(dirs::home_dir)
+        .map(|dir| dir.join("rusty-psn").join("pkgs"))
+        .unwrap_or_else(|| PathBuf::from("pkgs"))
 }
 
-/// Platform-specific default download path.
-#[cfg(not(target_os = "macos"))]
-fn default_download_path() -> PathBuf {
-    PathBuf::from("pkgs/")
-}
+impl UpdatesApp {
+    /// Open a folder in the platform's file manager, saying so when it cannot be started.
+    fn open_folder(&mut self, path: &Path) {
+        #[cfg(target_os = "linux")]
+        let opener = "xdg-open";
+        #[cfg(target_os = "macos")]
+        let opener = "open";
+        #[cfg(target_os = "windows")]
+        let opener = "explorer";
 
-/// Open a folder in the platform's file manager.
-fn open_folder(path: &Path) {
-    #[cfg(target_os = "linux")]
-    {
-        let _ = std::process::Command::new("xdg-open").arg(path).spawn();
+        if let Err(e) = std::process::Command::new(opener).arg(path).spawn() {
+            warn!("Could not open {} with {opener}: {e}", path.display());
+            self.show_notifications(format!("Could not open the folder: {e}"), ToastLevel::Warning);
+        }
     }
-    #[cfg(target_os = "macos")]
-    {
-        let _ = std::process::Command::new("open").arg(path).spawn();
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let _ = std::process::Command::new("explorer").arg(path).spawn();
+
+    /// Copy text to the clipboard, saying so when that fails.
+    fn copy_to_clipboard(&mut self, text: String) {
+        let Some(clip) = self.v.clipboard.as_mut() else {
+            self.show_notifications("No clipboard is available.", ToastLevel::Warning);
+            return;
+        };
+        if let Err(e) = clip.set_contents(text) {
+            warn!("Could not copy to the clipboard: {e}");
+            self.show_notifications(format!("Could not copy: {e}"), ToastLevel::Warning);
+        }
     }
 }
 
@@ -771,6 +786,20 @@ mod tests {
         assert_eq!(settings.theme, AppTheme::PlayStation);
         assert_eq!(settings.directory_format, crate::utils::DirectoryFormat::TitleSerial);
         assert_eq!(settings.max_concurrent_downloads, 7);
+    }
+
+    #[test]
+    fn a_stored_download_limit_of_zero_loads_as_one() {
+        // With 0 every download waited in the queue for ever (RPSN-0117).
+        let settings = load(r#"(settings:(max_concurrent_downloads:0))"#);
+        assert!(settings.is_some(), "settings with a zero limit did not load");
+        assert_eq!(settings.unwrap().max_concurrent_downloads, 1); // Checked just above.
+    }
+
+    #[test]
+    fn the_default_download_folder_does_not_depend_on_where_the_app_starts() {
+        // A relative default landed wherever the app was launched from (RPSN-0117).
+        assert!(default_download_path().is_absolute(), "{:?}", default_download_path());
     }
 
     #[test]

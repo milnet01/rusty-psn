@@ -4,12 +4,14 @@ use super::*;
 
 impl UpdatesApp {
     pub(super) fn handle_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
+        let mut cancel_settings = false;
         ctx.input(|i| {
             if i.modifiers.command && i.key_pressed(egui::Key::F) {
                 self.v.focus_search_bar = true;
             }
             if i.key_pressed(egui::Key::Escape) {
-                self.v.show_settings_window = false;
+                // Applying the theme needs the context, which this closure holds.
+                cancel_settings = self.v.show_settings_window;
                 self.v.show_mismatch_warning_window = false;
                 self.v.show_about_window = false;
                 self.v.show_rpcs3_library_window = false;
@@ -23,6 +25,9 @@ impl UpdatesApp {
                 self.v.show_settings_window = true;
             }
         });
+        if cancel_settings {
+            self.cancel_settings_window(ctx);
+        }
     }
 
     pub(super) fn draw_menu_bar(&mut self, ui: &mut egui::Ui) {
@@ -50,7 +55,7 @@ impl UpdatesApp {
                         if self.settings.rpcs3_config_dir.is_some() {
                             self.trigger_rpcs3_scan();
                         } else if let Some(installation) = crate::rpcs3::auto_detect::detect_rpcs3() {
-                            self.settings.rpcs3_config_dir = Some(installation.config_dir);
+                            self.adopt_detected_rpcs3(installation);
                             self.trigger_rpcs3_scan();
                             self.show_notifications("RPCS3 auto-detected and scan started.", ToastLevel::Info);
                         } else {

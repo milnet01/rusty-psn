@@ -267,7 +267,14 @@ impl UpdatesApp {
             });
 
         if !show_window {
-            self.v.show_settings_window = false;
+            self.cancel_settings_window(ctx);
         }
+    }
+
+    /// Close the settings window without saving, undoing a previewed theme.
+    pub(super) fn cancel_settings_window(&mut self, ctx: &egui::Context) {
+        self.v.show_settings_window = false;
+        self.v.settings_dirty = false;
+        self.settings.theme.apply(ctx);
     }
 }

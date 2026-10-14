@@ -3,6 +3,14 @@
 use super::*;
 
 impl UpdatesApp {
+    /// Use an auto-detected RPCS3: its config folder, and its executable when none is set.
+    pub(super) fn adopt_detected_rpcs3(&mut self, installation: crate::rpcs3::Rpcs3Installation) {
+        self.settings.rpcs3_config_dir = Some(installation.config_dir);
+        if self.settings.rpcs3_executable.is_none() {
+            self.settings.rpcs3_executable = installation.executable;
+        }
+    }
+
     pub(super) fn trigger_rpcs3_scan(&mut self) {
         let config_dir = match &self.settings.rpcs3_config_dir {
             Some(dir) => dir.clone(),

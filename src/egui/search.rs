@@ -319,7 +319,7 @@ impl UpdatesApp {
                 } else {
                     // Try auto-detect first.
                     if let Some(installation) = crate::rpcs3::auto_detect::detect_rpcs3() {
-                        self.settings.rpcs3_config_dir = Some(installation.config_dir);
+                        self.adopt_detected_rpcs3(installation);
                         self.trigger_rpcs3_scan();
                         self.show_notifications("RPCS3 auto-detected and scan started.", ToastLevel::Info);
                     } else {
@@ -367,7 +367,8 @@ impl UpdatesApp {
             });
 
             if ui.button("Open Downloads").clicked() {
-                open_folder(&self.settings.pkg_download_path);
+                let folder = self.settings.pkg_download_path.clone();
+                self.open_folder(&folder);
             }
         });
     }

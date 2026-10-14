@@ -424,7 +424,7 @@ impl UpdatesApp {
                                     &title,
                                     self.settings.directory_format,
                                 );
-                                open_folder(&folder);
+                                self.open_folder(&folder);
                             }
 
                             if is_installed {
@@ -440,8 +440,7 @@ impl UpdatesApp {
                                 self.v
                                     .failed_downloads
                                     .retain(|f| !(f.title_id == title_id && f.pkg_id == pkg.id()));
-                                let download = self.start_download(title_id.to_string(), title.clone(), pkg.clone(), ui);
-                                self.add_download(download);
+                                self.queue_download(title_id.to_string(), title.clone(), pkg.clone(), ui);
                             }
                             status_pill(ui, "Failed", STATUS_COLOR_FAILED);
                         }
@@ -480,17 +479,13 @@ impl UpdatesApp {
                         ui.label(egui::RichText::new("SHA-1:").weak());
                         ui.label(egui::RichText::new(&pkg.sha1sum).monospace().small());
                         if ui.small_button("Copy").clicked() {
-                            if let Some(ref mut clip) = self.v.clipboard {
-                                let _ = clip.set_contents(pkg.sha1sum.clone());
-                            }
+                            self.copy_to_clipboard(pkg.sha1sum.clone());
                         }
                     });
                     ui.horizontal(|ui| {
                         ui.label(egui::RichText::new("Source URL:").weak());
                         if ui.small_button("Copy URL").clicked() {
-                            if let Some(ref mut clip) = self.v.clipboard {
-                                let _ = clip.set_contents(pkg.url.clone());
-                            }
+                            self.copy_to_clipboard(pkg.url.clone());
                         }
                     });
                 });
