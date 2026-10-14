@@ -47,7 +47,9 @@ on 2026-10-12 and 2026-10-13. The signs it places are in `docs/discovery.md`.
 **Frontend-only code.** PSN and Files already hold some code compiled only
 for the window app (`#[cfg(feature = "egui")]`). That code may stay, and a
 fix to it stays where it is. **New code used only by one front end goes in
-that front end's own folder.**
+that front end's own folder.** Content is the exception: it is a part of its
+own, so new Content code goes in `src/content.rs`, although today only the
+window app calls it.
 
 **New screens.** **A new screen or panel goes in its own file under
 `src/egui/`**, the default `~/.claude/standards/coding.md` § 1.8
