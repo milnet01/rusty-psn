@@ -1,4 +1,5 @@
 use std::fmt;
+use std::io::Read;
 use std::path::Path;
 
 /// Maximum size for a batch file (1 MB). Prevents memory exhaustion from oversized files.
@@ -45,7 +46,16 @@ pub fn parse_batch_file(path: &Path) -> Result<BatchParseResult, BatchFileError>
         return Err(BatchFileError::TooLarge(metadata.len()));
     }
 
-    let content = std::fs::read_to_string(path).map_err(BatchFileError::Io)?;
+    // The reported size can be wrong, as for a pipe or a file still growing, so the read is capped too.
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .and_then(|file| file.take(MAX_BATCH_FILE_SIZE + 1).read_to_end(&mut bytes))
+        .map_err(BatchFileError::Io)?;
+    if bytes.len() as u64 > MAX_BATCH_FILE_SIZE {
+        return Err(BatchFileError::TooLarge(bytes.len() as u64));
+    }
+    let content =
+        String::from_utf8(bytes).map_err(|e| BatchFileError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e)))?;
 
     let mut serials = Vec::new();
     let mut seen = std::collections::HashSet::new();
@@ -161,6 +171,32 @@ mod tests {
         let f = write_temp_file("INVALID\nBAD\nNOPE\n");
         let result = parse_batch_file(f.path());
         assert!(matches!(result, Err(BatchFileError::NoValidSerials)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parse_caps_the_read_not_only_the_reported_size() {
+        // A pipe reports size 0, so only a capped read stops it (RPSN-0149).
+        let dir = tempfile::tempdir().unwrap();
+        let fifo = dir.path().join("batch.fifo");
+        let made = std::process::Command::new("mkfifo").arg(&fifo).status().unwrap();
+        assert!(made.success());
+        let writer_path = fifo.clone();
+        let writer = std::thread::spawn(move || {
+            let mut pipe = std::fs::OpenOptions::new().write(true).open(writer_path).unwrap();
+            let line = b"BCUS98111\n".repeat(1024);
+            // The reader stops early, so a later write fails with a broken pipe; that is expected.
+            for _ in 0..200 {
+                if pipe.write_all(&line).is_err() {
+                    break;
+                }
+            }
+        });
+
+        let result = parse_batch_file(&fifo);
+
+        drop(writer.join());
+        assert!(matches!(result, Err(BatchFileError::TooLarge(_))));
     }
 
     #[test]
