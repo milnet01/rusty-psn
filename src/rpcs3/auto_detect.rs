@@ -73,8 +73,13 @@ fn detect_executable(config_dir: &std::path::Path) -> Option<PathBuf> {
 
     #[cfg(target_os = "windows")]
     {
-        // Look for rpcs3.exe near the config directory or up two levels
-        let candidates = [config_dir.join("rpcs3.exe"), config_dir.join("../../rpcs3.exe").to_path_buf()];
+        // rpcs3.exe sits in RPCS3's own folder: the config folder itself (older versions),
+        // its parent (<RPCS3>\\config), or two up (<RPCS3>\\portable\\config).
+        let candidates = [
+            config_dir.join("rpcs3.exe"),
+            config_dir.join("../rpcs3.exe"),
+            config_dir.join("../../rpcs3.exe"),
+        ];
         for candidate in &candidates {
             if candidate.exists() {
                 return Some(candidate.canonicalize().unwrap_or_else(|_| candidate.clone()));
@@ -182,15 +187,11 @@ fn get_candidate_paths() -> Vec<PathBuf> {
 
     #[cfg(target_os = "windows")]
     {
-        if let Some(appdata) = dirs::config_dir() {
-            paths.push(appdata.join("rpcs3"));
-        }
-        if let Some(local) = dirs::data_local_dir() {
-            paths.push(local.join("rpcs3"));
-        }
-        // Alongside rpcs3.exe in Program Files.
-        paths.push(PathBuf::from("C:\\Program Files\\RPCS3"));
-        paths.push(PathBuf::from("C:\\Program Files (x86)\\RPCS3"));
+        let env_dir = std::env::var_os("RPCS3_CONFIG_DIR").map(PathBuf::from);
+        let exe_dir = std::env::var_os("PATH")
+            .and_then(|path| find_on_path("rpcs3.exe", &path))
+            .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf));
+        paths.extend(windows_config_candidates(env_dir, exe_dir));
     }
 
     #[cfg(target_os = "macos")]
@@ -201,6 +202,33 @@ fn get_candidate_paths() -> Vec<PathBuf> {
     }
 
     paths
+}
+
+/// Windows config folders to try, in the order RPCS3 itself chooses its folder: a
+/// `portable` folder beside rpcs3.exe, then RPCS3_CONFIG_DIR, then the exe's own folder
+/// (fs::get_config_dir in Utilities/File.cpp, RPCS3 commit 6fe3c87). Each folder's
+/// `config` subfolder comes first; older RPCS3 versions kept games.yml in the folder itself.
+#[cfg(any(target_os = "windows", test))]
+fn windows_config_candidates(env_dir: Option<PathBuf>, exe_dir: Option<PathBuf>) -> Vec<PathBuf> {
+    let bases = [
+        exe_dir.as_ref().map(|dir| dir.join("portable")),
+        env_dir,
+        exe_dir,
+        Some(PathBuf::from("C:\\Program Files\\RPCS3")),
+    ];
+    bases
+        .into_iter()
+        .flatten()
+        .flat_map(|base| [base.join("config"), base])
+        .collect()
+}
+
+/// The first `name` file in a PATH-style list of folders.
+#[cfg(any(target_os = "windows", test))]
+fn find_on_path(name: &str, path: &std::ffi::OsStr) -> Option<PathBuf> {
+    std::env::split_paths(path)
+        .map(|dir| dir.join(name))
+        .find(|candidate| candidate.is_file())
 }
 
 /// Scan a directory (non-recursively) for RPCS3 AppImage config patterns.
@@ -258,6 +286,37 @@ mod tests {
             std::fs::write(dir.path().join(name), b"").expect("appimage file");
         }
         (dir, config_dir)
+    }
+
+    #[test]
+    fn windows_candidates_follow_rpcs3s_own_order() {
+        // RPCS3 on Windows keeps everything beside rpcs3.exe, never in AppData (RPSN-0115).
+        let exe = PathBuf::from("/rpcs3");
+        let env = PathBuf::from("/custom");
+
+        let paths = windows_config_candidates(Some(env.clone()), Some(exe.clone()));
+
+        assert_eq!(
+            paths[..6],
+            [
+                exe.join("portable/config"),
+                exe.join("portable"),
+                env.join("config"),
+                env,
+                exe.join("config"),
+                exe,
+            ]
+        );
+    }
+
+    #[test]
+    fn find_on_path_takes_the_first_folder_holding_the_file() {
+        let first = tempfile::tempdir().unwrap();
+        let second = tempfile::tempdir().unwrap();
+        std::fs::write(second.path().join("rpcs3.exe"), b"").unwrap();
+        let path = std::env::join_paths([first.path(), second.path()]).unwrap();
+
+        assert_eq!(find_on_path("rpcs3.exe", &path), Some(second.path().join("rpcs3.exe")));
     }
 
     #[test]

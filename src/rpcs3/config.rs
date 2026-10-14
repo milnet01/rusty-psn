@@ -28,26 +28,45 @@ pub fn parse_games_yml(path: &Path) -> Result<HashMap<String, PathBuf>, String> 
 }
 
 /// The dev_hdd0 folder for an RPCS3 config folder: the one its vfs.yml sets, or
-/// `config_dir/dev_hdd0` when there is no vfs.yml or it cannot be read.
+/// `dev_hdd0` in RPCS3's own folder when there is no vfs.yml or it cannot be read.
 pub fn resolve_dev_hdd0(config_dir: &Path) -> PathBuf {
+    resolve_dev_hdd0_for(config_dir, cfg!(target_os = "windows"))
+}
+
+fn resolve_dev_hdd0_for(config_dir: &Path, windows: bool) -> PathBuf {
+    let emulator_dir = emulator_dir(config_dir, windows);
     let vfs_path = config_dir.join("vfs.yml");
     if !vfs_path.exists() {
-        return config_dir.join("dev_hdd0");
+        return emulator_dir.join("dev_hdd0");
     }
-    match parse_vfs_yml(&vfs_path, config_dir) {
+    match parse_vfs_yml(&vfs_path, &emulator_dir) {
         Ok(vfs) => vfs.dev_hdd0_path,
         Err(e) => {
             warn!("Failed to parse vfs.yml, using the default dev_hdd0 path: {e}");
-            config_dir.join("dev_hdd0")
+            emulator_dir.join("dev_hdd0")
         }
     }
 }
 
+/// RPCS3's own folder, which `$(EmulatorDir)` and the default dev_hdd0 hang off.
+///
+/// On Windows RPCS3 keeps its config files in a `config` subfolder of that folder;
+/// elsewhere the two are one folder (fs::get_config_dir in Utilities/File.cpp,
+/// RPCS3 commit 6fe3c87).
+fn emulator_dir(config_dir: &Path, windows: bool) -> PathBuf {
+    if windows && config_dir.file_name().is_some_and(|name| name.eq_ignore_ascii_case("config")) {
+        if let Some(parent) = config_dir.parent() {
+            return parent.to_path_buf();
+        }
+    }
+    config_dir.to_path_buf()
+}
+
 /// Parse RPCS3's vfs.yml file and resolve the dev_hdd0 path.
 ///
-/// `config_dir` is the directory containing vfs.yml — used to resolve `$(EmulatorDir)`
-/// when it's set to an empty string (the default).
-pub fn parse_vfs_yml(path: &Path, config_dir: &Path) -> Result<Rpcs3VfsConfig, String> {
+/// `emulator_dir` is RPCS3's own folder — used to resolve `$(EmulatorDir)` when it's
+/// set to an empty string (the default).
+pub fn parse_vfs_yml(path: &Path, emulator_dir: &Path) -> Result<Rpcs3VfsConfig, String> {
     let metadata = std::fs::metadata(path).map_err(|e| format!("cannot read vfs.yml: {e}"))?;
     if metadata.len() > MAX_YAML_SIZE {
         return Err(format!("vfs.yml too large: {} bytes", metadata.len()));
@@ -58,10 +77,10 @@ pub fn parse_vfs_yml(path: &Path, config_dir: &Path) -> Result<Rpcs3VfsConfig, S
     let map: HashMap<String, serde_yaml_ng::Value> =
         serde_yaml_ng::from_str(&content).map_err(|e| format!("failed to parse vfs.yml: {e}"))?;
 
-    // Resolve $(EmulatorDir). When the value is empty, it defaults to the config directory.
+    // Resolve $(EmulatorDir). When the value is empty, it defaults to RPCS3's own folder.
     let emulator_dir = match map.get("$(EmulatorDir)") {
         Some(serde_yaml_ng::Value::String(s)) if !s.is_empty() => PathBuf::from(s),
-        _ => config_dir.to_path_buf(),
+        _ => emulator_dir.to_path_buf(),
     };
 
     // Resolve /dev_hdd0/. The value may reference $(EmulatorDir) or be a direct path.
@@ -95,6 +114,32 @@ pub fn parse_vfs_yml(path: &Path, config_dir: &Path) -> Result<Rpcs3VfsConfig, S
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn windows_config_folder_puts_dev_hdd0_in_rpcs3s_own_folder() {
+        // On Windows the config files sit in <RPCS3>\config, dev_hdd0 in <RPCS3> (RPSN-0115).
+        let base = tempfile::tempdir().unwrap();
+        let config = base.path().join("config");
+        std::fs::create_dir(&config).unwrap();
+
+        assert_eq!(resolve_dev_hdd0_for(&config, true), base.path().join("dev_hdd0"));
+
+        std::fs::write(
+            config.join("vfs.yml"),
+            "\"$(EmulatorDir)\": \"\"\n\"/dev_hdd0/\": \"$(EmulatorDir)dev_hdd0/\"\n",
+        )
+        .unwrap();
+        assert_eq!(resolve_dev_hdd0_for(&config, true), base.path().join("dev_hdd0/"));
+    }
+
+    #[test]
+    fn other_systems_keep_dev_hdd0_in_the_config_folder() {
+        let base = tempfile::tempdir().unwrap();
+        let config = base.path().join("config");
+        std::fs::create_dir(&config).unwrap();
+
+        assert_eq!(resolve_dev_hdd0_for(&config, false), config.join("dev_hdd0"));
+    }
 
     #[test]
     fn parse_simple_games_yml() {

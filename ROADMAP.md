@@ -1431,7 +1431,7 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0115] **Find portable RPCS3 on Windows.**
+- ✅ [RPSN-0115] **Find portable RPCS3 on Windows.**
   src/rpcs3/auto_detect.rs:172-183 probe %APPDATA%\rpcs3 and Program Files; RPCS3 is portable and keeps its config beside rpcs3.exe. Remedy: probe the folder of an rpcs3.exe found on PATH; say in the UI that Windows usually needs the path set.
   RPCS3 source review (2026-10-13, finding 4): on Windows RPCS3's base
   folder is <exe dir>/portable/, else the RPCS3_CONFIG_DIR environment
@@ -1441,6 +1441,15 @@ reviewer proposed; check both against the code before fixing.
   config\. We probe %APPDATA% and %LOCALAPPDATA%, and place dev_hdd0
   under the config folder. Remedy: model a base folder and a config-file
   folder.
+  Resolved (2026-10-14): Windows detection tries RPCS3's own order,
+  a portable folder beside an rpcs3.exe found on PATH, then
+  RPCS3_CONFIG_DIR, then the exe's folder, then C:\Program Files\RPCS3,
+  each as <folder>\config before <folder>. The AppData guesses are gone.
+  resolve_dev_hdd0 now takes $(EmulatorDir) and the default dev_hdd0
+  from RPCS3's own folder, the parent of a Windows config folder.
+  rpcs3.exe is also looked for one level up. Not done: a settings-window
+  hint that Windows usually needs the path set. Windows-only lines first
+  compile on GitHub's Windows build.
   **Layman:** On Windows, the app rarely finds RPCS3 by itself.
   Kind: review-fix.
   Source: audit-2026-10-12 review-code lane 4 MEDIUM.
