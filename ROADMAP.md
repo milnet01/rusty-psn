@@ -1895,8 +1895,12 @@ existing item are noted on that item instead.
   Source: rpcs3-source-review-2026-10-13 finding 3.
   Lanes: RPCS3, Window app.
 
-- 📋 [RPSN-0139] **Honour RPCS3's portable folder and XDG_CONFIG_HOME on Linux and macOS.**
+- ✅ [RPSN-0139] **Honour RPCS3's portable folder and XDG_CONFIG_HOME on Linux and macOS.**
   auto_detect.rs hard-codes ~/.config/rpcs3, the Flatpak path and *.AppImage.home. RPCS3 picks <exe dir>/portable/ first, then $XDG_CONFIG_HOME/rpcs3, then ~/.config/rpcs3 (Utilities/File.cpp). For an AppImage the exe dir is the folder holding the .AppImage; on macOS the folder holding RPCS3.app. Remedy: add those candidates, and take the executable from the parent folder of a portable config. RPSN-0114 covers only the macOS executable.
+  Resolved 2026-10-14: auto-detect tries a portable folder beside each
+  RPCS3 found, then XDG_CONFIG_HOME, then ~/.config on Linux; a portable
+  folder beside RPCS3.app first on macOS; and takes a portable config's
+  executable from the folder above it.
   **Layman:** Auto-detect misses RPCS3 set up in portable mode.
   Kind: fix.
   Source: rpcs3-source-review-2026-10-13 finding 5.
