@@ -12,6 +12,14 @@ use tokio::{runtime::Runtime, sync::Notify};
 
 use log::info;
 
+// One front end per build (RPSN-0108). With both, the command line ran first and exited, so the
+// window never opened, and on Windows the window build's subsystem hid the command line's output.
+#[cfg(all(feature = "cli", feature = "egui"))]
+compile_error!(
+    "Build one front end: the default build is the window app; \
+     `--no-default-features --features cli` is the command line."
+);
+
 mod batch;
 #[cfg(feature = "cli")]
 mod cli;
