@@ -89,10 +89,12 @@ sets for a second reason to change.
   `utils::migrate_existing_dir` and `utils::migrate_directories`.
   `CLAUDE.md` rule 1 requires the check.
 - **Writes outside the download folder** — Content unpacks a DLC zip only
-  into a temporary folder, through the zip crate's `enclosed_name`, and
-  copies the licence file by its bare file name into the RPCS3 `exdata`
-  folder it is given. RPCS3 installs a package by running RPCS3 itself
-  (`--installpkg`), so rusty-psn writes nothing into RPCS3's folders there.
+  into a temporary folder, through the zip crate's `enclosed_name`. It
+  hands that one folder, holding the packages and their `.rap` and `.edat`
+  licence files, to RPCS3's `--installpkg`. RPCS3 copies the licences into
+  its own `exdata` folder and installs the packages (`InstallPackages` in
+  RPCS3's `rpcs3qt/main_window.cpp`, read at commit 6fe3c87). rusty-psn
+  writes nothing into RPCS3's folders.
 
 ## The stack, and what it rules out
 
