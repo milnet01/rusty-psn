@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::ffi::OsString;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -42,6 +43,8 @@ pub enum Rpcs3Error {
         serial: String,
         found: Option<String>,
     },
+    /// RPCS3 is already open, so an install would stop at its "already running" window.
+    AlreadyRunning,
     Io(std::io::Error),
 }
 
@@ -62,6 +65,7 @@ impl fmt::Display for Rpcs3Error {
             Rpcs3Error::NotInstalled { serial, found: None } => {
                 write!(f, "RPCS3 finished, but no installed version of {serial} was found")
             }
+            Rpcs3Error::AlreadyRunning => write!(f, "RPCS3 is open. Close RPCS3, then install again"),
             Rpcs3Error::Io(e) => write!(f, "I/O error: {e}"),
         }
     }
@@ -273,6 +277,73 @@ pub enum InstallOutcome {
     Unconfirmed,
 }
 
+/// Installs wait here for each other: two RPCS3 processes cannot run at once (RPSN-0138).
+static INSTALLS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// The file RPCS3 locks while it runs, `<cache dir>/RPCS3.buf`, or `None` where it cannot be
+/// named. The cache dir follows `fs::get_cache_dir` in Utilities/File.cpp, RPCS3 commit 6fe3c87.
+fn instance_lock_path(rpcs3_executable: &Path) -> Option<PathBuf> {
+    lock_path_from(rpcs3_executable, |key| std::env::var_os(key))
+}
+
+fn lock_path_from(rpcs3_executable: &Path, env: impl Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
+    let home = || env("HOME").map(PathBuf::from);
+    let exe_str = rpcs3_executable.to_string_lossy();
+    let cache_dir = if let Some(app_id) = exe_str.strip_prefix("flatpak:") {
+        // Flatpak points XDG_CACHE_HOME inside the sandbox at ~/.var/app/<app id>/cache.
+        if app_id.is_empty() || app_id.starts_with('.') || app_id.contains(['/', '\\']) {
+            return None;
+        }
+        home()?.join(".var/app").join(app_id).join("cache/rpcs3")
+    } else if cfg!(windows) {
+        // On Windows the cache dir is the config dir: a portable/ folder beside the
+        // executable, else RPCS3_CONFIG_DIR, else the executable's folder.
+        let exe_dir = rpcs3_executable.parent()?;
+        let portable = exe_dir.join("portable");
+        if portable.is_dir() {
+            portable
+        } else {
+            env("RPCS3_CONFIG_DIR").map_or_else(|| exe_dir.to_path_buf(), PathBuf::from)
+        }
+    } else if cfg!(target_os = "macos") {
+        home()?.join("Library/Caches/rpcs3")
+    } else {
+        // RPCS3 really does fall back to XDG_CONFIG_HOME here, not to a config folder.
+        let base = env("XDG_CACHE_HOME")
+            .or_else(|| env("XDG_CONFIG_HOME"))
+            .map(PathBuf::from)
+            .or_else(|| home().map(|home| home.join(".cache")))?;
+        base.join("rpcs3")
+    };
+    Some(cache_dir.join("RPCS3.buf"))
+}
+
+/// Whether a running RPCS3 holds `lock_file`. RPCS3 opens it for writing and takes
+/// `flock(LOCK_EX | LOCK_NB)`; on Windows it shares the file for reading only. So a test
+/// open for writing, then a test lock, finds it. RPCS3 retries its own lock for about two
+/// seconds at start, so this brief lock cannot stop it starting.
+fn rpcs3_is_running(lock_file: &Path) -> bool {
+    let file = match std::fs::OpenOptions::new().write(true).open(lock_file) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return false,
+        // ERROR_SHARING_VIOLATION: another process holds the file without sharing writes.
+        Err(e) if cfg!(windows) && e.raw_os_error() == Some(32) => return true,
+        Err(e) => {
+            warn!("Could not check whether RPCS3 is running ({}): {e}", lock_file.display());
+            return false;
+        }
+    };
+    match file.try_lock() {
+        // Dropping `file` releases the test lock.
+        Ok(()) => false,
+        Err(std::fs::TryLockError::WouldBlock) => true,
+        Err(std::fs::TryLockError::Error(e)) => {
+            warn!("Could not check whether RPCS3 is running ({}): {e}", lock_file.display());
+            false
+        }
+    }
+}
+
 /// Install a PKG file, or a folder of PKG, RAP and EDAT files, via RPCS3's headless mode.
 ///
 /// Headless RPCS3 installs with no window and exits 0 whatever happened (`main` in
@@ -280,7 +351,20 @@ pub enum InstallOutcome {
 /// `pkg_path` may also be a folder: RPCS3 then places the RAP and EDAT licences at its top
 /// level and installs every PKG there.
 /// If `rpcs3_executable` is the Flatpak sentinel `flatpak:net.rpcs3.RPCS3`, runs via `flatpak run`.
+///
+/// Installs run one at a time, and none starts while RPCS3 is already open: a second RPCS3
+/// shows a fatal-error window before it reads `--headless` (RPSN-0138).
 pub async fn install_pkg(rpcs3_executable: &Path, pkg_path: &Path, check: InstallCheck) -> Result<InstallOutcome, Rpcs3Error> {
+    let lock_file = instance_lock_path(rpcs3_executable);
+    install_pkg_guarded(rpcs3_executable, pkg_path, check, lock_file.as_deref()).await
+}
+
+async fn install_pkg_guarded(
+    rpcs3_executable: &Path,
+    pkg_path: &Path,
+    check: InstallCheck,
+    lock_file: Option<&Path>,
+) -> Result<InstallOutcome, Rpcs3Error> {
     if !pkg_path.exists() {
         return Err(Rpcs3Error::InstallFailed(format!(
             "PKG path not found: {}",
@@ -294,6 +378,15 @@ pub async fn install_pkg(rpcs3_executable: &Path, pkg_path: &Path, check: Instal
             return Err(Rpcs3Error::InstallFailed(format!("not a game serial: {serial:?}")));
         }
     }
+
+    // Held until RPCS3 exits. Taken before the lock check, so the RPCS3 an earlier
+    // install started is never mistaken for one the user has open.
+    let _one_at_a_time = INSTALLS.lock().await;
+    if lock_file.is_some_and(rpcs3_is_running) {
+        return Err(Rpcs3Error::AlreadyRunning);
+    }
+
+    // Read under the queue, after any earlier install of the same game has finished.
     let before = match &check {
         InstallCheck::AppVersion {
             dev_hdd0,
@@ -539,6 +632,12 @@ mod tests {
     #[cfg(unix)]
     const WRITES_01_05: &str = "mkdir -p '{game}' && cp '{fixture}' '{game}/PARAM.SFO'";
 
+    /// `install_pkg` without the running-RPCS3 check, so a test never reads the real cache folder.
+    #[cfg(unix)]
+    async fn install(exe: &Path, pkg: &Path, check: InstallCheck) -> Result<InstallOutcome, Rpcs3Error> {
+        install_pkg_guarded(exe, pkg, check, None).await
+    }
+
     #[cfg(unix)]
     fn expect(dev_hdd0: &Path, version: Option<&str>) -> InstallCheck {
         InstallCheck::AppVersion {
@@ -555,7 +654,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let (exe, args, _, pkg) = stand_in_rpcs3(root.path(), "", 0);
 
-        install_pkg(&exe, &pkg, InstallCheck::Unconfirmed).await.unwrap();
+        install(&exe, &pkg, InstallCheck::Unconfirmed).await.unwrap();
 
         let recorded = std::fs::read_to_string(args).unwrap();
         assert_eq!(recorded, format!("--headless\n--installpkg\n{}\n", pkg.display()));
@@ -568,18 +667,18 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 0);
         assert_eq!(
-            install_pkg(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await.unwrap(),
+            install(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await.unwrap(),
             InstallOutcome::Confirmed
         );
         assert!(matches!(
-            install_pkg(&exe, &pkg, expect(&dev_hdd0, Some("01.06"))).await,
+            install(&exe, &pkg, expect(&dev_hdd0, Some("01.06"))).await,
             Err(Rpcs3Error::NotInstalled { found: Some(ref v), .. }) if v == "01.05"
         ));
 
         let root = tempfile::tempdir().unwrap();
         let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), "", 0);
         assert!(matches!(
-            install_pkg(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await,
+            install(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await,
             Err(Rpcs3Error::NotInstalled { found: None, .. })
         ));
     }
@@ -590,14 +689,14 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 0);
         assert_eq!(
-            install_pkg(&exe, &pkg, expect(&dev_hdd0, None)).await.unwrap(),
+            install(&exe, &pkg, expect(&dev_hdd0, None)).await.unwrap(),
             InstallOutcome::Confirmed
         );
 
         // Now 01.05 is there before the install, and a stand-in that writes nothing changes nothing.
         let (exe, _, _, _) = stand_in_rpcs3(root.path(), "", 0);
         assert!(matches!(
-            install_pkg(&exe, &pkg, expect(&dev_hdd0, None)).await,
+            install(&exe, &pkg, expect(&dev_hdd0, None)).await,
             Err(Rpcs3Error::NotInstalled { .. })
         ));
     }
@@ -608,7 +707,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 1);
         assert!(matches!(
-            install_pkg(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await,
+            install(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await,
             Err(Rpcs3Error::InstallFailed(_))
         ));
     }
@@ -619,7 +718,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let (exe, _, _, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 0);
         assert_eq!(
-            install_pkg(&exe, &pkg, InstallCheck::Unconfirmed).await.unwrap(),
+            install(&exe, &pkg, InstallCheck::Unconfirmed).await.unwrap(),
             InstallOutcome::Unconfirmed
         );
     }
@@ -635,11 +734,85 @@ mod tests {
             version: None,
         };
 
-        assert!(matches!(
-            install_pkg(&exe, &pkg, check).await,
-            Err(Rpcs3Error::InstallFailed(_))
-        ));
+        assert!(matches!(install(&exe, &pkg, check).await, Err(Rpcs3Error::InstallFailed(_))));
         assert!(!args.exists(), "RPCS3 was launched");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn install_refuses_while_rpcs3_is_open() {
+        // A second RPCS3 shows a fatal-error window before it reads --headless (RPSN-0138).
+        let root = tempfile::tempdir().unwrap();
+        let (exe, args, _, pkg) = stand_in_rpcs3(root.path(), "", 0);
+        let lock_file = root.path().join("RPCS3.buf");
+        let open_rpcs3 = std::fs::File::create(&lock_file).unwrap();
+        open_rpcs3.lock().unwrap();
+
+        let result = install_pkg_guarded(&exe, &pkg, InstallCheck::Unconfirmed, Some(&lock_file)).await;
+
+        assert!(matches!(result, Err(Rpcs3Error::AlreadyRunning)));
+        assert!(!args.exists(), "RPCS3 was launched");
+
+        // Once RPCS3 has closed, the install runs and leaves the file unlocked.
+        drop(open_rpcs3);
+        let result = install_pkg_guarded(&exe, &pkg, InstallCheck::Unconfirmed, Some(&lock_file)).await;
+        assert_eq!(result.unwrap(), InstallOutcome::Unconfirmed);
+        assert!(std::fs::File::open(&lock_file).unwrap().try_lock().is_ok());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn installs_run_one_at_a_time() {
+        let root = tempfile::tempdir().unwrap();
+        let log = root.path().join("log");
+        let action = format!("echo start >> '{0}'; sleep 0.3; echo end >> '{0}'", log.display());
+        let (exe, _, _, pkg) = stand_in_rpcs3(root.path(), &action, 0);
+        let lock_file = root.path().join("RPCS3.buf");
+        std::fs::File::create(&lock_file).unwrap();
+
+        let (first, second) = tokio::join!(
+            install_pkg_guarded(&exe, &pkg, InstallCheck::Unconfirmed, Some(&lock_file)),
+            install_pkg_guarded(&exe, &pkg, InstallCheck::Unconfirmed, Some(&lock_file)),
+        );
+
+        first.unwrap();
+        second.unwrap();
+        assert_eq!(std::fs::read_to_string(log).unwrap(), "start\nend\nstart\nend\n");
+    }
+
+    #[test]
+    fn no_lock_file_means_rpcs3_is_not_running() {
+        let root = tempfile::tempdir().unwrap();
+        assert!(!rpcs3_is_running(&root.path().join("RPCS3.buf")));
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn lock_path_follows_rpcs3s_cache_dir() {
+        fn env<'a>(vars: &'a [(&str, &str)]) -> impl Fn(&str) -> Option<OsString> + 'a {
+            move |key| vars.iter().find(|(k, _)| *k == key).map(|(_, v)| OsString::from(v))
+        }
+        let exe = Path::new("/opt/rpcs3/rpcs3");
+        let all = [("XDG_CACHE_HOME", "/c"), ("XDG_CONFIG_HOME", "/f"), ("HOME", "/h")];
+
+        assert_eq!(lock_path_from(exe, env(&all)), Some(PathBuf::from("/c/rpcs3/RPCS3.buf")));
+        assert_eq!(lock_path_from(exe, env(&all[1..])), Some(PathBuf::from("/f/rpcs3/RPCS3.buf")));
+        assert_eq!(
+            lock_path_from(exe, env(&all[2..])),
+            Some(PathBuf::from("/h/.cache/rpcs3/RPCS3.buf"))
+        );
+        assert_eq!(lock_path_from(exe, env(&[])), None);
+    }
+
+    #[test]
+    fn flatpak_lock_path_is_inside_its_sandbox() {
+        let env = |key: &str| (key == "HOME").then(|| OsString::from("/h"));
+        assert_eq!(
+            lock_path_from(Path::new("flatpak:net.rpcs3.RPCS3"), env),
+            Some(PathBuf::from("/h/.var/app/net.rpcs3.RPCS3/cache/rpcs3/RPCS3.buf"))
+        );
+        assert_eq!(lock_path_from(Path::new("flatpak:../x"), env), None);
+        assert_eq!(lock_path_from(Path::new("flatpak:a/b"), env), None);
     }
 
     #[test]

@@ -210,10 +210,11 @@ exists.
   (`<cache dir>/RPCS3.buf`) before it reads `--headless`, so a second
   instance shows RPCS3's modal fatal-error window, waits for the user to
   close it, and then kills itself (`report_fatal_error` in
-  `rpcs3/rpcs3.cpp`). `install_pkg` waits with it, then sees a non-success
-  exit and returns `InstallFailed`. RPSN-0138 adds a check before launch.
-- **Two installs at once.** The same lock; the second fails the same way.
-  RPSN-0138.
+  `rpcs3/rpcs3.cpp`). So `install_pkg` test-locks that file before launch
+  and returns `AlreadyRunning` while RPCS3 holds it (RPSN-0138). RPCS3
+  opened between that check and the launch still meets the window.
+- **Two installs at once.** The same lock. `install_pkg` queues them, so
+  each waits for the one before it to finish (RPSN-0138).
 - **RPCS3 hangs.** The call never returns, as today. No timeout is added: a
   large package can take minutes and no figure would be right.
 - **RPCS3 refuses the package** (wrong TARGET_APP_VER, a damaged file).
