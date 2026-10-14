@@ -1883,8 +1883,13 @@ existing item are noted on that item instead.
   Source: rpcs3-source-review-2026-10-13 finding 2.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0138] **Run one RPCS3 install at a time, and not while RPCS3 is open.**
+- ✅ [RPSN-0138] **Run one RPCS3 install at a time, and not while RPCS3 is open.**
   Each Install button starts its own RPCS3 process (src/egui/results.rs, content_browser.rs). RPCS3 holds a lock on <cache dir>/RPCS3.buf and aborts a second instance with "Another instance of RPCS3 is running" (rpcs3/rpcs3.cpp). Remedy: queue installs one at a time (or pass one folder of packages), and check for a running RPCS3 first and tell the user to close it. RPSN-0058 depends on this.
+  Resolved 2026-10-14 (944181f): install_pkg queues installs behind one
+  shared lock and test-locks RPCS3.buf before launch, returning
+  AlreadyRunning while RPCS3 is open. Hand test still owed: press
+  Install with RPCS3 open, and two Installs at once, in the real window
+  app.
   **Layman:** Installing while RPCS3 is open, or two at once, fails.
   Kind: fix.
   Source: rpcs3-source-review-2026-10-13 finding 3.
