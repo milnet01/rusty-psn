@@ -1,7 +1,7 @@
 <!-- ants-spec-format: 1 -->
 # RPSN-0137 — Install through headless RPCS3 and confirm what it installed
 
-**Status:** spec draft (2026-10-14).
+**Status:** accepted (2026-10-14).
 **Kind:** fix.
 **Source:** ROADMAP RPSN-0137 (rpcs3-source-review-2026-10-13 finding 2).
 
@@ -123,16 +123,16 @@ package `version` and PARAM.SFO's APP_VER share the `XX.YY` form.
 | Caller | Check passed |
 |---|---|
 | Window app Install (`src/egui/results.rs`) | `AppVersion` with the package's `version`, `dev_hdd0` from `settings.rpcs3_config_dir` through `config::resolve_dev_hdd0`; `Unconfirmed` when that setting is empty |
-| Command line `--install` | `AppVersion` with the package's `version`, `dev_hdd0` from `--rpcs3-config-dir`, else `auto_detect::detect_rpcs3`; `Unconfirmed` when neither gives one |
+| Command line `--install` | `AppVersion` with the package's `version`, `dev_hdd0` from `--rpcs3-config-dir`, else `auto_detect::detect_rpcs3` when `--rpcs3-executable` is not given; `Unconfirmed` otherwise |
 | Content browser patch Install | `AppVersion` with `version: None` (`ContentPatch` carries no version), `dev_hdd0` as for the window app; `Unconfirmed` when `settings.rpcs3_config_dir` is empty |
 | `content::install_dlc_zip` | `Unconfirmed` |
 
 ### 4.4 What the user sees
 
 - **Window app.** `Confirmed`: the success toast and the "Installed in
-  RPCS3" pill, as today. `Unconfirmed`: the pill, and a warning toast saying
-  RPCS3 finished but rusty-psn could not check the result until the RPCS3
-  folder is set in Settings. `Err`: the error toast, as today.
+  RPCS3" pill, as today. `Unconfirmed`: a warning toast saying RPCS3 finished
+  but rusty-psn could not check the result until the RPCS3 folder is set in
+  Settings; no pill, so the Install button stays. `Err`: the error toast, as today.
 - **Command line.** `Confirmed`: "Installed successfully.". `Unconfirmed`: a
   line saying RPCS3 finished and the install was not checked, naming
   `--rpcs3-config-dir`; not counted as a failure. `Err`: counted as a failure,
@@ -220,9 +220,9 @@ exists.
   Headless RPCS3 still exits 0; the version check reports `NotInstalled`.
   Under `Unconfirmed` this is reported as unchecked, which is the point of
   that outcome.
-- **dev_hdd0 moved after detection.** The check reads the wrong folder and
-  reports `NotInstalled { found: None }`: a false failure, never a false
-  success.
+- **dev_hdd0 moved after detection.** The check reads the wrong folder: a
+  false `NotInstalled`, or, with `version: Some`, a false `Confirmed` where
+  that folder already holds the version.
 
 ## 7. Tests
 

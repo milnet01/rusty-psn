@@ -1845,6 +1845,10 @@ existing item are noted on that item instead.
 
 - 📋 [RPSN-0137] **Install with RPCS3's headless mode and confirm by reading the installed version.**
   install_pkg (src/rpcs3/mod.rs) runs `rpcs3 --installpkg <pkg>` and trusts exit 0. In window mode RPCS3 starts the install and keeps running (rpcs3/rpcs3.cpp, checked at 6fe3c87), so the call returns only when the user closes RPCS3, and the exit code says nothing about the install. With --headless it installs with no window and returns 0 regardless; --no-gui refuses. Remedy: pass --headless, then confirm by re-reading dev_hdd0/game/<SERIAL>/PARAM.SFO APP_VER. Not verified: the headless path makes a compatibility network request.
+  Spec: docs/specs/RPSN-0137-headless-confirmed-install.md, accepted
+  2026-10-14 after review-contract (2 loops, cap reached, 6 verified and
+  fixed). Settled while writing it: headless RPCS3 makes no network
+  request (RequestCompatibility defaults to offline).
   **Layman:** Install waits until RPCS3 is closed, and reports success even when nothing installed.
   Kind: fix.
   Source: rpcs3-source-review-2026-10-13 finding 2.
