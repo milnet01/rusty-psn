@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=151 -->
+<!-- ants-roadmap-id-high-water: RPSN=152 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1765,6 +1765,25 @@ reviewer proposed; check both against the code before fixing.
   Kind: security.
   Source: in-session-2026-10-14 upstream PR survey.
   Lanes: PSN.
+
+- 🚧 [RPSN-0152] **Follow the fixes offered to the upstream author.**
+  Opened 2026-10-14 on RainbowCookie32/rusty-psn, base dev, from fork
+  branches: #359 unsafe title id (upstream/title-id), #360 titles with
+  an entity (upstream/title-entities), #361 reader errors
+  (upstream/xml-errors), #362 Sony-only certificate bypass
+  (upstream/tls-scope). #359-#361 each add a mod tests at the end of
+  src/psn/parser.rs, so they conflict trivially with each other.
+  Comment on the author's draft #356 (CLI rewrite): empty selection
+  downloads all, only first -t read, exit code always 0, busy-wait loop.
+  Held back: deleting a package that fails its checksum (upstream
+  create_pkg_file returns no path, and no harness can force a mismatch).
+  Other fork fixes are fork-only features and were not offered.
+  Next: gh pr list -R RainbowCookie32/rusty-psn --author milnet01;
+  answer review comments; delete a fork branch once its PR closes.
+  **Layman:** Four fixes were sent to the original author; watch for replies and answer them.
+  Kind: chore.
+  Source: user-request-2026-10-14 share fixes upstream.
+  Lanes: PSN, Command line.
 
 ## 15. RPCS3 source review (2026-10-13)
 
