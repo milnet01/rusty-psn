@@ -81,6 +81,8 @@ pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), Par
     let mut err_code_encountered = false;
 
     loop {
+        // quick-xml appends each event to the buffer; cleared here so the "Code" arm's `continue` clears it too.
+        event_buf.clear();
         match reader.read_event_into(&mut event_buf) {
             Ok(Event::Start(e)) => {
                 depth += 1;
