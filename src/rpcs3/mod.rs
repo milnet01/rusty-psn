@@ -95,54 +95,21 @@ pub fn scan_library(installation: &Rpcs3Installation) -> Result<Vec<InstalledGam
             continue;
         }
 
-        // Try SFO sources in priority order.
-        // 1. dev_hdd0/game/{serial}/PARAM.SFO — has installed update version (APP_VER).
-        let hdd0_sfo_path = game_dir.join(serial).join("PARAM.SFO");
-        let hdd0_sfo = if hdd0_sfo_path.exists() {
-            match sfo::parse_sfo(&hdd0_sfo_path) {
-                Ok(params) => Some(params),
-                Err(e) => {
-                    warn!("Failed to parse dev_hdd0 PARAM.SFO for {serial}: {e}");
-                    None
-                }
-            }
-        } else {
-            None
-        };
+        // dev_hdd0/game/{serial}/PARAM.SFO holds an installed update's APP_VER.
+        let hdd0_sfo = read_sfo(&game_dir.join(serial).join("PARAM.SFO"));
+        // The game's own PARAM.SFO; an ISO's is inside the image, which is not read.
+        let game_sfo = read_sfo(&game_sfo_path(game_path));
 
-        // 2. {game_path}/PS3_GAME/PARAM.SFO — for .PS3/ folder-format games on disc.
-        // Also read it when the dev_hdd0 SFO gives no version (a disc game with no update installed).
-        let disc_sfo = if hdd0_sfo.as_ref().and_then(|sfo| sfo.app_ver.as_ref()).is_none() {
-            let disc_sfo_path = game_path.join("PS3_GAME").join("PARAM.SFO");
-            if disc_sfo_path.exists() {
-                match sfo::parse_sfo(&disc_sfo_path) {
-                    Ok(params) => Some(params),
-                    Err(e) => {
-                        warn!("Failed to parse disc PARAM.SFO for {serial}: {e}");
-                        None
-                    }
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // Determine title: prefer hdd0 SFO, then disc SFO, then extract from filename.
+        // Determine title: prefer hdd0 SFO, then the game's own SFO, then extract from filename.
         let title = if let Some(ref sfo) = hdd0_sfo {
             sfo.title.clone()
-        } else if let Some(ref sfo) = disc_sfo {
+        } else if let Some(ref sfo) = game_sfo {
             sfo.title.clone()
         } else {
             title_from_path(game_path)
         };
 
-        // Installed version comes from dev_hdd0 SFO (the update data), else from the disc.
-        let installed_version = hdd0_sfo
-            .as_ref()
-            .and_then(|sfo| sfo.app_ver.clone())
-            .or_else(|| disc_sfo.as_ref().and_then(|sfo| sfo.app_ver.clone()));
+        let installed_version = shown_version(game_sfo.as_ref(), hdd0_sfo.as_ref());
 
         installed_games.push(InstalledGame {
             serial: serial.clone(),
@@ -200,14 +167,61 @@ fn hdd0_games(game_dir: &Path) -> Vec<InstalledGame> {
         if !looks_like_serial(&sfo.title_id) {
             continue;
         }
+        let installed_version = shown_version(Some(&sfo), None);
         games.push(InstalledGame {
             serial: sfo.title_id,
             title: sfo.title,
-            installed_version: sfo.app_ver,
+            installed_version,
             game_path,
         });
     }
     games
+}
+
+/// A parsed PARAM.SFO, or `None` where there is none or it cannot be read.
+fn read_sfo(path: &Path) -> Option<sfo::SfoParams> {
+    if !path.is_file() {
+        return None;
+    }
+    sfo::parse_sfo(path)
+        .inspect_err(|e| warn!("Failed to parse {}: {e}", path.display()))
+        .ok()
+}
+
+/// Where a games.yml game keeps its own PARAM.SFO, as `get_sfo_dir_from_game_path` in
+/// rpcs3/Emu/system_utils.cpp (RPCS3 commit 6fe3c87) finds it: a disc game, marked by
+/// PS3_DISC.SFB, in PS3_GAME; any other game at its root. A folder with neither file falls
+/// back to PS3_GAME, which RPCS3 would not list at all.
+fn game_sfo_path(game_path: &Path) -> PathBuf {
+    let root_sfo = game_path.join("PARAM.SFO");
+    if !game_path.join("PS3_DISC.SFB").is_file() && root_sfo.is_file() {
+        return root_sfo;
+    }
+    game_path.join("PS3_GAME").join("PARAM.SFO")
+}
+
+/// The version RPCS3 shows for a game (`apply_patches` in rpcs3/Emu/game_enumeration.h and
+/// `GetGameVersion` in rpcs3/rpcs3qt/gui_game_info.cpp, RPCS3 commit 6fe3c87). A disc game,
+/// or one whose PARAM.SFO cannot be read, takes an installed patch's APP_VER where it is
+/// higher than its own or it has none. With no APP_VER, the game's VERSION is shown.
+fn shown_version(game: Option<&sfo::SfoParams>, patch: Option<&sfo::SfoParams>) -> Option<String> {
+    let mut app_ver = game.and_then(|game| game.app_ver.clone());
+    let takes_patches = game.is_none_or(|game| game.category == "DG");
+    let patch_ver = patch
+        .filter(|patch| patch.category != "DG")
+        .and_then(|patch| patch.app_ver.clone());
+    if let Some(patch_ver) = patch_ver.filter(|_| takes_patches) {
+        if app_ver.as_deref().is_none_or(|own| version_is_bigger(&patch_ver, own)) {
+            app_ver = Some(patch_ver);
+        }
+    }
+    app_ver.or_else(|| game.map(|game| game.version.clone()).filter(|version| !version.is_empty()))
+}
+
+/// `version_is_bigger` in rpcs3/Emu/system_utils.cpp: both versions read as decimal numbers,
+/// and a version that does not read as one is never bigger.
+fn version_is_bigger(v0: &str, v1: &str) -> bool {
+    matches!((v0.parse::<f64>(), v1.parse::<f64>()), (Ok(v0), Ok(v1)) if v0 > v1)
 }
 
 /// Extract a human-readable game title from a file path.
@@ -554,6 +568,72 @@ mod tests {
 
         assert_eq!(games.len(), 1);
         assert_eq!(games[0].installed_version.as_deref(), Some("01.05"));
+    }
+
+    fn sfo_with(category: &str, app_ver: Option<&str>, version: &str) -> sfo::SfoParams {
+        sfo::SfoParams {
+            title: String::new(),
+            title_id: "BCUS99999".to_string(),
+            app_ver: app_ver.map(str::to_string),
+            version: version.to_string(),
+            category: category.to_string(),
+        }
+    }
+
+    #[test]
+    fn shown_version_follows_rpcs3() {
+        // RPCS3 keeps the higher of a disc's and its patch's APP_VER (RPSN-0140).
+        let disc = |app_ver| sfo_with("DG", app_ver, "01.00");
+        let patch = sfo_with("GD", Some("01.05"), "01.00");
+        assert_eq!(
+            shown_version(Some(&disc(Some("01.02"))), Some(&patch)).as_deref(),
+            Some("01.05")
+        );
+        assert_eq!(
+            shown_version(Some(&disc(Some("01.10"))), Some(&patch)).as_deref(),
+            Some("01.10")
+        );
+        assert_eq!(shown_version(Some(&disc(None)), Some(&patch)).as_deref(), Some("01.05"));
+        // An unreadable disc, such as an ISO, takes the patch.
+        assert_eq!(shown_version(None, Some(&patch)).as_deref(), Some("01.05"));
+        // A version that does not read as a number is never higher.
+        let odd_patch = sfo_with("GD", Some("v2"), "01.00");
+        assert_eq!(
+            shown_version(Some(&disc(Some("01.00"))), Some(&odd_patch)).as_deref(),
+            Some("01.00")
+        );
+        // Only a disc game takes patches.
+        let psn_game = sfo_with("HG", Some("01.00"), "01.00");
+        assert_eq!(shown_version(Some(&psn_game), Some(&patch)).as_deref(), Some("01.00"));
+        // With no APP_VER, RPCS3 shows VERSION.
+        assert_eq!(
+            shown_version(Some(&sfo_with("HG", None, "01.03")), None).as_deref(),
+            Some("01.03")
+        );
+        assert_eq!(shown_version(Some(&sfo_with("HG", None, "")), None), None);
+    }
+
+    #[test]
+    fn scan_library_reads_an_external_game_at_its_root() {
+        // An external HG game keeps PARAM.SFO at its root, not in PS3_GAME (RPSN-0140).
+        let root = tempfile::tempdir().unwrap();
+        let game_path = root.path().join("external");
+        std::fs::create_dir_all(&game_path).unwrap();
+        std::fs::write(game_path.join("PARAM.SFO"), sfo::tests::make_test_sfo()).unwrap();
+        let installation = installation_with(root.path(), &format!("BCUS99999: {}/\n", game_path.display()));
+
+        let games = scan_library(&installation).unwrap();
+
+        assert_eq!(games[0].title, "Test Game");
+        assert_eq!(games[0].installed_version.as_deref(), Some("01.05"));
+    }
+
+    #[test]
+    fn a_disc_game_reads_ps3_game_even_with_a_root_param_sfo() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("PS3_DISC.SFB"), b"").unwrap();
+        std::fs::write(root.path().join("PARAM.SFO"), b"").unwrap();
+        assert_eq!(game_sfo_path(root.path()), root.path().join("PS3_GAME/PARAM.SFO"));
     }
 
     fn installation_with(root: &Path, games_yml: &str) -> Rpcs3Installation {
