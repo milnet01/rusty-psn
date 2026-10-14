@@ -1589,8 +1589,12 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 check-code typos.
   Lanes: Window app, PSN, Docs.
 
-- 📋 [RPSN-0124] **Update STANDARDS.md's download-flow diagram.**
+- ✅ [RPSN-0124] **Update STANDARDS.md's download-flow diagram.**
   STANDARDS.md 3.4 Download Flow says the file is truncated before streaming. The code resumes with Range/If-Range, and since 981f8ff an HTTP error status leaves the partial file untouched. Already stale before that commit.
+  Resolved (2026-10-14, 6cd23bd): § 3.4 diagram redrawn from
+  start_download: HEAD, resume with Range/If-Range, error status leaves
+  the file, the three resume answers, per-chunk pause/abort, short file
+  kept and whole file deleted on a failed checksum.
   **Layman:** A diagram describes the old download steps.
   Kind: doc-fix.
   Source: audit-2026-10-12 close-findings sweep.
@@ -1673,7 +1677,7 @@ reviewer proposed; check both against the code before fixing.
   Source: ants-projects-hub-website session 2026-10-12 (shot 3 review).
   Lanes: UI.
 
-- 📋 [RPSN-0132] **Fix two stale passages in STANDARDS.md seen during the 2026-10-12 fixes.**
+- ✅ [RPSN-0132] **Fix two stale passages in STANDARDS.md seen during the 2026-10-12 fixes.**
   1. § 4 (Domain model notes) spells `PlaformVariant`; the type is
      PlatformVariant.
   2. The technical-debt list says a new reqwest::Client is built for
@@ -1683,6 +1687,10 @@ reviewer proposed; check both against the code before fixing.
   Also (2026-10-14): § 10.1's unit-test table and the "Total: 48 tests"
   line are stale counts (the suite runs 111 tests). Replace the counts
   with test names or drop them, per the no-counts writing rule.
+  Resolved (2026-10-14, 6cd23bd; spelling in 526360b): § 11 drops
+  serde_yaml, client per request, blocking_lock and per-frame cloning,
+  all gone from the code; busy-wait and newline items still true and
+  kept. § 10.1/10.2 counts removed; the list command named instead.
   **Layman:** Two places in the project notes say things that are no longer true.
   Kind: doc-fix.
   Source: in-session-2026-10-12 (check-doc-facts over STANDARDS.md).
