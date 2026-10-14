@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=146 -->
+<!-- ants-roadmap-id-high-water: RPSN=147 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1641,6 +1641,18 @@ reviewer proposed; check both against the code before fixing.
   Kind: doc-fix.
   Source: review-contract design.md 2026-10-14 loop 5 lane 2.
   Lanes: Content.
+
+- 📋 [RPSN-0147] **Follow XDG_CONFIG_HOME and a portable folder when finding RPCS3 on Linux and macOS.**
+  fs::get_config_dir (Utilities/File.cpp, RPCS3 commit 6fe3c87) uses
+  a portable/ folder beside the executable first on every system, and
+  on Linux $XDG_CONFIG_HOME/rpcs3/ before ~/.config/rpcs3/.
+  get_candidate_paths (src/rpcs3/auto_detect.rs) checks neither.
+  Remedy: add $XDG_CONFIG_HOME/rpcs3 ahead of ~/.config/rpcs3, and a
+  portable/ folder beside an rpcs3 found on PATH.
+  **Layman:** If RPCS3's settings live somewhere other than the usual folder, the app does not find them.
+  Kind: fix.
+  Source: in-session-2026-10-14 RPSN-0115 research.
+  Lanes: RPCS3.
 
 ## 15. RPCS3 source review (2026-10-13)
 
