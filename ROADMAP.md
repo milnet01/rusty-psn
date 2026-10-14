@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=150 -->
+<!-- ants-roadmap-id-high-water: RPSN=151 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1543,8 +1543,19 @@ reviewer proposed; check both against the code before fixing.
   Source: audit-2026-10-12 review-code lane 4 LOW.
   Lanes: RPCS3, Content.
 
-- 📋 [RPSN-0121] **Harden the GitHub workflows zizmor flagged.**
+- ✅ [RPSN-0121] **Harden the GitHub workflows zizmor flagged.**
   zizmor, 25 findings over the 4 workflows: unpinned-uses 15 (High), artipacked 4, excessive-permissions 4, template-injection 1 (main.yml:54, informational), superfluous-actions 1 (:134). The workflows are the upstream author's; decide with the fork (RPSN-0096).
+  Resolved 2026-10-14 (11d1b40). Every action pinned to a commit at its
+  latest release; checkouts drop the token; workflows read-only by
+  default with per-job rights, each commented; the macOS bundle version
+  passes through an environment variable. Kept:
+  softprops/action-gh-release (zizmor informational note) because the
+  release job runs only on master and cannot be tried. Tested: zizmor
+  clean at the default level (bar that note) and no warning at the
+  auditor level; actionlint clean; main.yml and audit.yml passed on
+  GitHub at 11d1b40 on all three systems. Not run yet: clippy.yml and
+  rustfmt.yml (pull requests only), the release job and
+  remove-old-artifacts (master only).
   **Layman:** Tighten the automated build scripts' security settings.
   Kind: audit-fix.
   Source: audit-2026-10-12 check-code zizmor.
@@ -1741,6 +1752,19 @@ reviewer proposed; check both against the code before fixing.
   Kind: perf.
   Source: in-session-2026-10-14 RPSN-0120.
   Lanes: Window app, RPCS3, Content.
+
+- 📋 [RPSN-0151] **Cap Sony replies while reading them, not after.**
+  UpdateInfo::get_info (update XML and manifest, src/psn/mod.rs) and
+  the firmware list fetch (src/psn/firmware.rs) check Content-Length,
+  then call response.text(), then check the length. A chunked reply
+  with no Content-Length is read whole before the second check, so
+  MAX_METADATA_SIZE and MAX_FIRMWARE_LIST_SIZE bound nothing there.
+  Remedy: read the body in chunks (response.chunk()) and stop past
+  the cap.
+  **Layman:** A reply from Sony with no stated size is read whole into memory before its size is checked.
+  Kind: security.
+  Source: in-session-2026-10-14 upstream PR survey.
+  Lanes: PSN.
 
 ## 15. RPCS3 source review (2026-10-13)
 
