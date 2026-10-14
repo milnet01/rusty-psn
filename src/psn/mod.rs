@@ -17,7 +17,7 @@ use tokio::io::{AsyncSeekExt, AsyncWriteExt, SeekFrom};
 use tokio::sync::mpsc::Sender;
 #[cfg(feature = "egui")]
 use utils::copy_pkg_file;
-use utils::{get_platform_variant, get_update_info_url, PlatformVariant};
+use utils::{get_platform_variant, get_update_info_url, read_capped_text, CappedReadError, PlatformVariant};
 
 use crate::utils::DirectoryFormat;
 
@@ -168,6 +168,15 @@ pub enum UpdateError {
     ResponseTooLarge(u64),
 }
 
+impl From<CappedReadError> for UpdateError {
+    fn from(err: CappedReadError) -> Self {
+        match err {
+            CappedReadError::Reqwest(e) => UpdateError::Reqwest(e),
+            CappedReadError::TooLarge(size) => UpdateError::ResponseTooLarge(size),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct UpdateInfo {
     pub title_id: String,
@@ -220,20 +229,7 @@ impl UpdateInfo {
         info!("Querying for updates for serial: {}", title_id);
 
         let response = client.get(url).send().await.map_err(UpdateError::Reqwest)?;
-
-        // Check response size before reading the body into memory.
-        if let Some(len) = response.content_length() {
-            if len > crate::security::MAX_METADATA_SIZE {
-                return Err(UpdateError::ResponseTooLarge(len));
-            }
-        }
-
-        let response_txt = response.text().await.map_err(UpdateError::Reqwest)?;
-
-        // Double-check the actual body size (chunked encoding can bypass Content-Length).
-        if response_txt.len() as u64 > crate::security::MAX_METADATA_SIZE {
-            return Err(UpdateError::ResponseTooLarge(response_txt.len() as u64));
-        }
+        let response_txt = read_capped_text(response, crate::security::MAX_METADATA_SIZE).await?;
 
         if response_txt.is_empty() {
             return Err(UpdateError::NoUpdatesAvailable);
@@ -284,15 +280,7 @@ impl UpdateInfo {
             crate::security::validate_download_url(&package.manifest_url).map_err(UpdateError::Security)?;
 
             let manifest_response = client.get(&package.manifest_url).send().await.map_err(UpdateError::Reqwest)?;
-            if let Some(len) = manifest_response.content_length() {
-                if len > crate::security::MAX_METADATA_SIZE {
-                    return Err(UpdateError::ResponseTooLarge(len));
-                }
-            }
-            let manifest_response_txt = manifest_response.text().await.map_err(UpdateError::Reqwest)?;
-            if manifest_response_txt.len() as u64 > crate::security::MAX_METADATA_SIZE {
-                return Err(UpdateError::ResponseTooLarge(manifest_response_txt.len() as u64));
-            }
+            let manifest_response_txt = read_capped_text(manifest_response, crate::security::MAX_METADATA_SIZE).await?;
             match manifest_parser::parse_manifest_response(manifest_response_txt, &package, &mut info) {
                 Ok(()) => {}
                 Err(e) => {

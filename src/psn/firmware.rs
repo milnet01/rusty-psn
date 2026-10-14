@@ -10,6 +10,7 @@ use quick_xml::XmlVersion;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::Sender;
 
+use super::utils::{read_capped_text, CappedReadError};
 use super::{DownloadError, DownloadStatus, CANCEL_ABORT, CANCEL_NONE};
 
 /// Maximum firmware list response size: 1 MB.
@@ -300,6 +301,15 @@ fn get_firmware_list_url(console: FirmwareConsole, region: FirmwareRegion) -> St
     }
 }
 
+impl From<CappedReadError> for FirmwareError {
+    fn from(err: CappedReadError) -> Self {
+        match err {
+            CappedReadError::Reqwest(e) => Self::Reqwest(e),
+            CappedReadError::TooLarge(size) => Self::ResponseTooLarge(size),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Fetch
 // ---------------------------------------------------------------------------
@@ -317,18 +327,7 @@ pub async fn fetch_firmware(
     info!("Fetching firmware list from {url}");
 
     let response = client.get(&url).send().await.map_err(FirmwareError::Reqwest)?;
-
-    if let Some(len) = response.content_length() {
-        if len > MAX_FIRMWARE_LIST_SIZE {
-            return Err(FirmwareError::ResponseTooLarge(len));
-        }
-    }
-
-    let body = response.text().await.map_err(FirmwareError::Reqwest)?;
-
-    if body.len() as u64 > MAX_FIRMWARE_LIST_SIZE {
-        return Err(FirmwareError::ResponseTooLarge(body.len() as u64));
-    }
+    let body = read_capped_text(response, MAX_FIRMWARE_LIST_SIZE).await?;
 
     if body.is_empty() {
         return Err(FirmwareError::NoFirmwareFound);

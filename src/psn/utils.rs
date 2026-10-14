@@ -88,6 +88,36 @@ fn hmac_url_hash(hex_key: &str, title_id: &str) -> Result<String, UpdateError> {
     Ok(hex::encode(hash_bytes))
 }
 
+#[derive(Debug)]
+pub enum CappedReadError {
+    Reqwest(reqwest::Error),
+    /// The reply passed the cap. Holds its stated length, or the bytes read before reading stopped.
+    TooLarge(u64),
+}
+
+/// Read a reply's body as text, refusing it once it passes `cap` bytes.
+/// Content-Length is checked first, but a chunked reply carries none, so the body is also
+/// counted as it arrives and reading stops past the cap (RPSN-0151).
+/// Decodes as `Response::text` does without reqwest's `charset` feature: UTF-8, lossy.
+pub async fn read_capped_text(mut response: reqwest::Response, cap: u64) -> Result<String, CappedReadError> {
+    if let Some(len) = response.content_length() {
+        if len > cap {
+            return Err(CappedReadError::TooLarge(len));
+        }
+    }
+
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(CappedReadError::Reqwest)? {
+        let read = body.len() as u64 + chunk.len() as u64;
+        if read > cap {
+            return Err(CappedReadError::TooLarge(read));
+        }
+        body.extend_from_slice(&chunk);
+    }
+
+    Ok(String::from_utf8_lossy(&body).into_owned())
+}
+
 #[cfg(feature = "egui")]
 const MERGE_CHUNK_SIZE: usize = 1024 * 1024 * 128;
 #[cfg(feature = "egui")]
@@ -114,4 +144,61 @@ pub async fn copy_pkg_file(src_path: &PathBuf, target_path: &PathBuf, offset: u6
     let mut reader = BufReader::with_capacity(MERGE_CHUNK_SIZE, src_file);
     let read_bytes = copy_buf(&mut reader, &mut writer).await?;
     Ok(read_bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{read_capped_text, CappedReadError};
+    use std::io::{Read, Write};
+    use std::thread::JoinHandle;
+
+    const CHUNK: usize = 1024;
+
+    /// Serve one chunked reply with no Content-Length on a local port, `total` bytes long.
+    /// The thread returns how many bytes it wrote before the client hung up.
+    fn serve_chunked(total: usize) -> (String, JoinHandle<usize>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let _ = stream.read(&mut [0u8; 1024]);
+            let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
+            let chunk = format!("{CHUNK:x}\r\n{}\r\n", "a".repeat(CHUNK));
+            let mut sent = 0;
+            while sent < total && stream.write_all(chunk.as_bytes()).is_ok() {
+                sent += CHUNK;
+            }
+            let _ = stream.write_all(b"0\r\n\r\n");
+            sent
+        });
+        (url, server)
+    }
+
+    #[tokio::test]
+    async fn a_chunked_reply_stops_being_read_past_the_cap() {
+        // A reply with no Content-Length used to be read whole before its size was checked (RPSN-0151).
+        let total = 64 * 1024 * 1024;
+        let (url, server) = serve_chunked(total);
+        let client = reqwest::Client::new();
+        let response = client.get(&url).send().await.unwrap();
+
+        let result = read_capped_text(response, 4 * CHUNK as u64).await;
+        drop(client);
+
+        assert!(matches!(result, Err(CappedReadError::TooLarge(_))));
+        // Joined off the runtime, which must stay free to close the dropped connection.
+        let sent = tokio::task::spawn_blocking(move || server.join().unwrap()).await.unwrap();
+        assert!(sent < total, "the whole reply was read");
+    }
+
+    #[tokio::test]
+    async fn a_chunked_reply_within_the_cap_is_returned_whole() {
+        let (url, server) = serve_chunked(3 * CHUNK);
+        let response = reqwest::Client::new().get(&url).send().await.unwrap();
+
+        let text = read_capped_text(response, 3 * CHUNK as u64).await.unwrap();
+
+        assert_eq!(text, "a".repeat(3 * CHUNK));
+        tokio::task::spawn_blocking(move || server.join().unwrap()).await.unwrap();
+    }
 }

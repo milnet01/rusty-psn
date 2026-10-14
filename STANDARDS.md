@@ -259,7 +259,7 @@ These are well-known public keys used across PS4/PSVita homebrew/emulation tooli
 
 - Serial format validated via `security::validate_serial()` (9 alphanumeric chars, known prefixes)
 - Batch file size limited to 1 MB, YAML config size limited to 10 MB, SFO files to 1 MB
-- Metadata responses limited to `MAX_METADATA_SIZE` (1 MB) — both Content-Length and body size checked
+- Metadata responses limited to `MAX_METADATA_SIZE`, the firmware list to `MAX_FIRMWARE_LIST_SIZE` — `psn::utils::read_capped_text` checks Content-Length, then counts the body as it arrives and stops past the cap
 - Download paths validated for containment within the configured base directory
 
 ### 5.6 Path Containment
