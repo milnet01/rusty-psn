@@ -782,14 +782,56 @@ impl UpdatesApp {
     }
 }
 
-// Status pill colors. Kept consistent across the result header and per-package rows so
-// that "green/blue/yellow/red/gray" carries the same meaning everywhere in the results list.
-const STATUS_COLOR_DONE: egui::Color32 = egui::Color32::from_rgb(80, 200, 120);
-const STATUS_COLOR_ACTIVE: egui::Color32 = egui::Color32::from_rgb(100, 180, 255);
-const STATUS_COLOR_PAUSED: egui::Color32 = egui::Color32::from_rgb(240, 200, 80);
-const STATUS_COLOR_FAILED: egui::Color32 = egui::Color32::from_rgb(240, 100, 100);
-const STATUS_COLOR_QUEUED: egui::Color32 = egui::Color32::from_rgb(170, 170, 170);
-const LATEST_BADGE_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 215, 80);
+/// What a status label means. Each pairs a colour with an icon, and every label carries words too,
+/// so no status is told by colour alone (RPSN-0144). The same kind looks the same everywhere.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum StatusKind {
+    /// Finished, installed or up to date.
+    Done,
+    /// Downloading.
+    Active,
+    /// Verifying, merging, installing or checking: busy, nothing to do yet.
+    Working,
+    Paused,
+    Failed,
+    /// Waiting its turn.
+    Queued,
+    /// Needs a look, such as an update that is available or a folder that is wrong.
+    Attention,
+}
+
+impl StatusKind {
+    fn icon(self) -> &'static str {
+        match self {
+            StatusKind::Done => "\u{2714}",      // ✔
+            StatusKind::Active => "\u{2B07}",    // ⬇
+            StatusKind::Working => "\u{231B}",   // ⌛
+            StatusKind::Paused => "\u{23F8}",    // ⏸
+            StatusKind::Failed => "\u{2716}",    // ✖
+            StatusKind::Queued => "\u{2022}",    // •
+            StatusKind::Attention => "\u{26A0}", // ⚠
+        }
+    }
+
+    /// The colour for this status, darker on a light theme so it stays readable there.
+    fn color(self, visuals: &egui::Visuals) -> egui::Color32 {
+        let (dark, light) = match self {
+            StatusKind::Done => ((80, 200, 120), (0, 120, 50)),
+            StatusKind::Active => ((100, 180, 255), (0, 80, 180)),
+            StatusKind::Working | StatusKind::Paused => ((240, 200, 80), (140, 90, 0)),
+            StatusKind::Failed => ((240, 100, 100), (180, 20, 20)),
+            StatusKind::Queued => ((170, 170, 170), (90, 90, 90)),
+            StatusKind::Attention => ((255, 170, 60), (160, 70, 0)),
+        };
+        let (r, g, b) = if visuals.dark_mode { dark } else { light };
+        egui::Color32::from_rgb(r, g, b)
+    }
+}
+
+/// The colour of the "Latest" badge, from the same palette as the status labels.
+fn latest_badge_color(visuals: &egui::Visuals) -> egui::Color32 {
+    StatusKind::Attention.color(visuals)
+}
 
 /// Solid background color for the per-platform badge in the result header.
 fn platform_color(variant: utils::PlatformVariant) -> egui::Color32 {
@@ -810,11 +852,12 @@ fn platform_badge(ui: &mut egui::Ui, variant: utils::PlatformVariant) {
     );
 }
 
-/// Render a colored bullet followed by a label so a status reads at a glance.
-fn status_pill(ui: &mut egui::Ui, text: &str, color: egui::Color32) {
+/// Render a status as an icon and words in the status's colour, so it reads at a glance.
+fn status_pill(ui: &mut egui::Ui, text: &str, kind: StatusKind) {
+    let color = kind.color(ui.visuals());
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
-        ui.label(egui::RichText::new("\u{25CF}").color(color));
+        ui.label(egui::RichText::new(kind.icon()).color(color));
         ui.label(egui::RichText::new(text).color(color).strong());
     });
 }
@@ -914,6 +957,34 @@ mod tests {
         assert_eq!(settings.directory_format, crate::utils::DirectoryFormat::TitleSerial);
         assert_eq!(settings.max_concurrent_downloads, 7);
         assert_eq!(settings.text_size_percent, 150);
+    }
+
+    #[test]
+    fn no_two_statuses_look_the_same() {
+        // A status told apart by colour alone fails a reader who cannot see the colour (RPSN-0144).
+        let kinds = [
+            StatusKind::Done,
+            StatusKind::Active,
+            StatusKind::Working,
+            StatusKind::Paused,
+            StatusKind::Failed,
+            StatusKind::Queued,
+            StatusKind::Attention,
+        ];
+        for (i, a) in kinds.iter().enumerate() {
+            for b in &kinds[i + 1..] {
+                assert_ne!(a.icon(), b.icon(), "{a:?} and {b:?} share an icon");
+            }
+        }
+    }
+
+    #[test]
+    fn status_colours_follow_the_theme() {
+        // A pale colour that reads on a dark background washes out on a light one (RPSN-0062).
+        let (dark, light) = (egui::Visuals::dark(), egui::Visuals::light());
+        for kind in [StatusKind::Done, StatusKind::Failed, StatusKind::Attention] {
+            assert_ne!(kind.color(&dark), kind.color(&light), "{kind:?}");
+        }
     }
 
     #[test]

@@ -67,14 +67,9 @@ impl UpdatesApp {
                                                 self.v.content_install_promises.iter().any(|(k, _)| *k == patch_key);
 
                                             if is_installed {
-                                                ui.label(
-                                                    egui::RichText::new("Installed").color(egui::Rgba::from_rgb(0.0, 1.0, 0.0)),
-                                                );
+                                                status_pill(ui, "Installed", StatusKind::Done);
                                             } else if is_installing {
-                                                ui.label(
-                                                    egui::RichText::new("Installing...")
-                                                        .color(egui::Rgba::from_rgb(1.0, 0.8, 0.0)),
-                                                );
+                                                status_pill(ui, "Installing…", StatusKind::Working);
                                             } else if has_rpcs3 && ui.small_button("Install").clicked() {
                                                 let exe =
                                                     self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
@@ -116,14 +111,9 @@ impl UpdatesApp {
                                                 self.v.content_install_promises.iter().any(|(k, _)| *k == dlc_key);
 
                                             if is_installed {
-                                                ui.label(
-                                                    egui::RichText::new("Installed").color(egui::Rgba::from_rgb(0.0, 1.0, 0.0)),
-                                                );
+                                                status_pill(ui, "Installed", StatusKind::Done);
                                             } else if is_installing {
-                                                ui.label(
-                                                    egui::RichText::new("Installing...")
-                                                        .color(egui::Rgba::from_rgb(1.0, 0.8, 0.0)),
-                                                );
+                                                status_pill(ui, "Installing…", StatusKind::Working);
                                             } else if has_rpcs3 && ui.small_button("Install").clicked() {
                                                 let exe =
                                                     self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");

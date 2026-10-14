@@ -199,13 +199,13 @@ impl UpdatesApp {
                             ActiveMergeStatus::Merging(progress) => {
                                 let width = ui.available_width().min(150.0);
                                 ui.add(egui::ProgressBar::new(progress).desired_width(width).show_percentage());
-                                status_pill(ui, "Merging parts…", STATUS_COLOR_PAUSED);
+                                status_pill(ui, "Merging parts…", StatusKind::Working);
                             }
                             ActiveMergeStatus::Merged => {
-                                status_pill(ui, "Parts merged", STATUS_COLOR_DONE);
+                                status_pill(ui, "Parts merged", StatusKind::Done);
                             }
                             ActiveMergeStatus::Failed => {
-                                status_pill(ui, "Parts merge failed", STATUS_COLOR_FAILED);
+                                status_pill(ui, "Parts merge failed", StatusKind::Failed);
                             }
                             _ => {}
                         }
@@ -245,25 +245,25 @@ impl UpdatesApp {
 
                     // Aggregate status pill (rendered to the left of the action buttons).
                     if completed_count == update_count {
-                        status_pill(ui, "All downloaded", STATUS_COLOR_DONE);
+                        status_pill(ui, "All downloaded", StatusKind::Done);
                     } else if failed_count > 0 {
                         let text = if completed_count > 0 {
                             format!("{completed_count}/{update_count} done · {failed_count} failed")
                         } else {
                             format!("{failed_count} failed")
                         };
-                        status_pill(ui, &text, STATUS_COLOR_FAILED);
+                        status_pill(ui, &text, StatusKind::Failed);
                     } else if in_progress_count > 0 {
                         let text = if completed_count > 0 {
                             format!("{completed_count}/{update_count} done · {in_progress_count} active")
                         } else {
                             format!("{in_progress_count} downloading")
                         };
-                        status_pill(ui, &text, STATUS_COLOR_ACTIVE);
+                        status_pill(ui, &text, StatusKind::Active);
                     } else if paused_count > 0 {
-                        status_pill(ui, &format!("{paused_count} paused"), STATUS_COLOR_PAUSED);
+                        status_pill(ui, &format!("{paused_count} paused"), StatusKind::Paused);
                     } else if completed_count > 0 {
-                        status_pill(ui, &format!("{completed_count}/{update_count} done"), STATUS_COLOR_DONE);
+                        status_pill(ui, &format!("{completed_count}/{update_count} done"), StatusKind::Done);
                     }
                 });
             })
@@ -307,7 +307,7 @@ impl UpdatesApp {
                 if is_latest {
                     ui.label(
                         egui::RichText::new("\u{2605} Latest")
-                            .color(LATEST_BADGE_COLOR)
+                            .color(latest_badge_color(ui.visuals()))
                             .strong()
                             .small(),
                     );
@@ -330,7 +330,7 @@ impl UpdatesApp {
                                     .pending_downloads
                                     .retain(|p| !(p.title_id == title_id && p.pkg.id() == pkg.id()));
                             }
-                            status_pill(ui, "Queued", STATUS_COLOR_QUEUED);
+                            status_pill(ui, "Queued", StatusKind::Queued);
                         }
                         ActiveDownloadStatus::Downloading(_) | ActiveDownloadStatus::Resuming(_, _) => {
                             abort_clicked = ui.button("Abort").clicked();
@@ -339,10 +339,10 @@ impl UpdatesApp {
                                 ActiveDownloadStatus::Resuming(_, offset) => format!("Resuming from {}", ByteSize::b(offset)),
                                 _ => "Downloading".to_string(),
                             };
-                            status_pill(ui, &label, STATUS_COLOR_ACTIVE);
+                            status_pill(ui, &label, StatusKind::Active);
                         }
                         ActiveDownloadStatus::Verifying => {
-                            status_pill(ui, "Verifying", STATUS_COLOR_PAUSED);
+                            status_pill(ui, "Verifying", StatusKind::Working);
                         }
                         ActiveDownloadStatus::Paused => {
                             if ui.button("Abort").clicked() {
@@ -373,7 +373,7 @@ impl UpdatesApp {
                                     .retain(|p| !(p.title_id == title_id && p.pkg_id == pkg.id()));
                                 self.queue_download(title_id.to_string(), title.clone(), pkg.clone(), ui);
                             }
-                            status_pill(ui, "Paused", STATUS_COLOR_PAUSED);
+                            status_pill(ui, "Paused", StatusKind::Paused);
                         }
                         ActiveDownloadStatus::Completed => {
                             let install_key = (title_id.to_string(), pkg.id());
@@ -432,11 +432,11 @@ impl UpdatesApp {
                             }
 
                             if is_installed {
-                                status_pill(ui, "Installed in RPCS3", STATUS_COLOR_DONE);
+                                status_pill(ui, "Installed in RPCS3", StatusKind::Done);
                             } else if is_installing {
-                                status_pill(ui, "Installing…", STATUS_COLOR_PAUSED);
+                                status_pill(ui, "Installing…", StatusKind::Working);
                             } else {
-                                status_pill(ui, "Completed", STATUS_COLOR_DONE);
+                                status_pill(ui, "Completed", StatusKind::Done);
                             }
                         }
                         ActiveDownloadStatus::Failed => {
@@ -446,16 +446,16 @@ impl UpdatesApp {
                                     .retain(|f| !(f.title_id == title_id && f.pkg_id == pkg.id()));
                                 self.queue_download(title_id.to_string(), title.clone(), pkg.clone(), ui);
                             }
-                            status_pill(ui, "Failed", STATUS_COLOR_FAILED);
+                            status_pill(ui, "Failed", StatusKind::Failed);
                         }
                     }
 
                     // Per-package merge status (only meaningful for PS4 multipart entries).
                     match self.pkg_merge_status(title_id, pkg) {
                         ActiveMergeStatus::NotMergeable | ActiveMergeStatus::NotStarted => {}
-                        ActiveMergeStatus::Failed => status_pill(ui, "Merge failed", STATUS_COLOR_FAILED),
-                        ActiveMergeStatus::Merged => status_pill(ui, "Merged", STATUS_COLOR_DONE),
-                        ActiveMergeStatus::Merging(_) => status_pill(ui, "Merging…", STATUS_COLOR_PAUSED),
+                        ActiveMergeStatus::Failed => status_pill(ui, "Merge failed", StatusKind::Failed),
+                        ActiveMergeStatus::Merged => status_pill(ui, "Merged", StatusKind::Done),
+                        ActiveMergeStatus::Merging(_) => status_pill(ui, "Merging…", StatusKind::Working),
                     }
                 });
             });

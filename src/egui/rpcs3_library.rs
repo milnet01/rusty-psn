@@ -222,15 +222,10 @@ impl UpdatesApp {
                                     if let Some(latest) = update.packages.last() {
                                         match crate::rpcs3::compare_versions(inst, &latest.version) {
                                             std::cmp::Ordering::Less => {
-                                                ui.label(
-                                                    egui::RichText::new("Update available")
-                                                        .color(egui::Rgba::from_rgb(1.0, 1.0, 0.6)),
-                                                );
+                                                status_pill(ui, "Update available", StatusKind::Attention);
                                             }
                                             _ => {
-                                                ui.label(
-                                                    egui::RichText::new("Up to date").color(egui::Rgba::from_rgb(0.0, 1.0, 0.0)),
-                                                );
+                                                status_pill(ui, "Up to date", StatusKind::Done);
                                             }
                                         }
                                     } else {
@@ -240,7 +235,7 @@ impl UpdatesApp {
                                     && (self.v.batch_search_active.iter().any(|(s, _)| s == &game.serial)
                                         || self.v.batch_search_queue.iter().any(|s| s == &game.serial))
                                 {
-                                    ui.label(egui::RichText::new("Checking...").color(egui::Rgba::from_rgb(0.6, 0.6, 0.6)));
+                                    status_pill(ui, "Checking…", StatusKind::Working);
                                 } else {
                                     ui.label("--");
                                 }

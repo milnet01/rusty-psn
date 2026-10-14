@@ -6,7 +6,7 @@ impl UpdatesApp {
     pub(super) fn draw_hash_mismatch_window(&mut self, ctx: &egui::Context) {
         egui::Window::new("File integrity check failed").collapsible(false).fixed_size([550.0, 100.0]).show(ctx, | ui | {
             ui.vertical_centered(| ui | {
-                ui.label(egui::RichText::new("The integrity check for a downloaded file failed.").color(egui::Color32::YELLOW).heading());
+                ui.label(egui::RichText::new("\u{26A0} The integrity check for a downloaded file failed.").color(StatusKind::Attention.color(ui.visuals())).heading());
                 ui.label(egui::RichText::new("Considering the file is smaller than expected, it's likely that Sony's servers are being unreliable.").strong());
                 ui.label(egui::RichText::new("You should try to download the file again, or wait for a few hours before retrying. Sony's servers should eventually be able handle a complete download.").strong());
 

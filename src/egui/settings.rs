@@ -227,12 +227,9 @@ impl UpdatesApp {
         // Show status.
         if let Some(dir) = &self.v.modified_settings.rpcs3_config_dir {
             if dir.join("games.yml").exists() {
-                ui.label(egui::RichText::new("Status: RPCS3 config detected").color(egui::Rgba::from_rgb(0.0, 1.0, 0.0)));
+                status_pill(ui, "RPCS3 config detected", StatusKind::Done);
             } else {
-                ui.label(
-                    egui::RichText::new("Status: games.yml not found in this directory")
-                        .color(egui::Rgba::from_rgb(1.0, 0.6, 0.0)),
-                );
+                status_pill(ui, "games.yml not found in this directory", StatusKind::Attention);
             }
         } else {
             ui.label("Status: Not configured");
