@@ -24,6 +24,7 @@ on 2026-10-12 and 2026-10-13. The signs it places are in `docs/discovery.md`.
 | Batch | Reading a list of game IDs from a text file | `src/batch.rs` |
 | Security | Allowed Sony hosts, path containment, game ID validation, redirect policy | `src/security.rs` |
 | Files | Download paths and folder layouts, creating package files, hashing, migrating old layouts | `src/utils.rs` |
+| Promise | Lets a front end's frame or loop poll a background task's result without waiting | `src/promise.rs` |
 
 ## What may depend on what
 
@@ -40,6 +41,7 @@ on 2026-10-12 and 2026-10-13. The signs it places are in `docs/discovery.md`.
 - **Batch** may use PSN and Security.
 - **Security uses no other part.** It is the base every check rests on.
 - **Files** may use Security.
+- **Promise uses no other part.**
 
 **No two-way dependency may be added.** Files has its own error type
 (`FileError`), which PSN converts into its `DownloadError`.

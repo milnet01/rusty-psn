@@ -1869,15 +1869,25 @@ reviewer proposed; check both against the code before fixing.
   Source: in-session-2026-10-14 cargo audit.
   Lanes: Build, Security.
 
-- 📋 [RPSN-0155] **Name the part src/promise.rs belongs to in docs/design.md.**
+- ✅ [RPSN-0155] **Name the part src/promise.rs belongs to in docs/design.md.**
   main.rs declares mod promise, and both front ends use it (src/egui/mod.rs, src/cli/mod.rs), but the parts table in docs/design.md lists no part holding src/promise.rs. So the dependency rules say nothing about it, and new code there has no stated home. Remedy: add it to a part, or a row of its own. Found by a review-contract lane on 2026-10-14 (the RPSN-0146 gate), outside that change, so filed.
+  Resolved (2026-10-14): docs/design.md lists Promise as a part of its
+  own (src/promise.rs), using no other part.
   **Layman:** The design document does not say which part owns one shared file.
   Kind: doc-fix.
   Source: review-contract design.md 2026-10-14 loop 7 lane 1.
   Lanes: Entry.
 
-- 📋 [RPSN-0156] **Remember the window app's position and size between runs.**
+- ✅ [RPSN-0156] **Remember the window app's position and size between runs.**
   Owner request 2026-10-14. The window should open where and at the size it was closed. Before designing it, read how two of the owner's other apps got this right: /mnt/Games/Scripts/Linux/OneUp and /mnt/Games/Scripts/Linux/finbreak (search each for window geometry or position saving). eframe has a persist_window option and stores state through its persistence feature, which Cargo.toml already enables; check what src/main.rs passes in NativeOptions, and test that a moved, resized window comes back the same on Linux (X11 and Wayland behave differently for position).
+  Resolved (2026-10-14): 5266276. On Wayland the window app asks KWin
+  for its frame position at close and restores it after the first frame,
+  clamped to the screen (src/egui/placement.rs, OneUp's method). eframe
+  already kept the size. A KWin Remember rule was not used: kde-kwin
+  advised it is per-machine and stock Plasma forgets it at restart.
+  Proven on a private kwin_wayland --virtual: moved to 60,640, reopened
+  at 60,372 (clamped). Hand test owed: move, close and reopen on the
+  owner's desktop.
   **Layman:** The app should reopen where you left it, at the same size.
   Kind: fix.
   Source: user-request-2026-10-14.
@@ -1960,8 +1970,12 @@ existing item are noted on that item instead.
   Source: rpcs3-source-review-2026-10-13 finding 10.
   Lanes: RPCS3, PSN.
 
-- 📋 [RPSN-0154] **Read an unlocked trial game's version from its C00 folder.**
+- ✅ [RPSN-0154] **Read an unlocked trial game's version from its C00 folder.**
   RPCS3 reads a trial HG game's full-game PARAM.SFO from <game>/C00 when the user holds the matching EDAT licence (get_sfo_dir_from_game_path and verify_c00_unlock_edat in rpcs3/Emu/system_utils.cpp, RPCS3 commit 6fe3c87). scan_library reads the trial's root PARAM.SFO, so an unlocked trial shows the trial's version. Remedy: find out how verify_c00_unlock_edat checks the licence, then do the same. Left out of RPSN-0140.
+  Resolved (2026-10-14): game_sfo_path reads <game>/C00/PARAM.SFO for an
+  HG game whose {CONTENT_ID}.edat is in a user's exdata folder, as
+  RPCS3's game list does (fast check: file present). Red-first scan
+  test.
   **Layman:** An unlocked trial game shows the trial's version in the library.
   Kind: fix.
   Source: in-session-2026-10-14 RPSN-0140.
