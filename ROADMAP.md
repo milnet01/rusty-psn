@@ -1081,8 +1081,11 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: user-request-2026-10-13 RPSN-0133.
   Lanes: Window app.
 
-- 📋 [RPSN-0143] **Add a high-contrast theme to the window app.**
+- ✅ [RPSN-0143] **Add a high-contrast theme to the window app.**
   Second part of the approved redesign (RPSN-0133). Relates to RPSN-0059, the theme selector.
+  Resolved (2026-10-14): Settings > Appearance > Theme > High contrast.
+  The status colours still drawn by hand (green, orange) are RPSN-0144
+  and RPSN-0065.
   **Layman:** A stronger-contrast colour scheme that is easier to read.
   Kind: accessibility.
   Source: user-request-2026-10-13 RPSN-0133.
