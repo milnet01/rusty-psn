@@ -104,6 +104,21 @@ sets for a second reason to change.
   into RPCS3's folders. Content cannot see whether RPCS3 placed the
   licences: it reports success when `rpcs3::install_pkg` does.
 
+- **Window layout** — the window app opens no floating window, dialog or
+  pop-up notice. Every screen, panel and message has its own fixed place in
+  the main window, and each can be folded away. Folding or unfolding is the
+  only thing that moves another part. A status, a progress bar or a message
+  updates in its place without shifting anything around it. Where the
+  window cannot show everything, it opens bigger, or a list scrolls inside
+  its own fixed box; the app does not resize its window while it runs.
+  Every message reaches its place whatever the settings say, so the "Show
+  in-app toasts" setting goes; a settings file that still holds it loads
+  with it ignored. The desktop's file and folder pickers
+  are the exception: they belong to the system, not the app. So are system
+  notifications, which the user turns on in Settings and which repeat a
+  message the window also shows. The owner set this on 2026-10-14
+  (RPSN-0157); the code does not follow it yet.
+
 ## The stack, and what it rules out
 
 - **Rust**, inherited from the upstream project. The upstream project
@@ -132,3 +147,4 @@ None recorded as an ADR yet.
 | 5 | 2026-10-14 | 2 (both lanes held every question) | 0 | 1 | 1 | — | 1 verified in radius, 1 fixed; 1 out of radius, filed as RPSN-0146. A lane found the bullet never said how Content learns a licence failed, now stated: it cannot, and reports what `rpcs3::install_pkg` reports. Filed: the window-only-code rule does not name Content, which only the window app calls. Open questions resolved clean: `InstallPackages` defaults `from_boot` to false, so licences are copied; `init_dirs` defaults on. |
 | 6 | 2026-10-14 | 2 (both lanes held every question) | 0 | 0 | 0 | — | Converged: 0 verified, 1 dismissed. Dismissed: how to flatten nested zip entries and settle name clashes, which the implementer decides under the bullet's no-subfolders rule. Open questions left to the build: RPCS3's boot confirmation prompt in window mode, and whether a Flatpak RPCS3 can see the temporary folder (true of today's code too). Second share: 4 of 4 in-radius verified findings over the run landed in the amended bullet. |
 | 7 | 2026-10-14 | 2 (both lanes held every question) | 1 | 0 | 0 | — | Converged: gate on the RPSN-0146 amendment (Content is a part of its own; new Content code goes in src/content.rs); no finding landed in it. 1 verified, 1 fixed, 0 dismissed, out of radius: both lanes found RPCS3 allowed Files only while src/rpcs3/sfo.rs calls security::strip_control; now Security and Files, fixed in-run as a record of existing code (rule 14 code-exists exception). Filed: src/promise.rs belongs to no part (RPSN-0155). Open questions resolved clean: the content browser marks a DLC installed on a clean exit, as RPSN-0137 § 3 chose; copy_pkg_file runs only inside merge_parts after containment; the default layout is SerialTitle (ID - Title); merge_parts' fixed layouts are in tests; RPCS3's get_dir_entries lists top-level files only. The project's check-doc.py ran degraded (no Genre: line), so paths and symbols were checked by hand. Second share: 0 of 1 verified findings landed in the gated span. |
+| 8 | 2026-10-14 | 2 (both lanes held every question) | 0 | 0 | 2 | — | 2 verified, 2 fixed, 0 dismissed. Gate on the RPSN-0157 Window layout bullet. Both lanes found it never said what becomes of the saved "Show in-app toasts" setting: now it goes, and an older settings file loads with it ignored (run: a RON settings file with an unknown field loads). From a lane's open question: "the window is made bigger" left open whether the app resizes itself; now it opens bigger and does not resize while running. Open questions resolved clean: the File integrity check failed window only informs (its one button closes it); system notifications are off by default. Not checkable here: RPCS3 source at 6fe3c87. Surfaced to the owner: the system-notification exception is the author's, not the owner's words. |

@@ -1100,6 +1100,12 @@ Work named by docs/design.md and its review on 2026-10-12.
 
 - 📋 [RPSN-0145] **Build the redesigned layout: sidebar, library table with filters, Settings with Save and Undo.**
   Last and largest part of the approved redesign (RPSN-0133); mockups linked there. Spans several screens, so check whether it needs a spec before building (spec-format.md section 1).
+  Progress (2026-10-14): no spec needed (spec-format.md section 1: one
+  part, the Window app; mockups approved; each panel moves in one at a
+  time and is cheap to redo). Built together with RPSN-0157, the owner's
+  rule that nothing pops up and nothing moves. At 200% text size today's
+  top button row runs off the window's right edge; the sidebar replaces
+  it.
   **Layman:** The new layout from the approved mockups.
   Kind: ux.
   Source: user-request-2026-10-13 RPSN-0133.
@@ -1117,8 +1123,10 @@ Work named by docs/design.md and its review on 2026-10-12.
   Content Browser, Download Firmware, Download History, About, File
   integrity check failed, Migrate Downloads) and the toasts. The
   desktop's own folder and file pickers stay: they are the system's,
-  not the app's. Shapes RPSN-0145's layout, so the two are specced
-  together before either is built.
+  not the app's. Shapes RPSN-0145's layout. No spec (2026-10-14): one
+  part, the Window app, with approved mockups, and each panel can be
+  moved in one at a time. The rule is recorded in docs/design.md under
+  "Window layout".
   **Layman:** Nothing pops up and nothing jumps around: every part of the app has its own spot in the main window and can be folded away.
   Kind: ux.
   Source: user-request-2026-10-14.
