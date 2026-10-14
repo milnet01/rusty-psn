@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=147 -->
+<!-- ants-roadmap-id-high-water: RPSN=148 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1665,6 +1665,17 @@ reviewer proposed; check both against the code before fixing.
   Kind: fix.
   Source: in-session-2026-10-14 RPSN-0115 research.
   Lanes: RPCS3.
+
+- 📋 [RPSN-0148] **Share one scan-or-detect handler between the toolbar button and the menu.**
+  The "Scan RPCS3 Library" button (src/egui/search.rs) and the
+  "Scan RPCS3 Library..." menu item (src/egui/chrome.rs) each hold the
+  same scan, else auto-detect, else warn sequence; RPSN-0117 had to
+  change both. Only their warning text differs. Remedy: one method in
+  src/egui/rpcs3_library.rs that both call.
+  **Layman:** Two buttons that do the same thing have separate copies of the code, so a fix to one can miss the other.
+  Kind: refactor.
+  Source: in-session-2026-10-14 RPSN-0117.
+  Lanes: Window app.
 
 ## 15. RPCS3 source review (2026-10-13)
 
