@@ -274,7 +274,7 @@ Support resuming partially downloaded files instead of re-downloading from scrat
   Kind: feature.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0026] **Store download progress metadata in a `.rusty-psn-progress.json` sidecar file per download directory.**
+- 🚫 [RPSN-0026] **Store download progress metadata in a `.rusty-psn-progress.json` sidecar file per download directory.**
     ```json
     {
       "url": "https://...",
@@ -287,6 +287,9 @@ Support resuming partially downloaded files instead of re-downloading from scrat
   Checked against the code 2026-10-12: Not done — no progress sidecar
   file; ETag and If-Range are used instead.
   Former TODO.md task 4.3.
+  Dropped (2026-10-15, owner's decision): downloads already resume from
+  the partial file with ETag and If-Range, so a progress sidecar would
+  repeat what works today.
   **Layman:** Keep a small notes file so an interrupted download remembers where it stopped.
   Kind: feature.
   Source: todo-md-import-2026-10-12.
@@ -837,6 +840,25 @@ Lower priority items that would improve the overall experience.
   Checked against the code 2026-10-12: Not done — no Flatpak or Snap
   manifest or CI step.
   Former TODO.md task 9.9.
+  Owner decision (2026-10-15): a local Flatpak with every feature, built
+  and installed on this machine, NOT submitted to Flathub; it may start
+  RPCS3 outside its sandbox (flatpak-spawn --host, which needs
+  --talk-name=org.freedesktop.Flatpak, a permission Flathub would likely
+  refuse). No Snap. Plan: app id io.github.milnet01.RustyPsn; manifest
+  under packaging/flatpak/ on org.freedesktop.Platform 26.08 with
+  org.freedesktop.Sdk.Extension.rust-stable//26.08 (not yet installed:
+  flatpak install --user flathub
+  org.freedesktop.Sdk.Extension.rust-stable//26.08); a local build may
+  use build-args --share=network instead of vendored cargo sources;
+  reuse resources/rusty-psn.desktop and the icons; add a metainfo file.
+  Sandbox traps to handle in code: run_headless in src/rpcs3/mod.rs must
+  wrap RPCS3 in flatpak-spawn --host when /.flatpak-info exists; inside
+  the sandbox XDG_CONFIG_HOME and XDG_CACHE_HOME point under
+  ~/.var/app/<id>, so RPCS3 auto-detection and lock_path_from
+  (RPCS3.buf) read the wrong folders unless they use the host's
+  ($HOME/.config, $HOME/.cache); the app's own settings then live apart
+  from the native build's. Verify with a build on a private display and
+  a scan of a stand-in RPCS3 folder.
   **Layman:** Offer Flatpak or Snap packages for easier Linux installs.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
