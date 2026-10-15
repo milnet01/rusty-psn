@@ -400,11 +400,8 @@ mod tests {
         // Not a serial, so the search ends at once without the network.
         app.v.batch_search_queue.push_back("NOT-A-SERIAL".to_string());
 
+        // The search may already be done here, on a runtime thread, so the flag is read only at the end.
         app.handle_batch_search_queue(&mut Vec::new());
-        assert!(
-            !asked.load(std::sync::atomic::Ordering::SeqCst),
-            "nothing asked for a redraw yet"
-        );
         while app.v.batch_search_active.iter().any(|(_, p)| p.ready().is_none()) {
             std::thread::yield_now();
         }
