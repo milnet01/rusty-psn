@@ -108,86 +108,129 @@ impl UpdatesApp {
             });
     }
 
+    /// Every slot keeps its width whatever it shows, so a changing count or speed never moves the
+    /// slots after it (RPSN-0157). Each width is the width of the longest text the slot expects.
     pub(super) fn draw_status_bar(&mut self, ui: &mut egui::Ui) {
         egui::Panel::bottom("status_bar").show(ui, |ui| {
             ui.horizontal(|ui| {
-                // Batch search progress.
-                let batch_total = self.v.batch_search_total;
-                let batch_done = self.v.batch_search_completed;
-                let batch_active = self.v.batch_search_active.len();
-                if batch_total > 0 && (batch_done < batch_total || batch_active > 0) {
-                    ui.label(format!("Batch: {batch_done}/{batch_total} searched"));
-                    ui.separator();
-                }
-
                 let active = self.v.download_queue.len();
                 let completed = self.v.completed_downloads.len();
                 let failed = self.v.failed_downloads.len();
                 let pending = self.v.pending_downloads.len();
                 let paused = self.v.paused_downloads.len();
-
-                if active > 0 || completed > 0 || failed > 0 || pending > 0 || paused > 0 {
-                    let mut status_parts = format!("{active} active, {completed} completed, {failed} failed");
-                    if pending > 0 {
-                        status_parts.push_str(&format!(", {pending} queued"));
-                    }
-                    if paused > 0 {
-                        status_parts.push_str(&format!(", {paused} paused"));
-                    }
-                    ui.label(format!("Downloads: {status_parts}"));
-
-                    if active > 0 {
-                        // Calculate aggregate progress and speed across all active downloads.
-                        let mut total_progress: u64 = 0;
-                        let mut total_size: u64 = 0;
-                        let mut total_speed: f64 = 0.0;
-
-                        for download in &self.v.download_queue {
-                            total_size += download.size;
-                            let status = download
-                                .progress_status
-                                .lock()
-                                .unwrap_or_else(std::sync::PoisonError::into_inner);
-                            total_progress += status.progress;
-                            total_speed += status.speed_bps;
-                        }
-
-                        if total_size > 0 {
-                            let fraction = total_progress as f32 / total_size as f32;
-                            let bar_width = ui.available_width().clamp(50.0, 150.0);
-                            ui.separator();
-                            ui.label(format!("{} / {}", ByteSize::b(total_progress), ByteSize::b(total_size)));
-
-                            // Speed display.
-                            if total_speed > 0.0 {
-                                ui.label(format!("{}/s", ByteSize::b(total_speed as u64)));
-                                // ETA calculation.
-                                let remaining = total_size.saturating_sub(total_progress) as f64;
-                                let eta_secs = (remaining / total_speed) as u64;
-                                if eta_secs < 3600 {
-                                    ui.label(format!("ETA: {}:{:02}", eta_secs / 60, eta_secs % 60));
-                                } else {
-                                    ui.label(format!(
-                                        "ETA: {}:{:02}:{:02}",
-                                        eta_secs / 3600,
-                                        (eta_secs % 3600) / 60,
-                                        eta_secs % 60
-                                    ));
-                                }
-                            }
-
-                            ui.add(
-                                egui::ProgressBar::new(fraction)
-                                    .desired_width(bar_width)
-                                    .show_percentage()
-                                    .animate(true),
-                            );
-                        }
-                    }
+                let counts = if active > 0 || completed > 0 || failed > 0 || pending > 0 || paused > 0 {
+                    format!(
+                        "Downloads: {active} active, {completed} completed, {failed} failed, {pending} queued, {paused} paused"
+                    )
                 } else {
-                    ui.label("Ready");
+                    "Ready".to_string()
+                };
+                status_slot(
+                    ui,
+                    "Downloads: 99 active, 999 completed, 999 failed, 999 queued, 999 paused",
+                    &counts,
+                );
+
+                // Aggregate progress and speed across all active downloads.
+                let mut total_progress: u64 = 0;
+                let mut total_size: u64 = 0;
+                let mut total_speed: f64 = 0.0;
+                for download in &self.v.download_queue {
+                    total_size += download.size;
+                    let status = download
+                        .progress_status
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    total_progress += status.progress;
+                    total_speed += status.speed_bps;
+                }
+
+                let (sizes, speed, eta) = if total_size > 0 {
+                    let sizes = format!("{} / {}", ByteSize::b(total_progress), ByteSize::b(total_size));
+                    let (speed, eta) = if total_speed > 0.0 {
+                        let remaining = total_size.saturating_sub(total_progress) as f64;
+                        let eta_secs = (remaining / total_speed) as u64;
+                        let eta = if eta_secs < 3600 {
+                            format!("ETA: {}:{:02}", eta_secs / 60, eta_secs % 60)
+                        } else {
+                            format!("ETA: {}:{:02}:{:02}", eta_secs / 3600, (eta_secs % 3600) / 60, eta_secs % 60)
+                        };
+                        (format!("{}/s", ByteSize::b(total_speed as u64)), eta)
+                    } else {
+                        (String::new(), String::new())
+                    };
+                    (sizes, speed, eta)
+                } else {
+                    (String::new(), String::new(), String::new())
+                };
+                ui.separator();
+                status_slot(ui, "999.9 GiB / 999.9 GiB", &sizes);
+                status_slot(ui, "999.9 MiB/s", &speed);
+                status_slot(ui, "ETA: 999:59:59", &eta);
+                ui.separator();
+                // Batch search progress.
+                let batch_total = self.v.batch_search_total;
+                let batch_done = self.v.batch_search_completed;
+                let batch_active = self.v.batch_search_active.len();
+                let batch = if batch_total > 0 && (batch_done < batch_total || batch_active > 0) {
+                    format!("Batch: {batch_done}/{batch_total} searched")
+                } else {
+                    String::new()
+                };
+                status_slot(ui, "Batch: 9999/9999 searched", &batch);
+
+                if total_size > 0 {
+                    let fraction = total_progress as f32 / total_size as f32;
+                    ui.add(
+                        egui::ProgressBar::new(fraction)
+                            .desired_width(150.0)
+                            .show_percentage()
+                            .animate(true),
+                    );
                 }
             });
         });
+    }
+}
+
+/// A status bar label as wide as `widest` would be, whatever `text` is.
+fn status_slot(ui: &mut egui::Ui, widest: &str, text: &str) {
+    let font = egui::TextStyle::Body.resolve(ui.style());
+    let width = ui
+        .painter()
+        .layout_no_wrap(widest.to_string(), font, egui::Color32::PLACEHOLDER)
+        .size()
+        .x;
+    let size = egui::vec2(width, ui.spacing().interact_size.y);
+    ui.allocate_ui_with_layout(size, egui::Layout::left_to_right(egui::Align::Center), |ui| {
+        ui.set_min_width(width);
+        ui.add(egui::Label::new(text).truncate());
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Where the next widget would start after a slot showing `text`.
+    fn end_of_slot(text: &str) -> f32 {
+        let ctx = egui::Context::default();
+        let mut end = 0.0;
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            ui.horizontal(|ui| {
+                status_slot(ui, "Downloads: 99 active, 999 completed", text);
+                end = ui.cursor().min.x;
+            });
+        });
+        // Nothing draws these textures; epaint panics if they are dropped unapplied.
+        output.textures_delta.clear();
+        end
+    }
+
+    #[test]
+    fn a_status_slot_keeps_its_width_whatever_it_shows() {
+        let empty = end_of_slot("");
+        assert_eq!(end_of_slot("Ready"), empty);
+        assert_eq!(end_of_slot("Downloads: 3 active, 12 completed"), empty);
     }
 }

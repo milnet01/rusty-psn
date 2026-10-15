@@ -327,7 +327,7 @@ UpdatesApp (eframe::App)
 - **Results list**: Vertical scrollable area with collapsible headers per title (aggregate status in header)
 - **Package entries**: Grouped panels with version, size, SHA1, download/pause/abort/resume buttons, progress bar, Copy URL
 - **Settings page**: Downloads, Appearance (theme, text size), Notifications, RPCS3 Integration and Content Library, then folding sections for Migrate downloads and About. The fields scroll above the fixed Save row. Leaving the page drops unsaved changes
-- **Status bar**: Bottom panel with batch progress, download counts, speed (EMA), ETA, aggregate progress bar
+- **Status bar**: Bottom panel with fixed-width slots, so a changing value never moves the next: download counts (or "Ready"), total size, speed (EMA), ETA, batch progress, then the aggregate progress bar. Each slot is as wide as the longest text it expects (`status_slot` in `src/egui/chrome.rs`)
 - **RPCS3 library page**: a Scan button, then a grid showing serial, title, installed/available versions, update status
 - **Messages panel** (`src/egui/messages.rs`): above the status bar on every page; folds to one button. Unfolded, it lists the newest 200 messages in a fixed-height box that scrolls, each with a status icon, a word and a colour. A download that failed because the file arrived short also says "Failed: file incomplete" beside its package
 

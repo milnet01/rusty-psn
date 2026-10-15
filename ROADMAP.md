@@ -1181,6 +1181,12 @@ Work named by docs/design.md and its review on 2026-10-12.
   and the "Show in-app toasts" setting are gone (an older settings file
   still loads). The File integrity check failed window is now a warning
   message, and the download's status reads "Failed: file incomplete".
+  Progress (2026-10-15): step 3 built. The status bar's slots (download
+  counts or "Ready", total size, speed, ETA, batch progress) each keep
+  the width of the longest text they expect, so a changing value never
+  moves the next; the progress bar is last and fixed at 150 points. At
+  200% text size the later slots run past the right edge when all are
+  filled; step 7's larger window sizes answer that.
   **Layman:** Nothing pops up and nothing jumps around: every part of the app has its own spot in the main window and can be folded away.
   Kind: ux.
   Source: user-request-2026-10-14.
