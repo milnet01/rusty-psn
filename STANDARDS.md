@@ -323,7 +323,7 @@ UpdatesApp (eframe::App)
 ### 6.3 UI Layout
 
 - **Sidebar** (`src/egui/chrome.rs`): a fixed left panel choosing the page shown in the central area: Search, Downloads, RPCS3 library, Patches and DLC, Firmware and History at the top, Settings at the foot. `docs/design.md` § "Window layout" is the rule it follows (RPSN-0157). Ctrl+F goes to Search and focuses the serial box; Escape goes to Search; Ctrl+S opens Settings, or saves on the Settings page
-- **Search page**: serial input and search button; below it Import Batch, Download All, Download All Latest, Export results (CSV or JSON, `src/egui/export.rs`), Clear results and Open Downloads, wrapping at a large text size
+- **Search page**: serial input and search button; below it Import Batch, Download All, Download Missing (skips files already in the download folder at full size), Download All Latest, Export results (CSV or JSON, `src/egui/export.rs`), Clear results and Open Downloads, wrapping at a large text size
 - **Downloads page** (`src/egui/downloads_page.rs`): foldable sections Needs attention (failed), In progress (downloading, paused, queued) and Finished (newest first), each row the same package row the results list draws, with its buttons. Needs attention has a Retry all failed button
 - **Results list**: Vertical scrollable area with collapsible headers per title (aggregate status in header)
 - **Package entries**: Grouped panels with version, size, SHA1, download/pause/abort/resume buttons, progress bar, Copy URL

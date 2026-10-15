@@ -25,6 +25,22 @@ impl VolatileData {
     }
 }
 
+/// Whether a package's file is already in its download folder at its full size. Size only: the
+/// hash is checked when a download runs, and a file of the right size is one a finished download
+/// left (RPSN-0023).
+fn already_downloaded(
+    download_path: &Path,
+    update: &UpdateInfo,
+    pkg: &PackageInfo,
+    format: crate::utils::DirectoryFormat,
+) -> bool {
+    let Some(name) = pkg.file_name() else {
+        return false;
+    };
+    let path = crate::utils::create_pkg_path(&download_path, &update.title_id, &update.title(), format).join(name);
+    std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() == pkg.size)
+}
+
 impl UpdatesApp {
     /// Collect every finished search typed into the search bar. Several may run at once
     /// (RPSN-0069), so each message names its serial.
@@ -150,6 +166,27 @@ impl UpdatesApp {
             messages.push((msg, MessageLevel::Info));
             self.v.batch_search_total = 0; // Reset so the toast doesn't fire again.
         }
+    }
+
+    /// Queue every listed update whose file is not already in the download folder (RPSN-0023).
+    pub(super) fn download_missing(&mut self) {
+        let mut queued = 0;
+        let mut present = 0;
+        for update in self.v.update_results.clone() {
+            let title = update.title();
+            for pkg in &update.packages {
+                if already_downloaded(&self.settings.pkg_download_path, &update, pkg, self.settings.directory_format) {
+                    present += 1;
+                } else if !self.is_download_known(&update.title_id, pkg) {
+                    self.queue_download_no_ui(update.title_id.clone(), title.clone(), pkg.clone());
+                    queued += 1;
+                }
+            }
+        }
+        self.show_notifications(
+            format!("Download Missing: {queued} queued, {present} already in the download folder."),
+            MessageLevel::Info,
+        );
     }
 
     pub(super) fn trigger_batch_import(&mut self) {
@@ -307,6 +344,14 @@ impl UpdatesApp {
                     }
                 }
 
+                if ui
+                    .button("Download Missing")
+                    .on_hover_text("Download only the updates not already in the download folder")
+                    .clicked()
+                {
+                    self.download_missing();
+                }
+
                 if ui.button("Download All Latest").clicked() {
                     info!("Downloading latest updates for all results");
                     for update in self.v.update_results.clone().iter() {
@@ -339,6 +384,41 @@ impl UpdatesApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_full_size_file_counts_as_downloaded() {
+        let root = tempfile::tempdir().unwrap();
+        let pkg = PackageInfo {
+            url: "http://b0.ww.np.dl.playstation.net/tppkg/np/BLES00001/x/BLES00001-A0102-V0100.pkg".to_string(),
+            size: 4,
+            version: "01.02".to_string(),
+            sha1sum: String::new(),
+            hash_whole_file: false,
+            manifest_url: String::new(),
+            offset: 0,
+            part_number: None,
+            min_system_version: None,
+        };
+        let update = UpdateInfo {
+            title_id: "BLES00001".to_string(),
+            tag_name: String::new(),
+            titles: vec!["Game".to_string()],
+            packages: vec![pkg.clone()],
+            platform_variant: crate::psn::utils::PlatformVariant::PS3,
+        };
+        let format = crate::utils::DirectoryFormat::TitleSerial;
+        assert!(!already_downloaded(root.path(), &update, &pkg, format));
+
+        let folder = root.path().join("Game/BLES00001");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("BLES00001-A0102-V0100.pkg"), b"ab").unwrap();
+        assert!(
+            !already_downloaded(root.path(), &update, &pkg, format),
+            "a partial file is missing"
+        );
+        std::fs::write(folder.join("BLES00001-A0102-V0100.pkg"), b"abcd").unwrap();
+        assert!(already_downloaded(root.path(), &update, &pkg, format));
+    }
 
     #[test]
     fn several_typed_searches_run_at_once() {
