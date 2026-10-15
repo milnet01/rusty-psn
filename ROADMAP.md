@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=161 -->
+<!-- ants-roadmap-id-high-water: RPSN=165 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -823,7 +823,7 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 🚫 [RPSN-0072] **Localization.**
+- 📋 [RPSN-0072] **Localization.**
   The GUI embeds Japanese fonts already; add basic i18n framework for
   UI strings
   Checked against the code 2026-10-12: Not done — no translation
@@ -836,6 +836,11 @@ Lower priority items that would improve the overall experience.
   Owner (2026-10-15, later the same day): dropped, not parked. This is
   the owner's personal copy of someone else's app and is not offered to
   anyone, so a translation would have no audience.
+  Owner (2026-10-15, later again): back on. The fork will be offered as
+  a download once the UI work is finished, so translation has an
+  audience after all. This item is the preparation only: every
+  on-screen string goes through a translation layer, English only. The
+  translations themselves are a separate item, done last.
   **Layman:** Prepare the app for translation into other languages.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -1017,6 +1022,50 @@ Lower priority items that would improve the overall experience.
   **Layman:** Let the app find and download PS5 game updates, as it does for PS3, PS4, Vita and PSP.
   Kind: feature.
   Source: user-request-2026-10-15.
+
+- 📋 [RPSN-0162] **Offer the fork as a download.**
+  Owner decision 2026-10-15: yes, but only after the UI work is
+  finished. The licence is MIT, which allows it as long as LICENSE keeps
+  RainbowCookie32's copyright line. Plan: a README notice that this is
+  an unofficial fork, not made or supported by the original author;
+  keep LICENSE as is (an added line for the fork's changes is allowed);
+  then a first release on github.com/milnet01/rusty-psn with the CI
+  builds attached. RPSN-0096's versioning note belongs with it.
+  Owner (2026-10-15): the download waits for everything on the roadmap
+  (PS5 updates and the end-to-end checks included). Order: all other
+  work, then this release; RPSN-0163's translations come after it.
+  **Layman:** Publish your version of rusty-psn for others to download, clearly marked as an unofficial fork.
+  Kind: release.
+  Source: user-request-2026-10-15.
+
+- 📋 [RPSN-0163] **Translate the app into other languages.**
+  Owner decision 2026-10-15: do this last, after all other work.
+  Needs RPSN-0072's translation layer first. Which languages: ask the
+  owner when this starts.
+  **Layman:** Add other languages to the app, once everything else is done.
+  Kind: feature.
+  Source: user-request-2026-10-15.
+
+- 📋 [RPSN-0164] **Let the window fit a 1280-pixel-wide screen.**
+  Seen 2026-10-15 on the Windows test PC (1280x1024): src/main.rs
+  sets with_min_inner_size([1320.0, 700.0]), so the window cannot fit
+  and the right edge of the results list was cut off. Matters once the
+  fork is offered as a download (RPSN-0162); the owner's own screen is
+  wider. The minimum exists so the status bar's fixed slots fit at 100%
+  text size (RPSN-0157 step 7); a fix must keep that or let the slots
+  wrap.
+  **Layman:** On a small screen the app's window is wider than the screen, so its right edge is cut off.
+  Kind: ux.
+  Source: in-session-2026-10-15.
+
+- 📋 [RPSN-0165] **Correct STANDARDS.md § 12's default download path.**
+  § 12 says Linux and Windows default to `pkgs/` (relative).
+  default_download_path in src/egui/mod.rs uses
+  dirs::download_dir()/rusty-psn/pkgs on every platform (seen on
+  Windows 2026-10-15: C:\Users\<user>\Downloads\rusty-psn\pkgs).
+  **Layman:** One line in the coding notes names the wrong default download folder.
+  Kind: doc-fix.
+  Source: in-session-2026-10-15.
 
 ## 10. Custom Application Icon [P2]
 
