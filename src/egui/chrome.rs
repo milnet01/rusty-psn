@@ -1,93 +1,111 @@
-//! The menu bar, the status bar, and keyboard shortcuts.
+//! The sidebar and its pages, the status bar, and keyboard shortcuts.
 
 use super::*;
 
+/// The pages the sidebar offers (RPSN-0157). Each takes the main window's central area; nothing
+/// floats above it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Page {
+    Search,
+    Rpcs3Library,
+    PatchesAndDlc,
+    Firmware,
+    History,
+    Settings,
+}
+
+impl Page {
+    /// The pages listed at the top of the sidebar, in order. Settings sits apart, at its foot.
+    const TOP: [Page; 5] = [
+        Page::Search,
+        Page::Rpcs3Library,
+        Page::PatchesAndDlc,
+        Page::Firmware,
+        Page::History,
+    ];
+
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Page::Search => "Search",
+            Page::Rpcs3Library => "RPCS3 library",
+            Page::PatchesAndDlc => "Patches and DLC",
+            Page::Firmware => "Firmware",
+            Page::History => "History",
+            Page::Settings => "Settings",
+        }
+    }
+}
+
 impl UpdatesApp {
+    /// Switch to `page`. Leaving Settings discards unsaved changes, as closing its window did;
+    /// entering it starts the edit from the saved settings.
+    pub(super) fn go_to(&mut self, page: Page, ctx: &egui::Context) {
+        if page == self.v.page {
+            return;
+        }
+        if self.v.page == Page::Settings {
+            self.cancel_settings(ctx);
+        }
+        match page {
+            Page::Settings => self.v.modified_settings = self.settings.clone(),
+            Page::PatchesAndDlc => self.start_content_scan(),
+            _ => {}
+        }
+        self.v.page = page;
+    }
+
     pub(super) fn handle_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
-        let mut cancel_settings = false;
-        ctx.input(|i| {
-            if i.modifiers.command && i.key_pressed(egui::Key::F) {
-                self.v.focus_search_bar = true;
-            }
-            if i.key_pressed(egui::Key::Escape) {
-                // Applying the theme needs the context, which this closure holds.
-                cancel_settings = self.v.show_settings_window;
-                self.v.show_mismatch_warning_window = false;
-                self.v.show_about_window = false;
-                self.v.show_rpcs3_library_window = false;
-                self.v.show_firmware_window = false;
-                self.v.show_migration_dialog = false;
-                self.v.show_download_history_window = false;
-                self.v.show_content_browser_window = false;
-            }
-            if i.modifiers.command && i.key_pressed(egui::Key::S) && !self.v.show_settings_window {
-                self.v.modified_settings = self.settings.clone();
-                self.v.show_settings_window = true;
-            }
+        let (find, escape, save) = ctx.input(|i| {
+            (
+                i.modifiers.command && i.key_pressed(egui::Key::F),
+                i.key_pressed(egui::Key::Escape),
+                i.modifiers.command && i.key_pressed(egui::Key::S),
+            )
         });
-        if cancel_settings {
-            self.cancel_settings_window(ctx);
+        if find {
+            self.go_to(Page::Search, ctx);
+            self.v.focus_search_bar = true;
+        }
+        if escape {
+            self.go_to(Page::Search, ctx);
+        }
+        if save {
+            if self.v.page == Page::Settings {
+                self.save_settings();
+            } else {
+                self.go_to(Page::Settings, ctx);
+            }
         }
     }
 
-    pub(super) fn draw_menu_bar(&mut self, ui: &mut egui::Ui) {
-        egui::Panel::top("menu_bar").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Settings...").clicked() {
-                        self.v.modified_settings = self.settings.clone();
-                        self.v.show_settings_window = true;
-                        ui.close();
+    pub(super) fn draw_sidebar(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
+        egui::Panel::left("sidebar")
+            .resizable(false)
+            .exact_size(170.0)
+            .show(ui, |ui| {
+                let mut chosen = None;
+                let mut entry = |ui: &mut egui::Ui, page: Page, current: Page| {
+                    let button =
+                        egui::Button::selectable(page == current, page.label()).min_size(egui::vec2(ui.available_width(), 0.0));
+                    if ui.add(button).clicked() {
+                        chosen = Some(page);
                     }
-                    ui.separator();
-                    if ui.button("Quit").clicked() {
-                        ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
-                    }
+                };
+
+                ui.add_space(4.0);
+                for page in Page::TOP {
+                    entry(ui, page, self.v.page);
+                }
+                ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                    ui.add_space(4.0);
+                    entry(ui, Page::Settings, self.v.page);
                 });
 
-                ui.menu_button("Tools", |ui| {
-                    if ui.button("Import Batch File...").clicked() {
-                        ui.close();
-                        self.trigger_batch_import();
-                    }
-                    if ui.button("Scan RPCS3 Library...").clicked() {
-                        ui.close();
-                        self.scan_or_detect_rpcs3(ui.ctx());
-                    }
-                    if ui.button("Download Firmware...").clicked() {
-                        self.v.show_firmware_window = true;
-                        ui.close();
-                    }
-                    if ui.button("Download History...").clicked() {
-                        self.v.show_download_history_window = true;
-                        ui.close();
-                    }
-                    if ui.button("Content Browser...").clicked() {
-                        self.v.show_content_browser_window = true;
-                        self.start_content_scan();
-                        ui.close();
-                    }
-                    ui.separator();
-                    if ui.button("Migrate Downloads...").clicked() {
-                        let preview = crate::utils::detect_migratable_directories(
-                            &self.settings.pkg_download_path,
-                            self.settings.directory_format,
-                        );
-                        self.v.migration_preview = preview;
-                        self.v.migration_scan_root = self.settings.pkg_download_path.clone();
-                        self.v.show_migration_dialog = true;
-                        ui.close();
-                    }
-                });
-
-                ui.menu_button("Help", |ui| {
-                    if ui.button("About rusty-psn").clicked() {
-                        self.v.show_about_window = true;
-                        ui.close();
-                    }
-                });
+                if let Some(page) = chosen {
+                    self.go_to(page, &ctx);
+                }
             });
-        });
     }
 
     pub(super) fn draw_status_bar(&mut self, ui: &mut egui::Ui) {

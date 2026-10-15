@@ -1,67 +1,52 @@
-//! The settings window.
+//! The Settings page.
 
 use super::*;
 
 impl UpdatesApp {
-    pub(super) fn draw_settings_window(&mut self, ctx: &egui::Context) {
-        let mut show_window = self.v.show_settings_window;
+    pub(super) fn draw_settings_page(&mut self, ui: &mut egui::Ui) {
+        ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+            ui.horizontal(|ui| {
+                if ui.button("Save settings").clicked() {
+                    self.save_settings();
+                }
 
-        // Fixed size avoids a bug that makes the window gradually stretch itself vertically for some reason.
-        // See https://github.com/RainbowCookie32/rusty-psn/issues/138
-        // At a large text size the window is shorter than its fields, which then scroll.
-        let height = 700.0_f32.min(ctx.content_rect().height() - 60.0);
-        egui::Window::new("Settings")
-            .id(egui::Id::new("cfg_win"))
-            .open(&mut show_window)
-            .fixed_size([420.0, height])
-            .show(ctx, |ui| {
-                ui.with_layout(egui::Layout::bottom_up(egui::Align::TOP), |ui| {
-                    ui.horizontal(|ui| {
-                        if ui.button("Save settings").clicked() {
-                            self.v.settings_dirty = false;
-                            self.v.show_settings_window = false;
+                if ui
+                    .add_enabled(self.v.settings_dirty, egui::Button::new("Discard changes"))
+                    .clicked()
+                {
+                    self.cancel_settings(ui.ctx());
+                    self.v.modified_settings = self.settings.clone();
+                }
 
-                            self.settings = self.v.modified_settings.clone();
-                        }
+                if ui.button("Restore to defaults").clicked() {
+                    self.v.settings_dirty = false;
 
-                        if ui
-                            .add_enabled(self.v.settings_dirty, egui::Button::new("Discard changes"))
-                            .clicked()
-                        {
-                            self.v.settings_dirty = false;
-                            self.v.show_settings_window = false;
-
-                            // Revert the theme and text size if they were changed during preview.
-                            self.settings.apply_appearance(ui.ctx());
-                            self.v.modified_settings = self.settings.clone();
-                        }
-
-                        if ui.button("Restore to defaults").clicked() {
-                            self.v.settings_dirty = false;
-                            self.v.show_settings_window = false;
-
-                            self.settings = AppSettings::default();
-                            self.v.modified_settings = AppSettings::default();
-                            self.settings.apply_appearance(ui.ctx());
-                        }
-                    });
-
-                    ui.separator();
-
-                    ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-                        egui::ScrollArea::vertical().show(ui, |ui| self.draw_settings_fields(ui));
-                    });
-                });
+                    self.settings = AppSettings::default();
+                    self.v.modified_settings = AppSettings::default();
+                    self.settings.apply_appearance(ui.ctx());
+                }
             });
 
-        if !show_window {
-            self.cancel_settings_window(ctx);
-        }
+            ui.separator();
+
+            ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    self.draw_settings_fields(ui);
+                    ui.add_space(10.0);
+                    egui::CollapsingHeader::new("Migrate downloads").show(ui, |ui| self.draw_migration_section(ui));
+                    egui::CollapsingHeader::new("About rusty-psn").show(ui, |ui| self.draw_about_section(ui));
+                });
+            });
+        });
     }
 
-    /// Close the settings window without saving, undoing a previewed theme or text size.
-    pub(super) fn cancel_settings_window(&mut self, ctx: &egui::Context) {
-        self.v.show_settings_window = false;
+    pub(super) fn save_settings(&mut self) {
+        self.v.settings_dirty = false;
+        self.settings = self.v.modified_settings.clone();
+    }
+
+    /// Drop unsaved changes, undoing a previewed theme or text size.
+    pub(super) fn cancel_settings(&mut self, ctx: &egui::Context) {
         self.v.settings_dirty = false;
         self.settings.apply_appearance(ctx);
     }

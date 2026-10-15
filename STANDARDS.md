@@ -323,13 +323,13 @@ UpdatesApp (eframe::App)
 
 ### 6.3 UI Layout
 
-- **Menu bar**: File (Settings, Quit), Tools (Import Batch, Scan RPCS3, Migrate Downloads), Help (About)
-- **Search bar**: Serial input, search button, settings gear, Import Batch, Scan RPCS3, Download All, Clear
+- **Sidebar** (`src/egui/chrome.rs`): a fixed left panel choosing the page shown in the central area: Search, RPCS3 library, Patches and DLC, Firmware and History at the top, Settings at the foot. `docs/design.md` § "Window layout" is the rule it follows (RPSN-0157). Ctrl+F goes to Search and focuses the serial box; Escape goes to Search; Ctrl+S opens Settings, or saves on the Settings page
+- **Search page**: serial input and search button; below it Import Batch, Download All, Download All Latest, Clear results and Open Downloads, wrapping at a large text size
 - **Results list**: Vertical scrollable area with collapsible headers per title (aggregate status in header)
 - **Package entries**: Grouped panels with version, size, SHA1, download/pause/abort/resume buttons, progress bar, Copy URL
-- **Settings window**: Fixed-size window with Downloads, Appearance (theme, text size), Notifications, RPCS3 Integration and Content Library. Its fields scroll above the Save row, so it fits the screen at a large text size
+- **Settings page**: Downloads, Appearance (theme, text size), Notifications, RPCS3 Integration and Content Library, then folding sections for Migrate downloads and About. The fields scroll above the fixed Save row. Leaving the page drops unsaved changes
 - **Status bar**: Bottom panel with batch progress, download counts, speed (EMA), ETA, aggregate progress bar
-- **RPCS3 Library window**: Grid showing serial, title, installed/available versions, update status
+- **RPCS3 library page**: a Scan button, then a grid showing serial, title, installed/available versions, update status
 - **Hash mismatch warning**: Fixed-size modal (`550x100`) explaining Sony server reliability issues
 
 ### 6.4 Font Embedding

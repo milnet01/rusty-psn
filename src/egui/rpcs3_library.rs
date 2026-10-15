@@ -1,4 +1,4 @@
-//! The RPCS3 library window: scanning the library and installing updates.
+//! The RPCS3 library page: scanning the library and installing updates.
 
 use super::*;
 
@@ -11,7 +11,7 @@ impl UpdatesApp {
         }
     }
 
-    /// What "Scan RPCS3 Library" does, from the toolbar or the Tools menu: scan the
+    /// What "Scan RPCS3 library" does, on the RPCS3 library page: scan the
     /// configured RPCS3, else look for one and scan it when found.
     pub(super) fn scan_or_detect_rpcs3(&mut self, ctx: &egui::Context) {
         if self.settings.rpcs3_config_dir.is_some() {
@@ -61,8 +61,8 @@ impl UpdatesApp {
                 "RPCS3 not found. Go to Settings to configure the RPCS3 path.".to_string(),
                 ToastLevel::Warning,
             )),
-            // The Settings window was shut while the search ran: nothing is waiting for it.
-            (DetectFor::Settings, _) if !self.v.show_settings_window => {}
+            // The Settings page was left while the search ran: nothing is waiting for it.
+            (DetectFor::Settings, _) if self.v.page != chrome::Page::Settings => {}
             (DetectFor::Settings, Some(installation)) => {
                 self.v.settings_dirty = true;
                 self.v.modified_settings.rpcs3_config_dir = Some(installation.config_dir);
@@ -132,7 +132,6 @@ impl UpdatesApp {
                 let search_count = self.v.enqueue_batch_search(games.iter().map(|g| g.serial.clone()));
 
                 self.v.rpcs3_installed_games = games;
-                self.v.show_rpcs3_library_window = true;
 
                 toasts.push((
                     format!("RPCS3 scan: {count} game(s) found, checking {search_count} for updates..."),
@@ -145,10 +144,8 @@ impl UpdatesApp {
         }
     }
 
-    pub(super) fn draw_rpcs3_library_window(&mut self, ctx: &egui::Context) {
-        let mut show = self.v.show_rpcs3_library_window;
-
-        // Pre-compute outdated games list outside the window closure to minimize cloning.
+    pub(super) fn draw_rpcs3_library_page(&mut self, ui: &mut egui::Ui) {
+        // Pre-compute outdated games list outside the page closure to minimize cloning.
         // Only the title_id/title/pkg tuples needed for downloading are cloned, not the full lists.
         let game_count = self.v.rpcs3_installed_games.len();
         let games_to_update: Vec<_> = self
@@ -168,91 +165,89 @@ impl UpdatesApp {
             .collect();
         let outdated_count = games_to_update.len();
 
-        // Collect download actions from the window, then apply them after the closure.
+        // Collect download actions from the page, then apply them after the closure.
         let mut download_actions: Vec<(String, String, PackageInfo)> = Vec::new();
+        let mut scan = false;
 
-        egui::Window::new("RPCS3 Library")
-            .open(&mut show)
-            .resizable(true)
-            .default_size([700.0, 400.0])
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(format!(
-                        "{game_count} game(s) installed, {outdated_count} with updates available"
-                    ));
+        ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                scan = ui.button("Scan RPCS3 library").clicked();
+                ui.label(format!(
+                    "{game_count} game(s) installed, {outdated_count} with updates available"
+                ));
 
-                    if outdated_count > 0 && ui.button("Update All Outdated").clicked() {
-                        download_actions = games_to_update;
-                    }
-                });
-
-                ui.separator();
-
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    egui::Grid::new("rpcs3_library_grid")
-                        .striped(true)
-                        .min_col_width(60.0)
-                        .show(ui, |ui| {
-                            // Header row.
-                            ui.strong("Serial");
-                            ui.strong("Title");
-                            ui.strong("Installed");
-                            ui.strong("Available");
-                            ui.strong("Status");
-                            ui.end_row();
-
-                            for i in 0..self.v.rpcs3_installed_games.len() {
-                                let game = &self.v.rpcs3_installed_games[i];
-                                ui.label(&game.serial);
-                                ui.label(&game.title);
-
-                                let installed_ver = game.installed_version.as_deref().unwrap_or("--");
-                                ui.label(installed_ver);
-
-                                // Look up the PSN update info for this serial.
-                                let update_info = self.v.update_results.iter().find(|u| u.title_id == game.serial);
-                                let available_ver = update_info
-                                    .and_then(|u| u.packages.last())
-                                    .map(|p| p.version.as_str())
-                                    .unwrap_or("--");
-                                ui.label(available_ver);
-
-                                // Status column.
-                                if let (Some(inst), Some(update)) = (&game.installed_version, update_info) {
-                                    if let Some(latest) = update.packages.last() {
-                                        match crate::rpcs3::compare_versions(inst, &latest.version) {
-                                            std::cmp::Ordering::Less => {
-                                                status_pill(ui, "Update available", StatusKind::Attention);
-                                            }
-                                            _ => {
-                                                status_pill(ui, "Up to date", StatusKind::Done);
-                                            }
-                                        }
-                                    } else {
-                                        ui.label("No updates");
-                                    }
-                                } else if update_info.is_none()
-                                    && (self.v.batch_search_active.iter().any(|(s, _)| s == &game.serial)
-                                        || self.v.batch_search_queue.iter().any(|s| s == &game.serial))
-                                {
-                                    status_pill(ui, "Checking…", StatusKind::Working);
-                                } else {
-                                    ui.label("--");
-                                }
-
-                                ui.end_row();
-                            }
-                        });
-                });
+                if outdated_count > 0 && ui.button("Update All Outdated").clicked() {
+                    download_actions = games_to_update;
+                }
             });
 
-        // Apply queued download actions after the window closure.
-        for (title_id, title, pkg) in download_actions {
-            self.queue_download_no_ui(title_id, title, pkg);
+            ui.separator();
+
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                egui::Grid::new("rpcs3_library_grid")
+                    .striped(true)
+                    .min_col_width(60.0)
+                    .show(ui, |ui| {
+                        // Header row.
+                        ui.strong("Serial");
+                        ui.strong("Title");
+                        ui.strong("Installed");
+                        ui.strong("Available");
+                        ui.strong("Status");
+                        ui.end_row();
+
+                        for i in 0..self.v.rpcs3_installed_games.len() {
+                            let game = &self.v.rpcs3_installed_games[i];
+                            ui.label(&game.serial);
+                            ui.label(&game.title);
+
+                            let installed_ver = game.installed_version.as_deref().unwrap_or("--");
+                            ui.label(installed_ver);
+
+                            // Look up the PSN update info for this serial.
+                            let update_info = self.v.update_results.iter().find(|u| u.title_id == game.serial);
+                            let available_ver = update_info
+                                .and_then(|u| u.packages.last())
+                                .map(|p| p.version.as_str())
+                                .unwrap_or("--");
+                            ui.label(available_ver);
+
+                            // Status column.
+                            if let (Some(inst), Some(update)) = (&game.installed_version, update_info) {
+                                if let Some(latest) = update.packages.last() {
+                                    match crate::rpcs3::compare_versions(inst, &latest.version) {
+                                        std::cmp::Ordering::Less => {
+                                            status_pill(ui, "Update available", StatusKind::Attention);
+                                        }
+                                        _ => {
+                                            status_pill(ui, "Up to date", StatusKind::Done);
+                                        }
+                                    }
+                                } else {
+                                    ui.label("No updates");
+                                }
+                            } else if update_info.is_none()
+                                && (self.v.batch_search_active.iter().any(|(s, _)| s == &game.serial)
+                                    || self.v.batch_search_queue.iter().any(|s| s == &game.serial))
+                            {
+                                status_pill(ui, "Checking…", StatusKind::Working);
+                            } else {
+                                ui.label("--");
+                            }
+
+                            ui.end_row();
+                        }
+                    });
+            });
+        });
+
+        if scan {
+            self.scan_or_detect_rpcs3(&ui.ctx().clone());
         }
 
-        if !show {
-            self.v.show_rpcs3_library_window = false;
+        // Apply queued download actions after the page closure.
+        for (title_id, title, pkg) in download_actions {
+            self.queue_download_no_ui(title_id, title, pkg);
         }
     }
 

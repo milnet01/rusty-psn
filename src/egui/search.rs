@@ -285,11 +285,6 @@ impl UpdatesApp {
                 self.v.search_promise = Some(promise);
             });
 
-            if ui.button("⚙").clicked() {
-                self.v.modified_settings = self.settings.clone();
-                self.v.show_settings_window = true;
-            }
-
             // Batch search progress indicator (inline in search bar).
             let batch_active = self.v.batch_search_total > 0
                 && (self.v.batch_search_completed < self.v.batch_search_total || !self.v.batch_search_active.is_empty());
@@ -307,18 +302,10 @@ impl UpdatesApp {
             }
         });
 
-        // Row 2: Action buttons — always visible.
-        ui.horizontal(|ui| {
+        // Row 2: Action buttons — always visible, wrapping onto a second line at a large text size.
+        ui.horizontal_wrapped(|ui| {
             if ui.button("Import Batch...").clicked() {
                 self.trigger_batch_import();
-            }
-
-            if ui.button("Scan RPCS3 Library").clicked() {
-                self.scan_or_detect_rpcs3(ui.ctx());
-            }
-
-            if ui.button("Download Firmware").clicked() {
-                self.v.show_firmware_window = true;
             }
 
             ui.separator();

@@ -1,4 +1,4 @@
-//! Small dialogs: hash mismatch, about, and folder migration.
+//! The hash mismatch window, and the About and folder-migration sections of the Settings page.
 
 use super::*;
 
@@ -23,28 +23,10 @@ impl UpdatesApp {
         });
     }
 
-    pub(super) fn draw_about_window(&mut self, ctx: &egui::Context) {
-        let mut show_window = self.v.show_about_window;
-        egui::Window::new("About rusty-psn")
-            .open(&mut show_window)
-            .collapsible(false)
-            .resizable(false)
-            .fixed_size([300.0, 120.0])
-            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-            .show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.heading("rusty-psn");
-                    ui.label(format!("Version {}", env!("CARGO_PKG_VERSION")));
-                    ui.add_space(5.0);
-                    ui.label("Download PlayStation game updates for use with emulators.");
-                    ui.add_space(5.0);
-                    ui.hyperlink_to("GitHub Repository", "https://github.com/RainbowCookie32/rusty-psn");
-                });
-            });
-
-        if !show_window {
-            self.v.show_about_window = false;
-        }
+    pub(super) fn draw_about_section(&mut self, ui: &mut egui::Ui) {
+        ui.label(format!("rusty-psn version {}", env!("CARGO_PKG_VERSION")));
+        ui.label("Download PlayStation game updates for use with emulators.");
+        ui.hyperlink_to("GitHub Repository", "https://github.com/RainbowCookie32/rusty-psn");
     }
 
     /// Report a finished migration, even when its dialog was closed while it ran.
@@ -61,73 +43,76 @@ impl UpdatesApp {
                     self.show_notifications(&msg, ToastLevel::Success);
                 }
                 self.v.migration_promise = None;
-                self.v.show_migration_dialog = false;
+                self.v.migration_listed = false;
             }
         }
     }
 
-    pub(super) fn draw_migration_dialog(&mut self, ctx: &egui::Context) {
-        let mut show = self.v.show_migration_dialog;
-        egui::Window::new("Migrate Downloads")
-            .open(&mut show)
-            .collapsible(false)
-            .resizable(true)
-            .default_size([500.0, 300.0])
-            .show(ctx, |ui| {
-                if self.v.migration_promise.is_some() {
-                    ui.label("Migration in progress...");
-                    ui.spinner();
-                    return;
+    /// Moving download folders made under an older layout into the current one. The folders
+    /// are listed first, and nothing moves until the user presses Migrate.
+    pub(super) fn draw_migration_section(&mut self, ui: &mut egui::Ui) {
+        ui.vertical(|ui| {
+            if self.v.migration_promise.is_none() && ui.button("Look for folders to migrate").clicked() {
+                self.v.migration_preview =
+                    crate::utils::detect_migratable_directories(&self.settings.pkg_download_path, self.settings.directory_format);
+                self.v.migration_scan_root = self.settings.pkg_download_path.clone();
+                self.v.migration_listed = true;
+            }
+
+            if self.v.migration_promise.is_some() {
+                ui.label("Migration in progress...");
+                ui.spinner();
+                return;
+            }
+
+            if !self.v.migration_listed {
+                return;
+            }
+
+            if self.v.migration_preview.is_empty() {
+                ui.label("No folders found that need migration.");
+                ui.label(format!("Current format: {}", self.settings.directory_format));
+                return;
+            }
+
+            ui.label(format!(
+                "Found {} folder(s) to migrate to \"{}\" format:",
+                self.v.migration_preview.len(),
+                self.settings.directory_format
+            ));
+            ui.add_space(5.0);
+
+            egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                for (old, new) in &self.v.migration_preview {
+                    let old_name = old.file_name().unwrap_or_default().to_string_lossy();
+                    let new_display = new.strip_prefix(&self.v.migration_scan_root).unwrap_or(new);
+                    ui.label(format!("  {} → {}", old_name, new_display.display()));
                 }
-
-                if self.v.migration_preview.is_empty() {
-                    ui.label("No folders found that need migration.");
-                    ui.label(format!("Current format: {}", self.settings.directory_format));
-                    return;
-                }
-
-                ui.label(format!(
-                    "Found {} folder(s) to migrate to \"{}\" format:",
-                    self.v.migration_preview.len(),
-                    self.settings.directory_format
-                ));
-                ui.add_space(5.0);
-
-                egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                    for (old, new) in &self.v.migration_preview {
-                        let old_name = old.file_name().unwrap_or_default().to_string_lossy();
-                        let new_display = new.strip_prefix(&self.v.migration_scan_root).unwrap_or(new);
-                        ui.label(format!("  {} → {}", old_name, new_display.display()));
-                    }
-                });
-
-                ui.add_space(5.0);
-                ui.separator();
-                ui.horizontal(|ui| {
-                    if ui.button("Migrate").clicked() {
-                        let migrations = self.v.migration_preview.clone();
-                        let download_path = self.v.migration_scan_root.clone();
-                        let ctx = ui.ctx().clone();
-                        let _guard = self
-                            .v
-                            .rt_handle
-                            .as_ref()
-                            .expect("rt_handle set in UpdatesApp::new before any UI code runs")
-                            .enter();
-                        self.v.migration_promise = Some(Promise::spawn_async(async move {
-                            let outcome = crate::utils::migrate_directories(&migrations, &download_path).await;
-                            ctx.request_repaint();
-                            outcome
-                        }));
-                    }
-                    if ui.button("Cancel").clicked() {
-                        self.v.show_migration_dialog = false;
-                    }
-                });
             });
 
-        if !show {
-            self.v.show_migration_dialog = false;
-        }
+            ui.add_space(5.0);
+            ui.separator();
+            ui.horizontal(|ui| {
+                if ui.button("Migrate").clicked() {
+                    let migrations = self.v.migration_preview.clone();
+                    let download_path = self.v.migration_scan_root.clone();
+                    let ctx = ui.ctx().clone();
+                    let _guard = self
+                        .v
+                        .rt_handle
+                        .as_ref()
+                        .expect("rt_handle set in UpdatesApp::new before any UI code runs")
+                        .enter();
+                    self.v.migration_promise = Some(Promise::spawn_async(async move {
+                        let outcome = crate::utils::migrate_directories(&migrations, &download_path).await;
+                        ctx.request_repaint();
+                        outcome
+                    }));
+                }
+                if ui.button("Cancel").clicked() {
+                    self.v.migration_listed = false;
+                }
+            });
+        });
     }
 }

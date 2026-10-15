@@ -412,10 +412,11 @@ struct VolatileData {
     serial_query: String,
     update_results: Vec<UpdateInfo>,
 
-    show_settings_window: bool,
+    /// The page the sidebar has chosen.
+    page: chrome::Page,
     show_mismatch_warning_window: bool,
-    show_about_window: bool,
-    show_migration_dialog: bool,
+    /// Whether the Settings page lists the folders a migration would move.
+    migration_listed: bool,
     migration_preview: Vec<(PathBuf, PathBuf)>,
     /// The download folder the preview was scanned from; the migration checks against this one.
     migration_scan_root: PathBuf,
@@ -449,10 +450,8 @@ struct VolatileData {
     rpcs3_scan_promise: Option<Promise<Result<Vec<crate::rpcs3::InstalledGame>, crate::rpcs3::Rpcs3Error>>>,
     rpcs3_detect_promise: Option<(DetectFor, Promise<Option<crate::rpcs3::Rpcs3Installation>>)>,
     rpcs3_installed_games: Vec<crate::rpcs3::InstalledGame>,
-    show_rpcs3_library_window: bool,
 
     // Firmware download state
-    show_firmware_window: bool,
     firmware_console_idx: usize,
     firmware_region_idx: usize,
     firmware_fetch_promise: Option<Promise<Result<Vec<crate::psn::firmware::FirmwareInfo>, crate::psn::firmware::FirmwareError>>>,
@@ -472,7 +471,6 @@ struct VolatileData {
 
     // Download history (session-only).
     download_history: Vec<DownloadHistoryEntry>,
-    show_download_history_window: bool,
 
     // RPCS3 install state. Key is (title_id, pkg_id).
     #[allow(clippy::type_complexity)]
@@ -484,7 +482,6 @@ struct VolatileData {
     rpcs3_installed_pkgs: HashSet<(String, String)>,
 
     // Content browser state.
-    show_content_browser_window: bool,
     content_library: Option<crate::content::ContentLibrary>,
     /// A content folder scan running in the background; `None` inside means it panicked.
     content_scan_promise: Option<Promise<Option<crate::content::ContentLibrary>>>,
@@ -530,10 +527,9 @@ impl Default for VolatileData {
             serial_query: String::new(),
             update_results: Vec::new(),
 
-            show_settings_window: false,
+            page: chrome::Page::Search,
             show_mismatch_warning_window: false,
-            show_about_window: false,
-            show_migration_dialog: false,
+            migration_listed: false,
             migration_preview: Vec::new(),
             migration_scan_root: PathBuf::new(),
             migration_promise: None,
@@ -563,9 +559,7 @@ impl Default for VolatileData {
             rpcs3_scan_promise: None,
             rpcs3_detect_promise: None,
             rpcs3_installed_games: Vec::new(),
-            show_rpcs3_library_window: false,
 
-            show_firmware_window: false,
             firmware_console_idx: 0,
             firmware_region_idx: 0,
             firmware_fetch_promise: None,
@@ -581,12 +575,10 @@ impl Default for VolatileData {
             focus_search_bar: false,
 
             download_history: Vec::new(),
-            show_download_history_window: false,
 
             rpcs3_install_promises: Vec::new(),
             rpcs3_installed_pkgs: HashSet::new(),
 
-            show_content_browser_window: false,
             content_library: None,
             content_scan_promise: None,
             content_filter: String::new(),
@@ -651,49 +643,32 @@ impl eframe::App for UpdatesApp {
         self.handle_keyboard_shortcuts(ctx);
         self.handle_window_placement(ctx);
 
-        // Menu bar must come before CentralPanel.
-        self.draw_menu_bar(ui);
-        // Status bar must come before CentralPanel.
+        // The sidebar and the status bar must come before CentralPanel.
+        self.draw_sidebar(ui);
         self.draw_status_bar(ui);
 
         egui::CentralPanel::default().show(ui, |ui| {
-            self.draw_search_bar(ui);
+            ui.heading(self.v.page.label());
             ui.separator();
-            self.draw_results_list(ctx, ui);
+            match self.v.page {
+                chrome::Page::Search => {
+                    self.draw_search_bar(ui);
+                    ui.separator();
+                    self.draw_results_list(ctx, ui);
+                }
+                chrome::Page::Rpcs3Library => self.draw_rpcs3_library_page(ui),
+                chrome::Page::PatchesAndDlc => self.draw_content_browser_page(ui),
+                chrome::Page::Firmware => self.draw_firmware_page(ui),
+                chrome::Page::History => self.draw_history_page(ui),
+                chrome::Page::Settings => self.draw_settings_page(ui),
+            }
         });
-
-        if self.v.show_settings_window {
-            self.draw_settings_window(ctx);
-        }
 
         if self.v.show_mismatch_warning_window {
             self.draw_hash_mismatch_window(ctx);
         }
 
-        if self.v.show_about_window {
-            self.draw_about_window(ctx);
-        }
-
         self.poll_migration();
-        if self.v.show_migration_dialog {
-            self.draw_migration_dialog(ctx);
-        }
-
-        if self.v.show_rpcs3_library_window {
-            self.draw_rpcs3_library_window(ctx);
-        }
-
-        if self.v.show_firmware_window {
-            self.draw_firmware_window(ctx);
-        }
-
-        if self.v.show_download_history_window {
-            self.draw_download_history_window(ctx);
-        }
-
-        if self.v.show_content_browser_window {
-            self.draw_content_browser_window(ctx);
-        }
 
         self.v.toasts.show(ctx);
     }
@@ -939,6 +914,59 @@ mod tests {
         assert_eq!(settings.pkg_download_path, PathBuf::from("/games/pkgs"));
         assert!(!settings.show_toasts);
         assert_eq!(settings.theme, AppTheme::default());
+    }
+
+    /// Runs one frame that presses `key` with `modifiers`, then the app's shortcut handling.
+    fn press(app: &mut UpdatesApp, ctx: &egui::Context, key: egui::Key, modifiers: egui::Modifiers) {
+        let event = egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers,
+        };
+        let input = egui::RawInput {
+            events: vec![egui::Event::ModifiersChanged(modifiers), event],
+            ..Default::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| app.handle_keyboard_shortcuts(&ui.ctx().clone()));
+        // Nothing draws these textures; epaint panics if they are dropped unapplied.
+        output.textures_delta.clear();
+    }
+
+    #[test]
+    fn shortcuts_switch_pages() {
+        let ctx = egui::Context::default();
+        let mut app = UpdatesApp::default();
+
+        press(&mut app, &ctx, egui::Key::S, egui::Modifiers::COMMAND);
+        assert_eq!(app.v.page, chrome::Page::Settings, "Ctrl+S opens Settings");
+
+        app.v.modified_settings.max_concurrent_downloads = 9;
+        app.v.settings_dirty = true;
+        press(&mut app, &ctx, egui::Key::S, egui::Modifiers::COMMAND);
+        assert_eq!(app.settings.max_concurrent_downloads, 9, "Ctrl+S on Settings saves");
+
+        press(&mut app, &ctx, egui::Key::Escape, egui::Modifiers::NONE);
+        assert_eq!(app.v.page, chrome::Page::Search, "Escape returns to Search");
+    }
+
+    #[test]
+    fn leaving_settings_drops_unsaved_changes() {
+        // Closing the Settings window discarded its edits; leaving the Settings page must too (RPSN-0157).
+        let ctx = egui::Context::default();
+        let mut app = UpdatesApp::default();
+        app.go_to(chrome::Page::Settings, &ctx);
+        app.v.modified_settings.max_concurrent_downloads = 9;
+        app.v.settings_dirty = true;
+
+        app.go_to(chrome::Page::Search, &ctx);
+        assert!(!app.v.settings_dirty);
+        app.go_to(chrome::Page::Settings, &ctx);
+        assert_eq!(
+            app.v.modified_settings.max_concurrent_downloads,
+            app.settings.max_concurrent_downloads
+        );
     }
 
     #[test]

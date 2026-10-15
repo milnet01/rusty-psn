@@ -1,149 +1,138 @@
-//! The content browser window: local patches and DLC, and installing them.
+//! The Patches and DLC page: local patches and DLC, and installing them.
 
 use super::*;
 
 impl UpdatesApp {
-    pub(super) fn draw_content_browser_window(&mut self, ctx: &egui::Context) {
-        let mut show = self.v.show_content_browser_window;
-        egui::Window::new("Content Browser")
-            .open(&mut show)
-            .resizable(true)
-            .default_size([650.0, 500.0])
-            .show(ctx, |ui| {
-                if self.settings.content_directory.is_none() {
-                    ui.label("No content directory configured. Set it in Settings > Content Library.");
-                    if ui.button("Open Settings").clicked() {
-                        self.v.modified_settings = self.settings.clone();
-                        self.v.show_settings_window = true;
-                    }
-                    return;
+    pub(super) fn draw_content_browser_page(&mut self, ui: &mut egui::Ui) {
+        ui.vertical(|ui| {
+            if self.settings.content_directory.is_none() {
+                ui.label("No content directory configured. Set it on the Settings page, under Content Library.");
+                if ui.button("Open Settings").clicked() {
+                    self.go_to(chrome::Page::Settings, &ui.ctx().clone());
                 }
+                return;
+            }
 
-                let has_rpcs3 = self.settings.rpcs3_executable.is_some();
+            let has_rpcs3 = self.settings.rpcs3_executable.is_some();
 
-                // Toolbar
-                ui.horizontal(|ui| {
-                    ui.label("Filter:");
-                    ui.text_edit_singleline(&mut self.v.content_filter);
-                    if ui.button("Rescan").clicked() {
-                        self.start_content_scan();
-                    }
-                });
-                ui.separator();
-
-                let Some(ref library) = self.v.content_library else {
-                    ui.label("Loading...");
-                    return;
-                };
-
-                let filter_lower = self.v.content_filter.to_lowercase();
-                let filtered_games: Vec<usize> = library
-                    .games
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, g)| filter_lower.is_empty() || g.name.to_lowercase().contains(&filter_lower))
-                    .map(|(i, _)| i)
-                    .collect();
-
-                ui.label(format!("{} game(s) shown (of {})", filtered_games.len(), library.games.len()));
-                ui.add_space(3.0);
-
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for &game_idx in &filtered_games {
-                        let game = &library.games[game_idx];
-                        let id = egui::Id::new(("content_game", game_idx));
-                        egui::CollapsingHeader::new(egui::RichText::new(&game.name).strong())
-                            .id_salt(id)
-                            .show(ui, |ui| {
-                                // Patches section
-                                if !game.patches.is_empty() {
-                                    ui.label(egui::RichText::new(format!("Patches ({})", game.patches.len())).underline());
-                                    for patch in &game.patches {
-                                        ui.horizontal(|ui| {
-                                            ui.label(format!("  {} / {}", patch.serial, patch.pkg_filename));
-                                            let patch_key = patch.pkg_path.to_string_lossy().to_string();
-                                            let is_installed = self.v.content_installed_items.contains(&patch_key);
-                                            let is_installing =
-                                                self.v.content_install_promises.iter().any(|(k, _)| *k == patch_key);
-
-                                            if is_installed {
-                                                status_pill(ui, "Installed", StatusKind::Done);
-                                            } else if is_installing {
-                                                status_pill(ui, "Installing…", StatusKind::Working);
-                                            } else if has_rpcs3 && ui.small_button("Install").clicked() {
-                                                let exe =
-                                                    self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
-                                                let pkg = patch.pkg_path.clone();
-                                                let key = patch_key.clone();
-                                                // ContentPatch carries no version, so any change of version confirms it.
-                                                let check = Self::update_install_check(
-                                                    self.settings.rpcs3_config_dir.as_deref(),
-                                                    &patch.serial,
-                                                    None,
-                                                );
-                                                let rt = self
-                                                    .v
-                                                    .rt_handle
-                                                    .clone()
-                                                    .expect("rt_handle set in UpdatesApp::new before any UI code runs");
-                                                let _guard = rt.enter();
-                                                let promise = Promise::spawn_async(async move {
-                                                    crate::rpcs3::install_pkg(&exe, &pkg, check)
-                                                        .await
-                                                        .map_err(|e| crate::content::ContentError::InstallFailed(e.to_string()))
-                                                });
-                                                self.v.content_install_promises.push((key, promise));
-                                            }
-                                        });
-                                    }
-                                    ui.add_space(3.0);
-                                }
-
-                                // DLC section
-                                if !game.dlc.is_empty() {
-                                    ui.label(egui::RichText::new(format!("DLC ({})", game.dlc.len())).underline());
-                                    for dlc_item in &game.dlc {
-                                        ui.horizontal(|ui| {
-                                            ui.label(format!("  {} ({})", dlc_item.zip_filename, ByteSize::b(dlc_item.size)));
-                                            let dlc_key = dlc_item.zip_path.to_string_lossy().to_string();
-                                            let is_installed = self.v.content_installed_items.contains(&dlc_key);
-                                            let is_installing =
-                                                self.v.content_install_promises.iter().any(|(k, _)| *k == dlc_key);
-
-                                            if is_installed {
-                                                status_pill(ui, "Installed", StatusKind::Done);
-                                            } else if is_installing {
-                                                status_pill(ui, "Installing…", StatusKind::Working);
-                                            } else if has_rpcs3 && ui.small_button("Install").clicked() {
-                                                let exe =
-                                                    self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
-                                                let zip = dlc_item.zip_path.clone();
-                                                let key = dlc_key.clone();
-                                                let rt = self
-                                                    .v
-                                                    .rt_handle
-                                                    .clone()
-                                                    .expect("rt_handle set in UpdatesApp::new before any UI code runs");
-                                                let _guard = rt.enter();
-                                                let promise = Promise::spawn_async(async move {
-                                                    // A DLC cannot be checked; a clean exit marks it installed, as before
-                                                    // (docs/specs/RPSN-0137-headless-confirmed-install.md § 3).
-                                                    crate::content::install_dlc_zip(&exe, &zip)
-                                                        .await
-                                                        .map(|()| crate::rpcs3::InstallOutcome::Confirmed)
-                                                });
-                                                self.v.content_install_promises.push((key, promise));
-                                            }
-                                        });
-                                    }
-                                }
-                            });
-                    }
-                });
+            // Toolbar
+            ui.horizontal(|ui| {
+                ui.label("Filter:");
+                ui.text_edit_singleline(&mut self.v.content_filter);
+                if ui.button("Rescan").clicked() {
+                    self.start_content_scan();
+                }
             });
-        if !show {
-            self.v.show_content_browser_window = false;
-        }
+            ui.separator();
+
+            let Some(ref library) = self.v.content_library else {
+                ui.label("Loading...");
+                return;
+            };
+
+            let filter_lower = self.v.content_filter.to_lowercase();
+            let filtered_games: Vec<usize> = library
+                .games
+                .iter()
+                .enumerate()
+                .filter(|(_, g)| filter_lower.is_empty() || g.name.to_lowercase().contains(&filter_lower))
+                .map(|(i, _)| i)
+                .collect();
+
+            ui.label(format!("{} game(s) shown (of {})", filtered_games.len(), library.games.len()));
+            ui.add_space(3.0);
+
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                for &game_idx in &filtered_games {
+                    let game = &library.games[game_idx];
+                    let id = egui::Id::new(("content_game", game_idx));
+                    egui::CollapsingHeader::new(egui::RichText::new(&game.name).strong())
+                        .id_salt(id)
+                        .show(ui, |ui| {
+                            // Patches section
+                            if !game.patches.is_empty() {
+                                ui.label(egui::RichText::new(format!("Patches ({})", game.patches.len())).underline());
+                                for patch in &game.patches {
+                                    ui.horizontal(|ui| {
+                                        ui.label(format!("  {} / {}", patch.serial, patch.pkg_filename));
+                                        let patch_key = patch.pkg_path.to_string_lossy().to_string();
+                                        let is_installed = self.v.content_installed_items.contains(&patch_key);
+                                        let is_installing = self.v.content_install_promises.iter().any(|(k, _)| *k == patch_key);
+
+                                        if is_installed {
+                                            status_pill(ui, "Installed", StatusKind::Done);
+                                        } else if is_installing {
+                                            status_pill(ui, "Installing…", StatusKind::Working);
+                                        } else if has_rpcs3 && ui.small_button("Install").clicked() {
+                                            let exe =
+                                                self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
+                                            let pkg = patch.pkg_path.clone();
+                                            let key = patch_key.clone();
+                                            // ContentPatch carries no version, so any change of version confirms it.
+                                            let check = Self::update_install_check(
+                                                self.settings.rpcs3_config_dir.as_deref(),
+                                                &patch.serial,
+                                                None,
+                                            );
+                                            let rt = self
+                                                .v
+                                                .rt_handle
+                                                .clone()
+                                                .expect("rt_handle set in UpdatesApp::new before any UI code runs");
+                                            let _guard = rt.enter();
+                                            let promise = Promise::spawn_async(async move {
+                                                crate::rpcs3::install_pkg(&exe, &pkg, check)
+                                                    .await
+                                                    .map_err(|e| crate::content::ContentError::InstallFailed(e.to_string()))
+                                            });
+                                            self.v.content_install_promises.push((key, promise));
+                                        }
+                                    });
+                                }
+                                ui.add_space(3.0);
+                            }
+
+                            // DLC section
+                            if !game.dlc.is_empty() {
+                                ui.label(egui::RichText::new(format!("DLC ({})", game.dlc.len())).underline());
+                                for dlc_item in &game.dlc {
+                                    ui.horizontal(|ui| {
+                                        ui.label(format!("  {} ({})", dlc_item.zip_filename, ByteSize::b(dlc_item.size)));
+                                        let dlc_key = dlc_item.zip_path.to_string_lossy().to_string();
+                                        let is_installed = self.v.content_installed_items.contains(&dlc_key);
+                                        let is_installing = self.v.content_install_promises.iter().any(|(k, _)| *k == dlc_key);
+
+                                        if is_installed {
+                                            status_pill(ui, "Installed", StatusKind::Done);
+                                        } else if is_installing {
+                                            status_pill(ui, "Installing…", StatusKind::Working);
+                                        } else if has_rpcs3 && ui.small_button("Install").clicked() {
+                                            let exe =
+                                                self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
+                                            let zip = dlc_item.zip_path.clone();
+                                            let key = dlc_key.clone();
+                                            let rt = self
+                                                .v
+                                                .rt_handle
+                                                .clone()
+                                                .expect("rt_handle set in UpdatesApp::new before any UI code runs");
+                                            let _guard = rt.enter();
+                                            let promise = Promise::spawn_async(async move {
+                                                // A DLC cannot be checked; a clean exit marks it installed, as before
+                                                // (docs/specs/RPSN-0137-headless-confirmed-install.md § 3).
+                                                crate::content::install_dlc_zip(&exe, &zip)
+                                                    .await
+                                                    .map(|()| crate::rpcs3::InstallOutcome::Confirmed)
+                                            });
+                                            self.v.content_install_promises.push((key, promise));
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                }
+            });
+        });
     }
 
     /// Scan the content folder in the background: it reads every file there, which would

@@ -1161,6 +1161,20 @@ Work named by docs/design.md and its review on 2026-10-12.
   window sizes. Mockup labels for text size are Normal, Large, Extra
   large; today's setting offers 100% to 200%, so map them or keep
   percentages, the owner has not said.
+  Progress (2026-10-15): review loop 10 ran (ADR cap; 3 fixes: the
+  startup network error box is an exception, a list keeps one fixed box,
+  drop-down lists, hover hints and right-click menus stay). Step 1
+  built: a fixed left sidebar (Search, RPCS3 library, Patches and DLC,
+  Firmware, History; Settings at the foot) replaces the menu bar;
+  Settings, RPCS3 Library, Content Browser, Download Firmware and
+  Download History are pages; About and Migrate downloads fold inside
+  Settings. Leaving Settings drops unsaved changes, as closing its
+  window did. Escape goes to Search; Ctrl+S opens Settings, or saves on
+  it. The Downloads page waits for step 5, which gives it its list. The
+  File integrity check failed window and the toasts remain for step 2.
+  The private screenshot display does not pass key presses to the app,
+  so the shortcuts are proven by a unit test that presses them inside
+  egui.
   **Layman:** Nothing pops up and nothing jumps around: every part of the app has its own spot in the main window and can be folded away.
   Kind: ux.
   Source: user-request-2026-10-14.
