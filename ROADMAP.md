@@ -1111,7 +1111,7 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: user-request-2026-10-13 RPSN-0133.
   Lanes: Window app.
 
-- 📋 [RPSN-0145] **Build the redesigned layout: sidebar, library table with filters, Settings with Save and Undo.**
+- ✅ [RPSN-0145] **Build the redesigned layout: sidebar, library table with filters, Settings with Save and Undo.**
   Last and largest part of the approved redesign (RPSN-0133); mockups linked there. Spans several screens, so check whether it needs a spec before building (spec-format.md section 1).
   Progress (2026-10-14): no spec needed (spec-format.md section 1: one
   part, the Window app; mockups approved; each panel moves in one at a
@@ -1119,12 +1119,16 @@ Work named by docs/design.md and its review on 2026-10-12.
   rule that nothing pops up and nothing moves. At 200% text size today's
   top button row runs off the window's right edge; the sidebar replaces
   it.
+  Resolved (2026-10-15): built with RPSN-0157, steps 1 to 7: sidebar
+  pages, a Messages panel, fixed status bar slots, Settings with Save
+  changes and Undo changes, a Downloads page with three sections, and
+  RPCS3 library filter buttons. Hand tests are listed in RPSN-0157.
   **Layman:** The new layout from the approved mockups.
   Kind: ux.
   Source: user-request-2026-10-13 RPSN-0133.
   Lanes: Window app.
 
-- 📋 [RPSN-0157] **Give every panel and message a fixed, foldable place in the main window; no pop-up windows.**
+- ✅ [RPSN-0157] **Give every panel and message a fixed, foldable place in the main window; no pop-up windows.**
   Owner's words (2026-10-14): "The current app brings up modals for
   various tasks. I don't want this. Everything that provides feedback
   to the user should have a place on the app window and be collapsable.
@@ -1205,6 +1209,19 @@ Work named by docs/design.md and its review on 2026-10-12.
   function decides each game's status for both the Status column and the
   filters. A game whose search failed now shows "--" and appears under
   All only, where before nothing told it from a game with no updates.
+  Resolved (2026-10-15): step 7 built, the last. The window starts at
+  1320 x 860 and cannot be made smaller than 1320 x 700, the width the
+  sidebar and a full status bar need at 100% text size; it still fits a
+  1366-wide screen. No egui::Window, toast or modal is left in src; the
+  startup network error box is the rule's one exception. docs/design.md
+  now says the code follows the rule. Owner's hand tests: press Escape
+  and Ctrl+S (the private screenshot display cannot pass keys to the
+  app); watch a real download move from In progress to Finished on the
+  Downloads page; check the larger window on the real desktop, where
+  eframe restores the last size, so the new smallest size is what shows.
+  Not foldable: the sidebar and the one-line status bar, which hold
+  navigation and counts rather than messages; say if they should fold
+  too.
   **Layman:** Nothing pops up and nothing jumps around: every part of the app has its own spot in the main window and can be folded away.
   Kind: ux.
   Source: user-request-2026-10-14.

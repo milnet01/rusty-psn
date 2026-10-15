@@ -127,8 +127,8 @@ sets for a second reason to change.
   up its network connection at startup: the main window never opens, and
   the app closes after it. So are system notifications, which the user turns
   on in Settings and which repeat a message the Messages panel shows. The
-  owner set this on 2026-10-14 (RPSN-0157); the code does not follow it
-  yet.
+  owner set this on 2026-10-14 (RPSN-0157); the code follows it since
+  2026-10-15.
 
 ## The stack, and what it rules out
 

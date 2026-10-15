@@ -154,10 +154,12 @@ fn main() {
         let icon =
             eframe::icon_data::from_png_bytes(include_bytes!("../resources/icon-256.png")).expect("Failed to load app icon");
 
+        // Wide enough at 100% text size for the sidebar and a full status bar, whose fixed slots
+        // measure about 1,300 points together (RPSN-0157 step 7). It still fits a 1366-wide screen.
         let native_options = eframe::NativeOptions {
             viewport: eframe::egui::ViewportBuilder::default()
-                .with_inner_size([800.0, 600.0])
-                .with_min_inner_size([600.0, 400.0])
+                .with_inner_size([1320.0, 860.0])
+                .with_min_inner_size([1320.0, 700.0])
                 .with_icon(Arc::new(icon)),
             ..Default::default()
         };
