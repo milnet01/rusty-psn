@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=160 -->
+<!-- ants-roadmap-id-high-water: RPSN=161 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -863,6 +863,13 @@ Lower priority items that would improve the overall experience.
   Windows code passes clippy for x86_64-pc-windows-gnu. Owner hand
   tests: start a download and minimise; the rusty-psn taskbar icon
   should fill as it runs and clear when it ends, on KDE and on Windows.
+  Windows checked 2026-10-15 by Claude on SparePC (Windows 10 22H2)
+  over ssh wintest, with the GitHub build of 8e7a9ff: UI Automation
+  searched BCUS98174 and pressed Download All; screenshots show the
+  taskbar button filling green while downloading, still growing after
+  the window was minimised, and gone after close. The Windows hand test
+  is done; the owner does not test on that machine. KDE still unseen:
+  the signal was checked with dbus-monitor only.
   **Layman:** Let the app shrink to the system tray during long downloads.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -996,6 +1003,20 @@ Lower priority items that would improve the overall experience.
   **Layman:** A library scan's results stay on "Checking..." until the mouse moves; show them as soon as they arrive.
   Kind: fix.
   Source: in-session-2026-10-15.
+
+- 📋 [RPSN-0161] **PS5 game updates.**
+  Owner request 2026-10-15: Sony has announced the end of physical
+  media for PlayStation games, and PS5 emulation is moving fast as a
+  result, so PS5 updates are now worth having. The app already fetches
+  PS5 firmware (--firmware-console PS5) but no PS5 game updates.
+  Research first (project rule 2): how PS5 update metadata is served
+  (the PS4 route is an HMAC-keyed URL on gs-sec.ww.np.dl.playstation.net;
+  whether PS5 has a public equivalent or needs signed requests), the PS5
+  serial prefixes (PPSA and others), the package format and how a
+  download is verified, and what PS5 emulators expect on disk.
+  **Layman:** Let the app find and download PS5 game updates, as it does for PS3, PS4, Vita and PSP.
+  Kind: feature.
+  Source: user-request-2026-10-15.
 
 ## 10. Custom Application Icon [P2]
 
