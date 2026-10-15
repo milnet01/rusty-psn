@@ -52,6 +52,7 @@ impl UpdatesApp {
         match page {
             Page::Settings => self.v.modified_settings = self.settings.clone(),
             Page::PatchesAndDlc => self.start_content_scan(),
+            Page::Firmware => self.read_rpcs3_firmware_version(),
             _ => {}
         }
         self.v.page = page;

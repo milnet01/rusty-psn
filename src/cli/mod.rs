@@ -39,7 +39,28 @@ pub fn start_app(args: Args) -> bool {
         let destination = args.destination_path.clone().unwrap_or_else(|| PathBuf::from("pkgs/"));
         let silent = args.silent;
 
-        return runtime.block_on(download_firmware_cli(&client, console, region, &destination, silent));
+        // --install also installs the firmware into RPCS3 (RPSN-0141). Its folder, where the
+        // install is checked, is auto-detected only together with the executable, as for updates.
+        let install = if args.install {
+            let detected = if args.rpcs3_executable.is_none() {
+                crate::rpcs3::auto_detect::detect_rpcs3()
+            } else {
+                None
+            };
+            let config_dir = args
+                .rpcs3_config_dir
+                .clone()
+                .or_else(|| detected.as_ref().map(|i| i.config_dir.clone()));
+            let Some(exe) = args.rpcs3_executable.clone().or_else(|| detected.and_then(|i| i.executable)) else {
+                eprintln!("Error: --install requires RPCS3. Use --rpcs3-executable or ensure RPCS3 is auto-detectable.");
+                std::process::exit(1);
+            };
+            Some((exe, config_dir))
+        } else {
+            None
+        };
+
+        return runtime.block_on(download_firmware_cli(&client, console, region, &destination, silent, install));
     }
 
     let silent_mode = args.silent;
@@ -629,6 +650,7 @@ async fn download_firmware_cli(
     region: crate::psn::firmware::FirmwareRegion,
     destination: &std::path::Path,
     silent: bool,
+    install: Option<(PathBuf, Option<PathBuf>)>,
 ) -> bool {
     if !silent {
         println!("Fetching {} firmware list for {}...", console, region);
@@ -727,7 +749,13 @@ async fn download_firmware_cli(
                 } else if !silent {
                     println!("\nFirmware download completed successfully.");
                 }
-                break result.is_ok();
+                if result.is_err() {
+                    break false;
+                }
+                let Some((exe, config_dir)) = &install else {
+                    break true;
+                };
+                break install_firmware_cli(fw, destination, exe, config_dir.as_deref(), silent).await;
             }
             None => {
                 if let Ok(status) = rx.try_recv() {
@@ -767,8 +795,48 @@ async fn download_firmware_cli(
     }
 }
 
-/// Collect the serials from every `-t` value, split on any whitespace, normalised and deduplicated
-/// as a batch file's are. Validation stays with the search, which reports a bad serial by name.
+/// Install a downloaded firmware into RPCS3 for `--firmware --install` (RPSN-0141). Only a full
+/// PS3 update can go into RPCS3. Returns whether the install succeeded.
+async fn install_firmware_cli(
+    fw: &crate::psn::firmware::FirmwareInfo,
+    destination: &std::path::Path,
+    exe: &std::path::Path,
+    config_dir: Option<&std::path::Path>,
+    silent: bool,
+) -> bool {
+    use crate::psn::firmware::{FirmwareConsole, FirmwareType};
+    if fw.console != FirmwareConsole::PS3 || fw.fw_type != FirmwareType::Full {
+        eprintln!("Only a full PS3 firmware can be installed in RPCS3; this one was downloaded only.");
+        return false;
+    }
+    if !silent {
+        println!("Installing firmware {} into RPCS3...", fw.version);
+    }
+    let check = config_dir.map(|dir| crate::rpcs3::FirmwareCheck {
+        dev_flash: crate::rpcs3::config::resolve_dev_flash(dir),
+        version: fw.version.clone(),
+    });
+    match crate::rpcs3::install_firmware(exe, &fw.output_path(destination), check).await {
+        Ok(crate::rpcs3::InstallOutcome::Confirmed) => {
+            if !silent {
+                println!("Firmware installed.");
+            }
+            true
+        }
+        Ok(crate::rpcs3::InstallOutcome::Unconfirmed) => {
+            if !silent {
+                println!("RPCS3 finished; the install was not checked (pass --rpcs3-config-dir to check it).");
+            }
+            true
+        }
+        Err(e) => {
+            error!("Firmware install failed: {e}");
+            eprintln!("Firmware install failed: {e}");
+            false
+        }
+    }
+}
+
 /// Whether a downloaded update's parts can be joined into one package.
 #[derive(Debug, PartialEq)]
 enum Join {
@@ -789,6 +857,8 @@ fn parts_to_join(packages: &[crate::psn::PackageInfo], parts_downloaded: usize) 
     }
 }
 
+/// Collect the serials from every `-t` value, split on any whitespace, normalised and deduplicated
+/// as a batch file's are. Validation stays with the search, which reports a bad serial by name.
 fn serials_from_titles(titles: &[String]) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
     titles

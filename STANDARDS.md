@@ -363,6 +363,8 @@ Every message goes to the Messages panel (§ 6.3); nothing pops up inside the wi
 
 Exactly one of `--titles`, `--batch-file` or `--scan-rpcs3` must be provided, or `--firmware`
 instead of all three. Clap refuses two of them together, and an unknown `--directory-format` value.
+`--install` installs what was downloaded into RPCS3: update packages, or with `--firmware` a full
+PS3 firmware, checked against `dev_flash/vsh/etc/version.txt` when the RPCS3 folder is known.
 
 ### 7.2 Interactive Flow
 

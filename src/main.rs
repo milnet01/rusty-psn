@@ -82,7 +82,7 @@ struct Args {
     #[cfg(feature = "cli")]
     #[clap(
         long,
-        conflicts_with_all = ["titles", "batch_file", "scan_rpcs3", "install"],
+        conflicts_with_all = ["titles", "batch_file", "scan_rpcs3"],
         help = "Download firmware instead of game updates."
     )]
     firmware: bool,
@@ -97,7 +97,10 @@ struct Args {
     )]
     firmware_region: String,
     #[cfg(feature = "cli")]
-    #[clap(long, help = "Auto-install downloaded PKGs to RPCS3 after download.")]
+    #[clap(
+        long,
+        help = "Auto-install downloaded PKGs to RPCS3 after download; with --firmware, install a full PS3 firmware."
+    )]
     install: bool,
     #[cfg(feature = "cli")]
     #[clap(long, help = "Path to RPCS3 executable (AppImage, binary, or launch script).")]
@@ -314,8 +317,9 @@ mod tests {
         assert!(!parses(&["--firmware", "-t", "NPUB30826"]));
         assert!(!parses(&["--scan-rpcs3", "-t", "NPUB30826"]));
         assert!(!parses(&["--batch-file", "list.txt", "-t", "NPUB30826"]));
-        assert!(!parses(&["--firmware", "--install"]));
         assert!(parses(&["--scan-rpcs3", "--install"]));
+        // A full PS3 firmware can be installed into RPCS3 (RPSN-0141).
+        assert!(parses(&["--firmware", "--install"]));
     }
 }
 

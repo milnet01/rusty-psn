@@ -180,9 +180,16 @@ impl FirmwareInfo {
             .unwrap_or_else(|| format!("firmware_{}.PUP", self.console.short_name()))
     }
 
-    /// Download this firmware file.
+    /// Where this firmware is saved: `{download_path}/Firmware/{console_short}/v{version} {pup_filename}`.
+    pub fn output_path(&self, download_path: &std::path::Path) -> PathBuf {
+        download_path
+            .join("Firmware")
+            .join(self.console.short_name())
+            .join(format!("v{} {}", self.version, self.pup_filename()))
+    }
+
+    /// Download this firmware file to `output_path`.
     ///
-    /// Saves to `{download_path}/Firmware/{console_short}/v{version} {pup_filename}`.
     /// No hash verification is performed — Sony does not provide SHA1 hashes for firmware files.
     pub async fn start_download(
         &self,
@@ -193,10 +200,11 @@ impl FirmwareInfo {
     ) -> Result<(), DownloadError> {
         crate::security::validate_download_url(&self.download_url).map_err(DownloadError::Security)?;
 
-        let fw_dir = download_path.join("Firmware").join(self.console.short_name());
-        let pup_name = self.pup_filename();
-        let output_filename = format!("v{} {}", self.version, pup_name);
-        let output_path = fw_dir.join(&output_filename);
+        let output_path = self.output_path(&download_path);
+        let fw_dir = output_path
+            .parent()
+            .map(std::path::Path::to_path_buf)
+            .unwrap_or_else(|| download_path.clone());
 
         // Checked before any folder is created, so a linked folder cannot place one outside.
         crate::security::validate_path_containment(&output_path, &download_path).map_err(DownloadError::Security)?;

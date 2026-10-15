@@ -4,8 +4,9 @@ use super::*;
 
 impl UpdatesApp {
     pub(super) fn draw_firmware_page(&mut self, ui: &mut egui::Ui) {
-        // Collect download action outside the window closure to avoid borrow issues.
+        // Collect download and install actions outside the closure to avoid borrow issues.
         let mut download_fw: Option<crate::psn::firmware::FirmwareInfo> = None;
+        let mut install_fw: Option<crate::psn::firmware::FirmwareInfo> = None;
 
         ui.vertical(|ui| {
             let consoles = crate::psn::firmware::FirmwareConsole::all();
@@ -60,6 +61,11 @@ impl UpdatesApp {
                 }
             });
 
+            if self.settings.rpcs3_config_dir.is_some() {
+                let installed = self.v.rpcs3_firmware_version.as_deref().unwrap_or("none");
+                ui.label(format!("Firmware installed in RPCS3: {installed}"));
+            }
+
             ui.separator();
 
             if self.v.firmware_results.is_empty() && self.v.firmware_fetch_promise.is_none() {
@@ -88,10 +94,19 @@ impl UpdatesApp {
                                         .unwrap_or_else(|| "--".to_string()),
                                 );
 
-                                let downloading = self.v.firmware_download.is_some();
-                                ui.add_enabled_ui(!downloading, |ui| {
-                                    if ui.button("Download").clicked() {
-                                        download_fw = Some(entry.clone());
+                                ui.horizontal(|ui| {
+                                    let downloading = self.v.firmware_download.is_some();
+                                    ui.add_enabled_ui(!downloading, |ui| {
+                                        if ui.button("Download").clicked() {
+                                            download_fw = Some(entry.clone());
+                                        }
+                                    });
+                                    if self.can_install_firmware(entry) {
+                                        if self.v.firmware_install_promise.is_some() {
+                                            status_pill(ui, "Installing…", StatusKind::Working);
+                                        } else if ui.button("Install to RPCS3").clicked() {
+                                            install_fw = Some(entry.clone());
+                                        }
                                     }
                                 });
                                 ui.end_row();
@@ -132,9 +147,12 @@ impl UpdatesApp {
             }
         });
 
-        // Trigger firmware download if requested.
+        // Trigger firmware download or install if requested.
         if let Some(fw) = download_fw {
             self.start_firmware_download(fw);
+        }
+        if let Some(fw) = install_fw {
+            self.start_firmware_install(&fw);
         }
     }
 
@@ -198,7 +216,72 @@ impl UpdatesApp {
         });
     }
 
+    /// A full PS3 firmware already downloaded, with RPCS3 set in Settings: RPCS3 can install it.
+    fn can_install_firmware(&self, fw: &crate::psn::firmware::FirmwareInfo) -> bool {
+        fw.console == crate::psn::firmware::FirmwareConsole::PS3
+            && fw.fw_type == crate::psn::firmware::FirmwareType::Full
+            && self.settings.rpcs3_executable.is_some()
+            && fw.output_path(&self.settings.pkg_download_path).is_file()
+    }
+
+    pub(super) fn read_rpcs3_firmware_version(&mut self) {
+        self.v.rpcs3_firmware_version = self
+            .settings
+            .rpcs3_config_dir
+            .as_deref()
+            .and_then(|config| crate::rpcs3::installed_firmware_version(&crate::rpcs3::config::resolve_dev_flash(config)));
+    }
+
+    /// Install a downloaded firmware into RPCS3 in the background (RPSN-0141).
+    fn start_firmware_install(&mut self, fw: &crate::psn::firmware::FirmwareInfo) {
+        let Some(exe) = self.settings.rpcs3_executable.clone() else {
+            return;
+        };
+        let pup = fw.output_path(&self.settings.pkg_download_path);
+        let check = self
+            .settings
+            .rpcs3_config_dir
+            .as_deref()
+            .map(|config| crate::rpcs3::FirmwareCheck {
+                dev_flash: crate::rpcs3::config::resolve_dev_flash(config),
+                version: fw.version.clone(),
+            });
+        let ctx = self.v.egui_ctx.clone();
+        let _guard = self
+            .v
+            .rt_handle
+            .as_ref()
+            .expect("rt_handle set in UpdatesApp::new before any UI code runs")
+            .enter();
+        self.v.firmware_install_promise = Some(Promise::spawn_async(async move {
+            let outcome = crate::rpcs3::install_firmware(&exe, &pup, check).await;
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+            outcome
+        }));
+    }
+
     pub(super) fn handle_firmware_promises(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
+        if self.v.firmware_install_promise.as_ref().is_some_and(|p| p.ready().is_some()) {
+            let promise = self.v.firmware_install_promise.take().expect("checked is_some above");
+            match promise.block_and_take() {
+                Ok(crate::rpcs3::InstallOutcome::Confirmed) => {
+                    messages.push(("Firmware installed in RPCS3.".to_string(), MessageLevel::Success))
+                }
+                Ok(crate::rpcs3::InstallOutcome::Unconfirmed) => messages.push((
+                    "RPCS3 finished, but the firmware install could not be checked until the RPCS3 folder is set in Settings."
+                        .to_string(),
+                    MessageLevel::Warning,
+                )),
+                Err(e) => {
+                    error!("Firmware install failed: {e}");
+                    messages.push((format!("Firmware install failed: {e}"), MessageLevel::Error));
+                }
+            }
+            self.read_rpcs3_firmware_version();
+        }
+
         // Handle firmware fetch promise.
         if let Some(ref promise) = self.v.firmware_fetch_promise {
             if promise.ready().is_some() {

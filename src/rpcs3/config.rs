@@ -9,6 +9,8 @@ const MAX_YAML_SIZE: u64 = 10_485_760;
 /// Resolved RPCS3 virtual filesystem paths.
 pub struct Rpcs3VfsConfig {
     pub dev_hdd0_path: PathBuf,
+    /// Where RPCS3 installs firmware; `vsh/etc/version.txt` there names its version (RPSN-0141).
+    pub dev_flash_path: PathBuf,
 }
 
 /// Parse RPCS3's games.yml file.
@@ -53,16 +55,27 @@ pub fn resolve_dev_hdd0(config_dir: &Path) -> PathBuf {
 }
 
 fn resolve_dev_hdd0_for(config_dir: &Path, windows: bool) -> PathBuf {
+    resolve_vfs_for(config_dir, windows, "dev_hdd0", |vfs| vfs.dev_hdd0_path)
+}
+
+/// The dev_flash folder for an RPCS3 config folder, found the way `resolve_dev_hdd0` finds
+/// dev_hdd0: vfs.yml's `/dev_flash/`, default `$(EmulatorDir)dev_flash/` (Emu/vfs_config.h,
+/// RPCS3 commit 6fe3c87).
+pub fn resolve_dev_flash(config_dir: &Path) -> PathBuf {
+    resolve_vfs_for(config_dir, cfg!(target_os = "windows"), "dev_flash", |vfs| vfs.dev_flash_path)
+}
+
+fn resolve_vfs_for(config_dir: &Path, windows: bool, folder: &str, pick: fn(Rpcs3VfsConfig) -> PathBuf) -> PathBuf {
     let emulator_dir = emulator_dir(config_dir, windows);
     let vfs_path = config_dir.join("vfs.yml");
     if !vfs_path.exists() {
-        return emulator_dir.join("dev_hdd0");
+        return emulator_dir.join(folder);
     }
     match parse_vfs_yml(&vfs_path, &emulator_dir) {
-        Ok(vfs) => vfs.dev_hdd0_path,
+        Ok(vfs) => pick(vfs),
         Err(e) => {
-            warn!("Failed to parse vfs.yml, using the default dev_hdd0 path: {e}");
-            emulator_dir.join("dev_hdd0")
+            warn!("Failed to parse vfs.yml, using the default {folder} path: {e}");
+            emulator_dir.join(folder)
         }
     }
 }
@@ -109,19 +122,21 @@ pub fn parse_vfs_yml(path: &Path, emulator_dir: &Path) -> Result<Rpcs3VfsConfig,
         }
     };
 
-    let dev_hdd0_path = match map.get("/dev_hdd0/") {
-        Some(serde_yaml_ng::Value::String(s)) if !s.is_empty() => {
-            let resolved = s.replace("$(EmulatorDir)", &emulator_dir_str);
-            PathBuf::from(resolved)
-        }
-        _ => emulator_dir.join("dev_hdd0"),
+    let resolve = |key: &str, folder: &str| match map.get(key) {
+        Some(serde_yaml_ng::Value::String(s)) if !s.is_empty() => PathBuf::from(s.replace("$(EmulatorDir)", &emulator_dir_str)),
+        _ => emulator_dir.join(folder),
     };
+    let dev_hdd0_path = resolve("/dev_hdd0/", "dev_hdd0");
+    let dev_flash_path = resolve("/dev_flash/", "dev_flash");
 
     if !dev_hdd0_path.exists() {
         warn!("Resolved dev_hdd0 path does not exist: {}", dev_hdd0_path.display());
     }
 
-    Ok(Rpcs3VfsConfig { dev_hdd0_path })
+    Ok(Rpcs3VfsConfig {
+        dev_hdd0_path,
+        dev_flash_path,
+    })
 }
 
 #[cfg(test)]

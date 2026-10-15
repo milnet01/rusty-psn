@@ -43,6 +43,12 @@ pub enum Rpcs3Error {
         serial: String,
         found: Option<String>,
     },
+    /// RPCS3 exited cleanly but its firmware is not the version installed. `found` is the version
+    /// `dev_flash/vsh/etc/version.txt` names afterwards, `None` where it cannot be read.
+    FirmwareNotInstalled {
+        expected: String,
+        found: Option<String>,
+    },
     /// RPCS3 is already open, so an install would stop at its "already running" window.
     AlreadyRunning,
     Io(std::io::Error),
@@ -64,6 +70,15 @@ impl fmt::Display for Rpcs3Error {
             }
             Rpcs3Error::NotInstalled { serial, found: None } => {
                 write!(f, "RPCS3 finished, but no installed version of {serial} was found")
+            }
+            Rpcs3Error::FirmwareNotInstalled {
+                expected,
+                found: Some(found),
+            } => {
+                write!(f, "RPCS3 finished, but its firmware is {found}, not {expected}")
+            }
+            Rpcs3Error::FirmwareNotInstalled { expected, found: None } => {
+                write!(f, "RPCS3 finished, but no installed firmware was found (expected {expected})")
             }
             Rpcs3Error::AlreadyRunning => write!(f, "RPCS3 is open. Close RPCS3, then install again"),
             Rpcs3Error::Io(e) => write!(f, "I/O error: {e}"),
@@ -450,46 +465,7 @@ async fn install_pkg_guarded(
         _ => None,
     };
 
-    let exe_str = rpcs3_executable.to_string_lossy();
-    let is_flatpak = exe_str.starts_with("flatpak:");
-
-    if !is_flatpak && !rpcs3_executable.exists() {
-        return Err(Rpcs3Error::InstallFailed(format!(
-            "RPCS3 executable not found: {}",
-            rpcs3_executable.display()
-        )));
-    }
-
-    info!(
-        "Installing PKG via RPCS3: {} --headless --installpkg {}",
-        rpcs3_executable.display(),
-        pkg_path.display()
-    );
-
-    let output = if is_flatpak {
-        let app_id = exe_str.strip_prefix("flatpak:").unwrap_or("net.rpcs3.RPCS3");
-        tokio::process::Command::new("flatpak")
-            .args(["run", app_id, "--headless", "--installpkg"])
-            .arg(pkg_path)
-            .output()
-            .await
-    } else {
-        tokio::process::Command::new(rpcs3_executable)
-            .args(["--headless", "--installpkg"])
-            .arg(pkg_path)
-            .output()
-            .await
-    }
-    .map_err(|e| Rpcs3Error::InstallFailed(format!("failed to launch RPCS3: {e}")))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(Rpcs3Error::InstallFailed(format!(
-            "RPCS3 exited with {}: {}",
-            output.status,
-            stderr.trim()
-        )));
-    }
+    run_headless(rpcs3_executable, "--installpkg", pkg_path).await?;
 
     let InstallCheck::AppVersion {
         dev_hdd0,
@@ -515,6 +491,140 @@ async fn install_pkg_guarded(
         warn!("RPCS3 finished but {serial} reports version {found:?}, expected {version:?}");
         Err(Rpcs3Error::NotInstalled { serial, found })
     }
+}
+
+/// Run RPCS3 headless with `flag` and `path` (`--installpkg` or `--installfw`), waiting for it
+/// to exit. If `rpcs3_executable` is the Flatpak sentinel `flatpak:net.rpcs3.RPCS3`, runs via
+/// `flatpak run`. The caller holds `INSTALLS` and has checked RPCS3 is not open.
+async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Result<(), Rpcs3Error> {
+    let exe_str = rpcs3_executable.to_string_lossy();
+    let is_flatpak = exe_str.starts_with("flatpak:");
+
+    if !is_flatpak && !rpcs3_executable.exists() {
+        return Err(Rpcs3Error::InstallFailed(format!(
+            "RPCS3 executable not found: {}",
+            rpcs3_executable.display()
+        )));
+    }
+
+    info!(
+        "Running RPCS3: {} --headless {flag} {}",
+        rpcs3_executable.display(),
+        path.display()
+    );
+
+    let output = if is_flatpak {
+        let app_id = exe_str.strip_prefix("flatpak:").unwrap_or("net.rpcs3.RPCS3");
+        tokio::process::Command::new("flatpak")
+            .args(["run", app_id, "--headless", flag])
+            .arg(path)
+            .output()
+            .await
+    } else {
+        tokio::process::Command::new(rpcs3_executable)
+            .args(["--headless", flag])
+            .arg(path)
+            .output()
+            .await
+    }
+    .map_err(|e| Rpcs3Error::InstallFailed(format!("failed to launch RPCS3: {e}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(Rpcs3Error::InstallFailed(format!(
+            "RPCS3 exited with {}: {}",
+            output.status,
+            stderr.trim()
+        )));
+    }
+    Ok(())
+}
+
+/// What a firmware install should leave behind: `dev_flash` holding firmware `version`, as Sony
+/// lists it ("4.9300").
+pub struct FirmwareCheck {
+    pub dev_flash: PathBuf,
+    pub version: String,
+}
+
+/// Install a PS3 firmware file (PS3UPDAT.PUP) via RPCS3's headless mode (RPSN-0141).
+///
+/// Like `install_pkg`, headless RPCS3 exits 0 whatever happened (`run_rpcs3` in rpcs3/rpcs3.cpp,
+/// RPCS3 commit 6fe3c87), so `check`, when given, decides: the firmware version.txt names
+/// afterwards must be the expected one. Runs one at a time with package installs, and not
+/// while RPCS3 is open.
+pub async fn install_firmware(
+    rpcs3_executable: &Path,
+    pup_path: &Path,
+    check: Option<FirmwareCheck>,
+) -> Result<InstallOutcome, Rpcs3Error> {
+    let lock_file = instance_lock_path(rpcs3_executable);
+    install_firmware_guarded(rpcs3_executable, pup_path, check, lock_file.as_deref()).await
+}
+
+async fn install_firmware_guarded(
+    rpcs3_executable: &Path,
+    pup_path: &Path,
+    check: Option<FirmwareCheck>,
+    lock_file: Option<&Path>,
+) -> Result<InstallOutcome, Rpcs3Error> {
+    if !pup_path.is_file() {
+        return Err(Rpcs3Error::InstallFailed(format!(
+            "firmware file not found: {}",
+            pup_path.display()
+        )));
+    }
+
+    let _one_at_a_time = INSTALLS.lock().await;
+    if lock_file.is_some_and(rpcs3_is_running) {
+        return Err(Rpcs3Error::AlreadyRunning);
+    }
+
+    run_headless(rpcs3_executable, "--installfw", pup_path).await?;
+
+    let Some(FirmwareCheck { dev_flash, version }) = check else {
+        info!("RPCS3 finished; the firmware install was not checked");
+        return Ok(InstallOutcome::Unconfirmed);
+    };
+    let found = installed_firmware_version(&dev_flash);
+    if found.is_some() && found == normalize_firmware_version(&version) {
+        info!("RPCS3 firmware is now {found:?}");
+        Ok(InstallOutcome::Confirmed)
+    } else {
+        warn!("RPCS3 finished but its firmware reads {found:?}, expected {version}");
+        Err(Rpcs3Error::FirmwareNotInstalled {
+            expected: version,
+            found,
+        })
+    }
+}
+
+/// The firmware version RPCS3 has installed, as RPCS3 shows it ("4.93"), or `None` where
+/// `dev_flash/vsh/etc/version.txt` is missing or unreadable. The version is the text between
+/// the first two colons ("release:04.9300:"), as `utils::get_firmware_version` in
+/// util/sysinfo.cpp reads it (RPCS3 commit 6fe3c87).
+pub fn installed_firmware_version(dev_flash: &Path) -> Option<String> {
+    let path = dev_flash.join("vsh/etc/version.txt");
+    let text = String::from_utf8(read_capped(&path, 4096).ok()?).ok()?;
+    let field = text.split(':').nth(1)?;
+    normalize_firmware_version(field)
+}
+
+/// "04.9300" and "4.9300" both become "4.93": leading zeros off the major number, trailing zeros
+/// off the minor, as RPCS3 trims them.
+fn normalize_firmware_version(version: &str) -> Option<String> {
+    let (major, minor) = version.trim().split_once('.').unwrap_or((version.trim(), ""));
+    if major.is_empty() || !major.bytes().all(|b| b.is_ascii_digit()) || !minor.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let major = major.trim_start_matches('0');
+    let major = if major.is_empty() { "0" } else { major };
+    let minor = minor.trim_end_matches('0');
+    Some(if minor.is_empty() {
+        major.to_string()
+    } else {
+        format!("{major}.{minor}")
+    })
 }
 
 /// APP_VER of `dev_hdd0/game/<serial>/PARAM.SFO`, trimmed, or `None` where it cannot be read.
@@ -834,6 +944,55 @@ mod tests {
 
         let recorded = std::fs::read_to_string(args).unwrap();
         assert_eq!(recorded, format!("--headless\n--installpkg\n{}\n", pkg.display()));
+    }
+
+    #[test]
+    fn firmware_versions_read_as_rpcs3_shows_them() {
+        let dev_flash = tempfile::tempdir().unwrap();
+        assert_eq!(installed_firmware_version(dev_flash.path()), None);
+        std::fs::create_dir_all(dev_flash.path().join("vsh/etc")).unwrap();
+        std::fs::write(dev_flash.path().join("vsh/etc/version.txt"), "release:04.9300:\nbuild:...").unwrap();
+        assert_eq!(installed_firmware_version(dev_flash.path()).as_deref(), Some("4.93"));
+
+        assert_eq!(normalize_firmware_version("4.9300").as_deref(), Some("4.93"));
+        assert_eq!(normalize_firmware_version("04.8900").as_deref(), Some("4.89"));
+        assert_eq!(normalize_firmware_version("4.90").as_deref(), Some("4.9"));
+        assert_eq!(normalize_firmware_version("x.10"), None);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn firmware_install_runs_installfw_and_confirms_the_version() {
+        // RPSN-0141: headless --installfw, then version.txt decides.
+        let root = tempfile::tempdir().unwrap();
+        let dev_flash = root.path().join("dev_flash");
+        let writes_4_93 = format!(
+            "mkdir -p '{0}/vsh/etc' && printf 'release:04.9300:' > '{0}/vsh/etc/version.txt'",
+            dev_flash.display()
+        );
+        let (exe, args, _, _) = stand_in_rpcs3(root.path(), &writes_4_93, 0);
+        let pup = root.path().join("PS3UPDAT.PUP");
+        std::fs::write(&pup, b"pup").unwrap();
+        let check = |version: &str| {
+            Some(FirmwareCheck {
+                dev_flash: dev_flash.clone(),
+                version: version.to_string(),
+            })
+        };
+
+        let outcome = install_firmware_guarded(&exe, &pup, check("4.9300"), None).await.unwrap();
+        assert_eq!(outcome, InstallOutcome::Confirmed);
+        let recorded = std::fs::read_to_string(&args).unwrap();
+        assert_eq!(recorded, format!("--headless\n--installfw\n{}\n", pup.display()));
+
+        assert!(matches!(
+            install_firmware_guarded(&exe, &pup, check("4.9400"), None).await,
+            Err(Rpcs3Error::FirmwareNotInstalled { found: Some(ref v), .. }) if v == "4.93"
+        ));
+        assert_eq!(
+            install_firmware_guarded(&exe, &pup, None, None).await.unwrap(),
+            InstallOutcome::Unconfirmed
+        );
     }
 
     #[cfg(unix)]

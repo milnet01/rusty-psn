@@ -520,6 +520,10 @@ struct VolatileData {
     firmware_fetch_promise: Option<Promise<Result<Vec<crate::psn::firmware::FirmwareInfo>, crate::psn::firmware::FirmwareError>>>,
     firmware_results: Vec<crate::psn::firmware::FirmwareInfo>,
     firmware_download: Option<ActiveFirmwareDownload>,
+    /// A firmware install into RPCS3 that is running (RPSN-0141).
+    firmware_install_promise: Option<Promise<Result<crate::rpcs3::InstallOutcome, crate::rpcs3::Rpcs3Error>>>,
+    /// The firmware RPCS3 has installed, read when the Firmware page opens and after an install.
+    rpcs3_firmware_version: Option<String>,
 
     /// Per-frame download status cache. Built once at the start of each frame.
     download_status_cache: HashMap<(String, String), CachedDownloadInfo>,
@@ -629,6 +633,8 @@ impl Default for VolatileData {
             firmware_fetch_promise: None,
             firmware_results: Vec::new(),
             firmware_download: None,
+            firmware_install_promise: None,
+            rpcs3_firmware_version: None,
 
             download_status_cache: HashMap::new(),
 
