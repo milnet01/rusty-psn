@@ -213,10 +213,17 @@ enum AppTheme {
     Light,
     PlayStation,
     HighContrast,
+    Rpcs3Blue,
 }
 
 /// Every theme, in the order the settings window lists them.
-const APP_THEMES: [AppTheme; 4] = [AppTheme::Dark, AppTheme::Light, AppTheme::PlayStation, AppTheme::HighContrast];
+const APP_THEMES: [AppTheme; 5] = [
+    AppTheme::Dark,
+    AppTheme::Light,
+    AppTheme::PlayStation,
+    AppTheme::Rpcs3Blue,
+    AppTheme::HighContrast,
+];
 
 impl AppTheme {
     fn label(self) -> &'static str {
@@ -225,6 +232,7 @@ impl AppTheme {
             AppTheme::Light => "Light",
             AppTheme::PlayStation => "PlayStation",
             AppTheme::HighContrast => "High contrast",
+            AppTheme::Rpcs3Blue => "RPCS3 Blue",
         }
     }
 
@@ -268,11 +276,45 @@ impl AppTheme {
                 ctx.set_visuals(visuals);
             }
             AppTheme::HighContrast => ctx.set_visuals(high_contrast_visuals()),
+            AppTheme::Rpcs3Blue => ctx.set_visuals(rpcs3_blue_visuals()),
         }
     }
 }
 
 /// White text and outlines on black, with yellow marking what is selected, hovered or pressed.
+/// RPCS3 Blue (RPSN-0059): the colours of RPCS3's own "ModernBlue Theme by TheMitoSan.qss"
+/// (bin/GuiConfigs in the RPCS3 repository), so rusty-psn looks at home beside it.
+fn rpcs3_blue_visuals() -> egui::Visuals {
+    let rgb = egui::Color32::from_rgb;
+    let mut visuals = egui::Visuals::dark();
+    let text = rgb(0xec, 0xf0, 0xf1); // QListWidget::item:selected color
+    let accent = rgb(0x00, 0x78, 0xd7); // the stylesheet's highlight blue
+
+    visuals.panel_fill = rgb(0x23, 0x2e, 0x3a); // QWidget background-color
+    visuals.window_fill = rgb(0x23, 0x2e, 0x3a);
+    visuals.extreme_bg_color = rgb(0x14, 0x1e, 0x28); // QWidget alternate-background-color
+    visuals.faint_bg_color = rgb(0x1b, 0x25, 0x31);
+    visuals.window_stroke = egui::Stroke::new(1.0_f32, rgb(0x35, 0x44, 0x54));
+
+    visuals.widgets.noninteractive.bg_fill = rgb(0x23, 0x2e, 0x3a);
+    visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0_f32, rgb(0x35, 0x44, 0x54));
+    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0_f32, text);
+    visuals.widgets.inactive.bg_fill = rgb(0x46, 0x59, 0x8b); // QPushButton background-color
+    visuals.widgets.inactive.weak_bg_fill = rgb(0x46, 0x59, 0x8b);
+    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0_f32, egui::Color32::WHITE);
+    visuals.widgets.hovered.bg_fill = rgb(0x3d, 0x47, 0x5e); // QToolButton::hover
+    visuals.widgets.hovered.weak_bg_fill = rgb(0x3d, 0x47, 0x5e);
+    visuals.widgets.active.bg_fill = rgb(0x17, 0x20, 0x38); // QPushButton::pressed
+    visuals.widgets.active.weak_bg_fill = rgb(0x17, 0x20, 0x38);
+    visuals.widgets.open.bg_fill = rgb(0x32, 0x3c, 0x47); // QComboBox background-color
+    visuals.widgets.open.weak_bg_fill = rgb(0x32, 0x3c, 0x47);
+
+    visuals.selection.bg_fill = accent;
+    visuals.selection.stroke = egui::Stroke::new(1.0_f32, egui::Color32::WHITE);
+    visuals.hyperlink_color = rgb(0x84, 0x9a, 0xd2);
+    visuals
+}
+
 fn high_contrast_visuals() -> egui::Visuals {
     let mut visuals = egui::Visuals::dark();
     let black = egui::Color32::BLACK;
@@ -1051,6 +1093,7 @@ mod tests {
             assert_eq!(settings.theme, theme);
         }
         assert!(APP_THEMES.contains(&AppTheme::HighContrast));
+        assert!(APP_THEMES.contains(&AppTheme::Rpcs3Blue));
     }
 
     #[test]
