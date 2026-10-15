@@ -299,10 +299,13 @@ Support resuming partially downloaded files instead of re-downloading from scrat
   Kind: feature.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0029] **Add a "Retry failed downloads" button in the GUI that attempts to resume all items in the `failed_downloads` list.**
+- ✅ [RPSN-0029] **Add a "Retry failed downloads" button in the GUI that attempts to resume all items in the `failed_downloads` list.**
   Checked against the code 2026-10-12: Partly done — a per-item Retry
   button exists; there is no retry-all-failed button.
   Former TODO.md task 4.6.
+  Resolved (2026-10-15, d6fb597): the Downloads page's Needs attention
+  section has a Retry all failed button, queuing every failed download
+  again under the download limit.
   **Layman:** One button to retry every download that failed.
   Kind: feature.
   Source: todo-md-import-2026-10-12.
@@ -650,7 +653,7 @@ Integrate directly with the RPCS3 emulator to auto-detect games and install upda
 
 Add visual theming support to the egui GUI.
 
-- 📋 [RPSN-0059] **Add a theme selector to the settings window with at least.**
+- ✅ [RPSN-0059] **Add a theme selector to the settings window with at least.**
     - **Dark** (egui default `Visuals::dark()`)
     - **Light** (`Visuals::light()`)
     - **RPCS3 Blue** (custom theme matching RPCS3's UI colors)
@@ -658,6 +661,9 @@ Add visual theming support to the egui GUI.
   Checked against the code 2026-10-12: Partly done — Dark, Light and
   PlayStation themes exist; RPCS3 Blue does not.
   Former TODO.md task 8.1.
+  Resolved (2026-10-15, 33ba668): an RPCS3 Blue theme, its colours taken
+  from RPCS3's own "ModernBlue Theme by TheMitoSan.qss". RPCS3 ships no
+  theme named "RPCS3 Blue"; ModernBlue is its bundled blue stylesheet.
   **Layman:** Add an RPCS3-style blue colour theme.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -1004,7 +1010,7 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: design-review-2026-10-12.
   Lanes: PSN, Files, Security.
 
-- 📋 [RPSN-0084] **Make Title / ID the default download layout.**
+- ✅ [RPSN-0084] **Make Title / ID the default download layout.**
   Both apps default to ID - Title (`DirectoryFormat::SerialTitle`, and the
   CLI's `--directory-format` default `serial-title`). Discovery S4 and
   CLAUDE.md rule 6 make Title / ID the default; the other layouts stay
@@ -1012,6 +1018,9 @@ Work named by docs/design.md and its review on 2026-10-12.
   Progress 2026-10-12 (verify-delivery, CLI run): downloads landed
   inside the chosen folder, laid out ID - Title, confirming this item is
   still open.
+  Resolved (2026-10-15, 66a57de): both apps default to Title / ID. An
+  existing window-app user keeps the saved layout; a fresh install and a
+  command-line run without --directory-format get the new default.
   **Layman:** Sort downloads into Game Title / Game ID folders unless you pick another layout.
   Kind: feature.
   Source: design-review-2026-10-12.
@@ -1061,7 +1070,7 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: design-review-2026-10-12.
   Lanes: docs.
 
-- 📋 [RPSN-0133] **Redesign the window app after the approved mockups.**
+- ✅ [RPSN-0133] **Redesign the window app after the approved mockups.**
   Mockups: https://claude.ai/artifact/PWr5yiihCDzG1JCswamS3m
   (four screens: Search, Downloads, RPCS3 library, Settings).
   Approved by the owner on 2026-10-12 ("I like the new look").
@@ -1076,6 +1085,8 @@ Work named by docs/design.md and its review on 2026-10-12.
   text-size setting, high-contrast theme, status labels pairing an icon
   with words, then the sidebar with the library table and the Settings
   page with Save and Undo. Split into RPSN-0142 to RPSN-0145.
+  Resolved (2026-10-15): the owner split it into RPSN-0142 to RPSN-0145,
+  and with RPSN-0157 all are shipped.
   **Layman:** The owner liked a new look for the app; which parts to build, and in what order, is still theirs to choose.
   Kind: ux.
   Source: user-request-2026-10-12.
@@ -1810,13 +1821,16 @@ reviewer proposed; check both against the code before fixing.
   Source: in-session-2026-10-12 (RPSN-0127 screenshots).
   Lanes: UI.
 
-- 📋 [RPSN-0131] **Say "version unknown" in the RPCS3 library window when a game has no installed version on record.**
+- ✅ [RPSN-0131] **Say "version unknown" in the RPCS3 library window when a game has no installed version on record.**
   Seen on a scan where games.yml lists games but no PARAM.SFO gives an
   APP_VER: the header reads "3 game(s) installed, 0 with updates
   available", Installed and Status show "--", and Available shows a
   version. Correct by the code (nothing to compare against), but it
   reads as a contradiction. Say "in library" in the header and
   "version unknown" in Status.
+  Resolved (2026-10-15, 51f9a2d): Status says "version unknown" when PSN
+  has an update but no installed version is on record, and the header
+  counts games "in library".
   **Layman:** The library window calls a game "installed" but leaves its status blank when it can't tell the version, which looks like a contradiction.
   Kind: ux.
   Source: ants-projects-hub-website session 2026-10-12 (shot 3 review).
