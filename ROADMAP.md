@@ -782,11 +782,14 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0071] **Export update list.**
+- ✅ [RPSN-0071] **Export update list.**
   Export search results as JSON/CSV for documentation or sharing
   Checked against the code 2026-10-12: Not done — no JSON or CSV
   export.
   Former TODO.md task 9.6.
+  Resolved (2026-10-15, 3b0d36f): Export results on the Search page
+  saves one row per package as CSV, or JSON for a .json name; CSV cells
+  that would run as spreadsheet formulas are kept as text.
   **Layman:** Save search results to a spreadsheet-style or data file.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -2119,10 +2122,16 @@ existing item are noted on that item instead.
   Source: rpcs3-source-review-2026-10-13 finding 7.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0141] **Install downloaded firmware into RPCS3 and show its installed version.**
+- ✅ [RPSN-0141] **Install downloaded firmware into RPCS3 and show its installed version.**
   Optional (finding 10). Firmware is only downloaded today. RPCS3 installs it with --installfw <PUP> (not together with --installpkg) and records the installed version in dev_flash/vsh/etc/version.txt (util/sysinfo.cpp at 6fe3c87). Considered, not planned: the owner decides whether it is wanted.
   Owner decision (2026-10-13): wanted, but after the RPCS3 install fixes
   (RPSN-0137, RPSN-0138).
+  Resolved (2026-10-15, eeff7fb): a full PS3 firmware installs into
+  RPCS3 from the Firmware page or with --firmware --install, confirmed
+  by dev_flash/vsh/etc/version.txt; the Firmware page shows the
+  installed version. No spec: one RPCS3 function and one button on the
+  RPSN-0137 pattern. Owner's hand test: install a downloaded
+  PS3UPDAT.PUP into a real RPCS3 and check the version RPCS3 shows.
   **Layman:** Could install the firmware into RPCS3 for you, not just download it.
   Kind: feature.
   Source: rpcs3-source-review-2026-10-13 finding 10.
