@@ -124,6 +124,9 @@ impl UpdatesApp {
                         _ => format!("{e:?}"),
                     };
                     info!("Batch search failed for {serial}: {msg}");
+                    if matches!(e, UpdateError::NoUpdatesAvailable) {
+                        self.v.no_update_serials.insert(serial.clone());
+                    }
                     self.v.batch_search_errors.push((serial.clone(), msg));
                 }
             }
@@ -339,6 +342,7 @@ impl UpdatesApp {
 
                 if ui.button("Clear results").clicked() {
                     self.v.update_results = Vec::new();
+                    self.v.no_update_serials.clear();
                 }
             });
 

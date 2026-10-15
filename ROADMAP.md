@@ -1200,6 +1200,11 @@ Work named by docs/design.md and its review on 2026-10-12.
   row, so its Pause, Resume, Retry, Install and Open folder buttons work
   from either page. Failed and finished downloads now keep their package
   to make that possible.
+  Progress (2026-10-15): step 6 built. The RPCS3 library page has filter
+  buttons All, Needs update, Up to date and No updates exist. One
+  function decides each game's status for both the Status column and the
+  filters. A game whose search failed now shows "--" and appears under
+  All only, where before nothing told it from a game with no updates.
   **Layman:** Nothing pops up and nothing jumps around: every part of the app has its own spot in the main window and can be folded away.
   Kind: ux.
   Source: user-request-2026-10-14.

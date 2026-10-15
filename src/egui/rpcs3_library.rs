@@ -181,6 +181,13 @@ impl UpdatesApp {
                 }
             });
 
+            ui.horizontal(|ui| {
+                ui.label("Show:");
+                for filter in LibraryFilter::ALL {
+                    ui.selectable_value(&mut self.v.library_filter, filter, filter.label());
+                }
+            });
+
             ui.separator();
 
             egui::ScrollArea::vertical().show(ui, |ui| {
@@ -198,6 +205,9 @@ impl UpdatesApp {
 
                         for i in 0..self.v.rpcs3_installed_games.len() {
                             let game = &self.v.rpcs3_installed_games[i];
+                            if !self.v.library_filter.shows(self.library_status(game)) {
+                                continue;
+                            }
                             ui.label(&game.serial);
                             ui.label(&game.title);
 
@@ -212,27 +222,16 @@ impl UpdatesApp {
                                 .unwrap_or("--");
                             ui.label(available_ver);
 
-                            // Status column.
-                            if let (Some(inst), Some(update)) = (&game.installed_version, update_info) {
-                                if let Some(latest) = update.packages.last() {
-                                    match crate::rpcs3::compare_versions(inst, &latest.version) {
-                                        std::cmp::Ordering::Less => {
-                                            status_pill(ui, "Update available", StatusKind::Attention);
-                                        }
-                                        _ => {
-                                            status_pill(ui, "Up to date", StatusKind::Done);
-                                        }
-                                    }
-                                } else {
+                            match self.library_status(game) {
+                                LibraryStatus::NeedsUpdate => status_pill(ui, "Update available", StatusKind::Attention),
+                                LibraryStatus::UpToDate => status_pill(ui, "Up to date", StatusKind::Done),
+                                LibraryStatus::NoUpdates => {
                                     ui.label("No updates");
                                 }
-                            } else if update_info.is_none()
-                                && (self.v.batch_search_active.iter().any(|(s, _)| s == &game.serial)
-                                    || self.v.batch_search_queue.iter().any(|s| s == &game.serial))
-                            {
-                                status_pill(ui, "Checking…", StatusKind::Working);
-                            } else {
-                                ui.label("--");
+                                LibraryStatus::Checking => status_pill(ui, "Checking…", StatusKind::Working),
+                                LibraryStatus::Unknown => {
+                                    ui.label("--");
+                                }
                             }
 
                             ui.end_row();
@@ -248,6 +247,26 @@ impl UpdatesApp {
         // Apply queued download actions after the page closure.
         for (title_id, title, pkg) in download_actions {
             self.queue_download_no_ui(title_id, title, pkg);
+        }
+    }
+
+    /// Where one installed game stands against what PSN offers.
+    pub(super) fn library_status(&self, game: &crate::rpcs3::InstalledGame) -> LibraryStatus {
+        let update_info = self.v.update_results.iter().find(|u| u.title_id == game.serial);
+        let checking = self.v.batch_search_active.iter().any(|(s, _)| s == &game.serial)
+            || self.v.batch_search_queue.iter().any(|s| s == &game.serial);
+        match (update_info, update_info.and_then(|u| u.packages.last())) {
+            (None, _) if checking => LibraryStatus::Checking,
+            (None, _) if self.v.no_update_serials.contains(&game.serial) => LibraryStatus::NoUpdates,
+            (None, _) => LibraryStatus::Unknown,
+            (Some(_), None) => LibraryStatus::NoUpdates,
+            (Some(_), Some(latest)) => match &game.installed_version {
+                None => LibraryStatus::Unknown,
+                Some(installed) => match crate::rpcs3::compare_versions(installed, &latest.version) {
+                    std::cmp::Ordering::Less => LibraryStatus::NeedsUpdate,
+                    _ => LibraryStatus::UpToDate,
+                },
+            },
         }
     }
 
@@ -293,5 +312,123 @@ impl UpdatesApp {
                 i += 1;
             }
         }
+    }
+}
+
+/// Where an installed game stands; see `UpdatesApp::library_status`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum LibraryStatus {
+    NeedsUpdate,
+    UpToDate,
+    /// PSN lists no update for it.
+    NoUpdates,
+    /// Its search is still queued or running.
+    Checking,
+    /// Not searched, its search failed, or the installed version could not be read.
+    Unknown,
+}
+
+/// The RPCS3 library page's filter buttons (RPSN-0157 step 6).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) enum LibraryFilter {
+    #[default]
+    All,
+    NeedsUpdate,
+    UpToDate,
+    NoUpdates,
+}
+
+impl LibraryFilter {
+    const ALL: [LibraryFilter; 4] = [
+        LibraryFilter::All,
+        LibraryFilter::NeedsUpdate,
+        LibraryFilter::UpToDate,
+        LibraryFilter::NoUpdates,
+    ];
+
+    fn label(self) -> &'static str {
+        match self {
+            LibraryFilter::All => "All",
+            LibraryFilter::NeedsUpdate => "Needs update",
+            LibraryFilter::UpToDate => "Up to date",
+            LibraryFilter::NoUpdates => "No updates exist",
+        }
+    }
+
+    pub(super) fn shows(self, status: LibraryStatus) -> bool {
+        match self {
+            LibraryFilter::All => true,
+            LibraryFilter::NeedsUpdate => status == LibraryStatus::NeedsUpdate,
+            LibraryFilter::UpToDate => status == LibraryStatus::UpToDate,
+            LibraryFilter::NoUpdates => status == LibraryStatus::NoUpdates,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn game(serial: &str, installed: Option<&str>) -> crate::rpcs3::InstalledGame {
+        crate::rpcs3::InstalledGame {
+            serial: serial.to_string(),
+            title: String::new(),
+            installed_version: installed.map(str::to_string),
+            game_path: PathBuf::new(),
+        }
+    }
+
+    fn update(serial: &str, versions: &[&str]) -> UpdateInfo {
+        UpdateInfo {
+            title_id: serial.to_string(),
+            tag_name: String::new(),
+            titles: Vec::new(),
+            packages: versions
+                .iter()
+                .map(|version| PackageInfo {
+                    url: String::new(),
+                    size: 0,
+                    version: version.to_string(),
+                    sha1sum: String::new(),
+                    hash_whole_file: false,
+                    manifest_url: String::new(),
+                    offset: 0,
+                    part_number: None,
+                })
+                .collect(),
+            platform_variant: crate::psn::utils::PlatformVariant::PS3,
+        }
+    }
+
+    #[test]
+    fn each_filter_shows_only_its_games() {
+        let mut app = UpdatesApp::default();
+        let games = [
+            game("OLD", Some("01.00")),
+            game("NEW", Some("01.02")),
+            game("NONE", Some("01.00")),
+            game("FAILED", Some("01.00")),
+            game("WAITING", Some("01.00")),
+        ];
+        app.v.update_results = vec![update("OLD", &["01.02"]), update("NEW", &["01.02"])];
+        app.v.no_update_serials.insert("NONE".to_string());
+        app.v.batch_search_queue.push_back("WAITING".to_string());
+
+        let shown = |app: &UpdatesApp, filter: LibraryFilter| {
+            games
+                .iter()
+                .filter(|g| filter.shows(app.library_status(g)))
+                .map(|g| g.serial.as_str())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(shown(&app, LibraryFilter::All).len(), games.len());
+        assert_eq!(shown(&app, LibraryFilter::NeedsUpdate), ["OLD"]);
+        assert_eq!(shown(&app, LibraryFilter::UpToDate), ["NEW"]);
+        assert_eq!(
+            shown(&app, LibraryFilter::NoUpdates),
+            ["NONE"],
+            "a failed search is not 'no updates'"
+        );
+        assert_eq!(app.library_status(&games[4]), LibraryStatus::Checking);
     }
 }

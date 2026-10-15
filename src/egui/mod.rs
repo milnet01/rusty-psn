@@ -457,11 +457,15 @@ struct VolatileData {
     batch_search_total: usize,
     batch_search_completed: usize,
     batch_search_errors: Vec<(String, String)>,
+    /// Serials a search found no update for, so the RPCS3 library can tell them from failed searches.
+    no_update_serials: HashSet<String>,
 
     // RPCS3 integration state
     rpcs3_scan_promise: Option<Promise<Result<Vec<crate::rpcs3::InstalledGame>, crate::rpcs3::Rpcs3Error>>>,
     rpcs3_detect_promise: Option<(DetectFor, Promise<Option<crate::rpcs3::Rpcs3Installation>>)>,
     rpcs3_installed_games: Vec<crate::rpcs3::InstalledGame>,
+    /// Which rows the RPCS3 library page shows.
+    library_filter: rpcs3_library::LibraryFilter,
 
     // Firmware download state
     firmware_console_idx: usize,
@@ -566,10 +570,12 @@ impl Default for VolatileData {
             batch_search_total: 0,
             batch_search_completed: 0,
             batch_search_errors: Vec::new(),
+            no_update_serials: HashSet::new(),
 
             rpcs3_scan_promise: None,
             rpcs3_detect_promise: None,
             rpcs3_installed_games: Vec::new(),
+            library_filter: rpcs3_library::LibraryFilter::All,
 
             firmware_console_idx: 0,
             firmware_region_idx: 0,
