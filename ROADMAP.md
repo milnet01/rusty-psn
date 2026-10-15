@@ -495,10 +495,13 @@ Add PlayStation Vita game update downloads. Research status: **confirmed feasibl
   Kind: feature.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0044] **Test with known Vita serials: PCSA00007 (Hustle Kings), PCSE00120 (Persona 4 Golden), PCSA00126 (Killzone Mercenary).**
+- ✅ [RPSN-0044] **Test with known Vita serials: PCSA00007 (Hustle Kings), PCSE00120 (Persona 4 Golden), PCSA00126 (Killzone Mercenary).**
   Checked against the code 2026-10-12: Partly done — tests exist for
   PCSA00007 and PCSA00107 only; none for PCSE00120 or PCSA00126.
   Former TODO.md task 6.4.
+  Resolved (2026-10-15, b11d1bd): live tests cover PCSA00007, PCSA00107,
+  PCSE00120 (empty reply: no updates) and PCSA00126 (Sony says Not
+  found; Killzone Mercenary is PCSA00107).
   **Layman:** Test Vita support with a few more real games.
   Kind: feature.
   Source: todo-md-import-2026-10-12.
@@ -526,10 +529,13 @@ Add PlayStation Vita game update downloads. Research status: **confirmed feasibl
   Kind: feature.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0048] **Optionally parse `psp2_system_ver` to display minimum firmware requirement in the UI.**
+- ✅ [RPSN-0048] **Optionally parse `psp2_system_ver` to display minimum firmware requirement in the UI.**
   Checked against the code 2026-10-12: Not done — psp2_system_ver is
   not parsed.
   Former TODO.md task 6.8.
+  Resolved (2026-10-15, e5c8f36): Vita packages show "needs system X.YY"
+  from psp2_system_ver, a decimal whose hex form holds the digits
+  (PCSA00007: 23461888 = 0x01660000 = 1.66), checked by the live test.
   **Layman:** Show the minimum Vita system version an update needs.
   Kind: feature.
   Source: todo-md-import-2026-10-12.
@@ -633,7 +639,7 @@ Integrate directly with the RPCS3 emulator to auto-detect games and install upda
   Kind: feature.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0058] **Batch update all outdated games.**
+- ✅ [RPSN-0058] **Batch update all outdated games.**
   "Update All" button that downloads and installs updates for every
   game that has a newer version available
   Checked against the code 2026-10-12: Partly done — "Update All
@@ -645,6 +651,12 @@ Integrate directly with the RPCS3 emulator to auto-detect games and install upda
   compared as decimal numbers (Crypto/unpkg.cpp at 6fe3c87). Install a
   chain in ascending order and re-read PARAM.SFO between steps. Depends
   on RPSN-0137 and RPSN-0138.
+  Resolved (2026-10-15, 99e832c): Update All Outdated downloads every
+  newer update and, with RPCS3's executable set, installs them oldest
+  first once all have arrived, checking each against PARAM.SFO and
+  stopping at the first failure. No spec: one window-app file using the
+  RPSN-0137 install. Owner's hand test: run it on a real RPCS3 library
+  with a game two updates behind.
   **Layman:** Make "Update All Outdated" install the updates into RPCS3 as well as downloading them.
   Kind: feature.
   Source: todo-md-import-2026-10-12.
@@ -887,13 +899,16 @@ Create a unique, recognizable icon for rusty-psn that displays in the taskbar/ta
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0077] **Generate platform-specific icon formats.**
+- ✅ [RPSN-0077] **Generate platform-specific icon formats.**
     - Windows: `.ico` file (multi-resolution: 16, 32, 48, 64, 128, 256)
     - Linux: `.png` files at standard sizes (48, 64, 128, 256, 512) + `.desktop` file
     - macOS: `.icns` file (already has `Info.plist` for app bundle)
   Checked against the code 2026-10-12: Partly done — PNGs and a
   .desktop file exist; no .ico, no .icns and no 512 px PNG.
   Former TODO.md task 10.2.
+  Resolved (2026-10-15, f6181e8): resources/icon.ico, icon.icns and
+  icon-512.png rendered from icon.svg. Wiring them into the Windows and
+  macOS builds is RPSN-0078 and RPSN-0080.
   **Layman:** Make icon files for Windows and macOS, and a larger Linux icon.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
