@@ -2,6 +2,11 @@
 
 use super::*;
 
+/// RPCS3 emulates the PS3 only, so only a PS3 package can be installed into it (RPSN-0158).
+fn rpcs3_can_install(title_id: &str) -> bool {
+    utils::get_platform_variant(title_id) == Some(utils::PlatformVariant::PS3)
+}
+
 impl UpdatesApp {
     pub(super) fn draw_results_list(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         // Build filtered/sorted index list up front so the toolbar can show "showing X of Y".
@@ -387,7 +392,7 @@ impl UpdatesApp {
                                 .any(|(tid, pid, _)| tid == title_id && *pid == pkg.id());
                             let is_installed = self.v.rpcs3_installed_pkgs.contains(&install_key);
 
-                            if !is_installing && !is_installed {
+                            if !is_installing && !is_installed && rpcs3_can_install(title_id) {
                                 if let Some(rpcs3_exe) = &self.settings.rpcs3_executable {
                                     if ui.button("Install to RPCS3").clicked() {
                                         // Install exactly the file this download wrote.
@@ -535,6 +540,20 @@ impl UpdatesApp {
                 format!("{}:{:02}:{:02}", eta_secs / 3600, (eta_secs % 3600) / 60, eta_secs % 60)
             };
             ui.label(format!("{}/s - ETA {eta_str}", ByteSize::b(cached.speed_bps as u64)));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_ps3_packages_install_into_rpcs3() {
+        assert!(rpcs3_can_install("BLUS31147"));
+        assert!(rpcs3_can_install("NPUB30826"));
+        for other in ["CUSA01021", "PCSA00007", "NPUG80318", "ULUS10336"] {
+            assert!(!rpcs3_can_install(other), "{other}");
         }
     }
 }
