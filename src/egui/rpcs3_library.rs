@@ -173,7 +173,7 @@ impl UpdatesApp {
             ui.horizontal(|ui| {
                 scan = ui.button("Scan RPCS3 library").clicked();
                 ui.label(format!(
-                    "{game_count} game(s) installed, {outdated_count} with updates available"
+                    "{game_count} game(s) in library, {outdated_count} with updates available"
                 ));
 
                 if outdated_count > 0 && ui.button("Update All Outdated").clicked() {
@@ -229,6 +229,9 @@ impl UpdatesApp {
                                     ui.label("No updates");
                                 }
                                 LibraryStatus::Checking => status_pill(ui, "Checking…", StatusKind::Working),
+                                LibraryStatus::VersionUnknown => {
+                                    ui.label("version unknown");
+                                }
                                 LibraryStatus::Unknown => {
                                     ui.label("--");
                                 }
@@ -261,7 +264,7 @@ impl UpdatesApp {
             (None, _) => LibraryStatus::Unknown,
             (Some(_), None) => LibraryStatus::NoUpdates,
             (Some(_), Some(latest)) => match &game.installed_version {
-                None => LibraryStatus::Unknown,
+                None => LibraryStatus::VersionUnknown,
                 Some(installed) => match crate::rpcs3::compare_versions(installed, &latest.version) {
                     std::cmp::Ordering::Less => LibraryStatus::NeedsUpdate,
                     _ => LibraryStatus::UpToDate,
@@ -324,7 +327,9 @@ pub(super) enum LibraryStatus {
     NoUpdates,
     /// Its search is still queued or running.
     Checking,
-    /// Not searched, its search failed, or the installed version could not be read.
+    /// PSN has an update, but no installed version is on record to compare it with (RPSN-0131).
+    VersionUnknown,
+    /// Not searched yet, or its search failed.
     Unknown,
 }
 
@@ -430,5 +435,6 @@ mod tests {
             "a failed search is not 'no updates'"
         );
         assert_eq!(app.library_status(&games[4]), LibraryStatus::Checking);
+        assert_eq!(app.library_status(&game("OLD", None)), LibraryStatus::VersionUnknown);
     }
 }
