@@ -246,21 +246,7 @@ impl UpdatesApp {
                     Err(e) => {
                         self.v.failed_merges.push(merge.title_id.clone());
 
-                        match e {
-                            MergeError::FilepathMismatch(reason) | MergeError::PackagesUnmergeable(reason) => {
-                                messages.push((format!("Failed to merge {}: {reason}", merge.title_id), MessageLevel::Error));
-                            }
-                            MergeError::FileMergeFailure => {
-                                messages.push((
-                                    format!("Failed to merge {}. Check the log for details.", merge.title_id),
-                                    MessageLevel::Error,
-                                ));
-                            }
-                            MergeError::Security(e) => {
-                                error!("Merge for {} refused: {e}", merge.title_id);
-                                messages.push((format!("Failed to merge {}: {e}", merge.title_id), MessageLevel::Error));
-                            }
-                        }
+                        messages.push((format!("Failed to merge {}: {e}", merge.title_id), MessageLevel::Error));
 
                         error!("Could not merge files for {}, reason: {:?}", merge.title_id, e);
                     }

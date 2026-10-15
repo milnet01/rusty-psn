@@ -1,14 +1,11 @@
 use crate::psn::UpdateError;
 
 use std::fmt;
-#[cfg(feature = "egui")]
 use std::io::{Error, SeekFrom};
-#[cfg(feature = "egui")]
 use std::path::PathBuf;
 
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
-#[cfg(feature = "egui")]
 use tokio::{
     fs::OpenOptions,
     io::{copy_buf, AsyncSeekExt, BufReader, BufWriter},
@@ -118,9 +115,7 @@ pub async fn read_capped_text(mut response: reqwest::Response, cap: u64) -> Resu
     Ok(String::from_utf8_lossy(&body).into_owned())
 }
 
-#[cfg(feature = "egui")]
 const MERGE_CHUNK_SIZE: usize = 1024 * 1024 * 128;
-#[cfg(feature = "egui")]
 pub async fn copy_pkg_file(src_path: &PathBuf, target_path: &PathBuf, offset: u64) -> Result<u64, Error> {
     let src_file = OpenOptions::default()
         .create(false)

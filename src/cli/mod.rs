@@ -315,6 +315,8 @@ pub fn start_app(args: Args) -> bool {
             println!("{} {} - Downloading update(s): {}", update.title_id, title, updates);
         }
 
+        // Parts of a multi-part PS4 update that downloaded in this run; see the join below.
+        let mut parts_downloaded = 0;
         for (idx, pkg) in update.packages.iter().enumerate() {
             if !updates_to_fetch.is_empty() && !updates_to_fetch.contains(&idx) {
                 continue;
@@ -501,6 +503,8 @@ pub fn start_app(args: Args) -> bool {
                 if !should_retry {
                     if downloaded_file.is_none() {
                         failures += 1;
+                    } else if pkg.part_number.is_some() {
+                        parts_downloaded += 1;
                     }
                     // If the download succeeded and --install is set, install exactly the file it wrote.
                     if install_mode {
@@ -542,6 +546,31 @@ pub fn start_app(args: Args) -> bool {
                 // Loop continues: the partial file persists on disk, so start_download()
                 // will automatically resume via HTTP Range headers.
             }
+        }
+
+        // A multi-part PS4 update is usable only as one file, so join its parts once every one has
+        // downloaded, as the window app does (RPSN-0087).
+        let join = parts_to_join(&update.packages, parts_downloaded);
+        if join == Join::All {
+            if !silent_mode {
+                println!("  Joining {parts_downloaded} parts into one package...");
+            }
+            // Room for every progress report, since nothing reads them here.
+            let (tx, _progress) = tokio::sync::mpsc::channel(update.packages.len() + 1);
+            match runtime.block_on(update.merge_parts(tx, &destination_path, directory_format)) {
+                Ok(()) => {
+                    if !silent_mode {
+                        println!("  Parts joined.");
+                    }
+                }
+                Err(e) => {
+                    error!("Joining the parts of {} failed: {e:?}", update.title_id);
+                    eprintln!("  Joining the parts failed: {e}.");
+                    failures += 1;
+                }
+            }
+        } else if join == Join::Partial && !silent_mode {
+            println!("  Not every part was downloaded, so the parts were not joined.");
         }
 
         if !silent_mode {
@@ -740,6 +769,26 @@ async fn download_firmware_cli(
 
 /// Collect the serials from every `-t` value, split on any whitespace, normalised and deduplicated
 /// as a batch file's are. Validation stays with the search, which reports a bad serial by name.
+/// Whether a downloaded update's parts can be joined into one package.
+#[derive(Debug, PartialEq)]
+enum Join {
+    /// Not a multi-part update, or no part arrived.
+    None,
+    /// Some parts arrived and some did not, so there is nothing whole to join.
+    Partial,
+    /// Every part arrived.
+    All,
+}
+
+fn parts_to_join(packages: &[crate::psn::PackageInfo], parts_downloaded: usize) -> Join {
+    let multipart = !packages.is_empty() && packages.iter().all(|p| p.part_number.is_some());
+    match (multipart, parts_downloaded) {
+        (false, _) | (true, 0) => Join::None,
+        (true, n) if n == packages.len() => Join::All,
+        (true, _) => Join::Partial,
+    }
+}
+
 fn serials_from_titles(titles: &[String]) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
     titles
@@ -765,6 +814,33 @@ fn parse_update_selection(input: &str, count: usize) -> Option<Vec<usize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn part(number: Option<usize>) -> crate::psn::PackageInfo {
+        crate::psn::PackageInfo {
+            url: String::new(),
+            size: 0,
+            version: "01.01".to_string(),
+            sha1sum: String::new(),
+            hash_whole_file: true,
+            manifest_url: String::new(),
+            offset: 0,
+            part_number: number,
+        }
+    }
+
+    #[test]
+    fn parts_are_joined_only_when_every_one_arrived() {
+        // The command line could not join a multi-part PS4 update at all (RPSN-0087).
+        let parts = [part(Some(1)), part(Some(2)), part(Some(3))];
+        assert_eq!(parts_to_join(&parts, 3), Join::All);
+        assert_eq!(parts_to_join(&parts, 2), Join::Partial);
+        assert_eq!(parts_to_join(&parts, 0), Join::None);
+        assert_eq!(
+            parts_to_join(&[part(None)], 0),
+            Join::None,
+            "a single package is never joined"
+        );
+    }
 
     #[test]
     fn read_answer_end_of_input_is_no_answer() {

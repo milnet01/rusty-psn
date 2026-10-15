@@ -6,16 +6,13 @@ mod parser;
 pub mod utils;
 
 use std::path::PathBuf;
-#[cfg(feature = "egui")]
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
-#[cfg(feature = "egui")]
 use reqwest::Url;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt, SeekFrom};
 use tokio::sync::mpsc::Sender;
-#[cfg(feature = "egui")]
 use utils::copy_pkg_file;
 use utils::{get_platform_variant, get_update_info_url, read_capped_text, CappedReadError, PlatformVariant};
 
@@ -64,21 +61,31 @@ pub enum DownloadStatus {
     DownloadFailure,
 }
 
-#[cfg(feature = "egui")]
 #[derive(Debug)]
 pub enum MergeStatus {
-    PartProgress(usize),
+    /// The command line does not show per-part progress.
+    PartProgress(#[cfg_attr(not(feature = "egui"), allow(dead_code))] usize),
 
     MergeSuccess,
 }
 
-#[cfg(feature = "egui")]
 #[derive(Debug)]
 pub enum MergeError {
     FilepathMismatch(String),
     FileMergeFailure,
     PackagesUnmergeable(String),
     Security(crate::security::SecurityError),
+}
+
+/// What both apps tell the user when joining parts fails.
+impl std::fmt::Display for MergeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MergeError::FilepathMismatch(reason) | MergeError::PackagesUnmergeable(reason) => f.write_str(reason),
+            MergeError::FileMergeFailure => f.write_str("the parts could not be joined; the log says why"),
+            MergeError::Security(e) => write!(f, "{e}"),
+        }
+    }
 }
 
 /// Cancel signal values for download pause/abort.
@@ -199,7 +206,6 @@ impl UpdateInfo {
         }
     }
 
-    #[cfg(feature = "egui")]
     pub fn title(&self) -> String {
         if let Some(title) = self.titles.first() {
             title.clone()
@@ -295,7 +301,6 @@ impl UpdateInfo {
         Ok(info)
     }
 
-    #[cfg(feature = "egui")]
     pub async fn merge_parts(
         &self,
         tx: Sender<MergeStatus>,
@@ -383,7 +388,6 @@ pub struct PackageInfo {
     pub sha1sum: String,
     pub hash_whole_file: bool,
     pub manifest_url: String,
-    #[cfg_attr(not(feature = "egui"), allow(dead_code))]
     pub offset: u64,
     pub part_number: Option<usize>,
 }
@@ -605,7 +609,6 @@ impl PackageInfo {
         }
     }
 
-    #[cfg(feature = "egui")]
     pub fn file_name(&self) -> Option<String> {
         let pkg_url = match Url::from_str(&self.url) {
             Ok(url) => url,
@@ -691,7 +694,6 @@ mod tests {
         assert!(result.is_err(), "a self-signed certificate on a non-Sony host was accepted");
     }
 
-    #[cfg(feature = "egui")]
     #[tokio::test]
     async fn merge_parts_refuses_folder_outside_download_folder() {
         // A title id carrying "../" points the merge at a folder outside the download folder.
