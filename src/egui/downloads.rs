@@ -33,13 +33,16 @@ impl UpdatesApp {
                             title: download.title.clone(),
                             pkg: download.pkg.clone(),
                         });
-                        self.v.download_history.push(DownloadHistoryEntry {
-                            title_id: download.title_id.clone(),
-                            pkg_id: download.pkg_id.clone(),
-                            title: download.title.clone(),
-                            size: download.size,
-                            completed_at: std::time::Instant::now(),
-                        });
+                        history::record(
+                            &mut self.v.download_history,
+                            DownloadHistoryEntry {
+                                title_id: download.title_id.clone(),
+                                pkg_id: download.pkg_id.clone(),
+                                title: download.title.clone(),
+                                size: download.size,
+                                completed_at: history::now(),
+                            },
+                        );
                     }
                     Err(e) => {
                         match e {

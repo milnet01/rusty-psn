@@ -178,12 +178,15 @@ enum DetectFor {
     Settings,
 }
 
+/// One finished download on the History page, kept between runs (RPSN-0068).
+#[derive(Clone, Deserialize, Serialize)]
 struct DownloadHistoryEntry {
     title_id: String,
     pkg_id: String,
     title: String,
     size: u64,
-    completed_at: std::time::Instant,
+    /// When it finished, in seconds since 1970 (UTC).
+    completed_at: u64,
 }
 
 /// Maximum number of concurrent batch search API calls.
@@ -668,6 +671,7 @@ impl eframe::App for UpdatesApp {
         if let Some(position) = self.v.frame_position {
             eframe::set_value(storage, placement::STORAGE_KEY, &position);
         }
+        eframe::set_value(storage, history::STORAGE_KEY, &self.v.download_history);
     }
 
     // Runs before every `ui` call, and also while the window is hidden, so downloads keep moving when minimised.
@@ -779,6 +783,10 @@ impl UpdatesApp {
         app.v.frame_position = cc
             .storage
             .and_then(|storage| eframe::get_value(storage, placement::STORAGE_KEY));
+        app.v.download_history = cc
+            .storage
+            .and_then(|storage| eframe::get_value(storage, history::STORAGE_KEY))
+            .unwrap_or_default();
 
         // Apply the persisted theme and text size on startup.
         app.settings.apply_appearance(&cc.egui_ctx);
