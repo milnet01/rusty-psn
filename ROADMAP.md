@@ -747,22 +747,28 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0068] **Download history.**
+- ✅ [RPSN-0068] **Download history.**
   Persist a log of completed downloads with timestamps, shown in a
   "History" tab
   Checked against the code 2026-10-12: Partly done — history lasts one
   session only and shows in a window, not a tab.
   Former TODO.md task 9.3.
+  Resolved (2026-10-15, 98573bf): the History page is saved between
+  runs, newest 500 kept, and shows days for older entries. It was
+  already its own sidebar page (RPSN-0157).
   **Layman:** Keep a history of finished downloads between sessions, in its own tab.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0069] **Concurrent serial search.**
+- ✅ [RPSN-0069] **Concurrent serial search.**
   The GUI currently allows only one search at a time (`search_promise`
   is a single `Option`); allow concurrent searches
   Checked against the code 2026-10-12: Partly done — batch searches
   run concurrently; the single search_promise remains.
   Former TODO.md task 9.4.
+  Resolved (2026-10-15, e903f93): several typed searches run at once;
+  the Search button waits only for a serial already being searched, and
+  each error names its serial.
   **Layman:** Allow more than one game search at the same time.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -1050,10 +1056,15 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: design-2026-10-12.
   Lanes: Window app.
 
-- 📋 [RPSN-0087] **Let the command line merge multi-part PS4 updates.**
+- ✅ [RPSN-0087] **Let the command line merge multi-part PS4 updates.**
   `psn::merge_parts`, `MergeStatus` and `copy_pkg_file` compile only with
   the `egui` feature, so a command-line build cannot merge a multi-part PS4
   update. Found by the design review 2026-10-12. Claims S3 and S9.
+  Resolved (2026-10-15, 733800d): the merge code compiles for the
+  command line, which joins a multi-part PS4 update's parts once every
+  part has downloaded in the run; a failed join fails the exit status.
+  Owner's hand test: download a multi-part PS4 update with the command
+  line and check the joined .pkg (gigabytes, so not run here).
   **Layman:** Make the command-line version join multi-part PS4 updates, like the window app does.
   Kind: feature.
   Source: design-review-2026-10-12.
