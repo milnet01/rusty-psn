@@ -47,6 +47,13 @@ impl UpdatesApp {
         [attention, in_progress, finished]
     }
 
+    /// Queue every failed download again, in the order they failed (RPSN-0029).
+    pub(super) fn retry_all_failed(&mut self) {
+        for failed in std::mem::take(&mut self.v.failed_downloads) {
+            self.queue_download_no_ui(failed.title_id, failed.title, failed.pkg);
+        }
+    }
+
     pub(super) fn draw_downloads_page(&mut self, ui: &mut egui::Ui) {
         let [attention, in_progress, finished] = self.download_sections();
         if attention.is_empty() && in_progress.is_empty() && finished.is_empty() {
@@ -66,6 +73,8 @@ impl UpdatesApp {
                     .show(ui, |ui| {
                         if rows.is_empty() {
                             ui.weak("None.");
+                        } else if name == "Needs attention" && ui.button("Retry all failed").clicked() {
+                            self.retry_all_failed();
                         }
                         for (title_id, title, pkg) in rows {
                             ui.label(egui::RichText::new(format!("{title_id} · {title}")).strong());
@@ -130,5 +139,25 @@ mod tests {
         assert_eq!(ids(&attention), ["FAILED"]);
         assert_eq!(ids(&in_progress), ["PAUSED", "QUEUED"]);
         assert_eq!(ids(&finished), ["DONE2", "DONE1"], "newest finished first");
+    }
+
+    #[test]
+    fn retry_all_failed_queues_every_failed_download() {
+        let mut app = UpdatesApp::default();
+        app.settings.max_concurrent_downloads = 0; // Everything waits, so no download starts in the test.
+        for (title_id, version) in [("ONE", "01.01"), ("TWO", "01.02")] {
+            app.v.failed_downloads.push(FailedDownload {
+                title_id: title_id.into(),
+                pkg_id: version.into(),
+                title: "Game".into(),
+                pkg: package(version),
+                incomplete: false,
+            });
+        }
+
+        app.retry_all_failed();
+        assert!(app.v.failed_downloads.is_empty());
+        let queued: Vec<_> = app.v.pending_downloads.iter().map(|p| p.title_id.as_str()).collect();
+        assert_eq!(queued, ["ONE", "TWO"]);
     }
 }
