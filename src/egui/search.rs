@@ -26,7 +26,7 @@ impl VolatileData {
 }
 
 impl UpdatesApp {
-    pub(super) fn handle_search_promise(&mut self, toasts: &mut Vec<(String, ToastLevel)>) -> Option<()> {
+    pub(super) fn handle_search_promise(&mut self, messages: &mut Vec<(String, MessageLevel)>) -> Option<()> {
         let is_ready = {
             let promise = self.v.search_promise.as_ref()?;
             promise.ready().is_some()
@@ -44,45 +44,48 @@ impl UpdatesApp {
                 Err(ref e) => {
                     match e {
                         UpdateError::UnhandledErrorResponse(e) => {
-                            toasts.push((
+                            messages.push((
                                 format!("Unexpected error received in a response from PSN ({e})."),
-                                ToastLevel::Error,
+                                MessageLevel::Error,
                             ));
                         }
                         UpdateError::InvalidSerial => {
-                            toasts.push((
+                            messages.push((
                                 String::from("The provided serial didn't give any results, double-check your input."),
-                                ToastLevel::Error,
+                                MessageLevel::Error,
                             ));
                         }
                         UpdateError::NoUpdatesAvailable => {
-                            toasts.push((
+                            messages.push((
                                 String::from("The provided serial doesn't have any available updates."),
-                                ToastLevel::Error,
+                                MessageLevel::Error,
                             ));
                         }
                         UpdateError::Reqwest(e) => {
-                            toasts.push((format!("There was an error completing the request ({e})."), ToastLevel::Error));
+                            messages.push((
+                                format!("There was an error completing the request ({e})."),
+                                MessageLevel::Error,
+                            ));
                         }
                         UpdateError::XmlParsing(e) => {
-                            toasts.push((
+                            messages.push((
                                 format!("Error parsing response from Sony, try again later ({e})."),
-                                ToastLevel::Error,
+                                MessageLevel::Error,
                             ));
                         }
                         UpdateError::ManifestParsing(e) => {
-                            toasts.push((
+                            messages.push((
                                 format!("Error parsing manifest response from Sony, try again later ({e})."),
-                                ToastLevel::Error,
+                                MessageLevel::Error,
                             ));
                         }
                         UpdateError::Security(e) => {
-                            toasts.push((format!("Security check failed: {e}"), ToastLevel::Error));
+                            messages.push((format!("Security check failed: {e}"), MessageLevel::Error));
                         }
                         UpdateError::ResponseTooLarge(size) => {
-                            toasts.push((
+                            messages.push((
                                 format!("Response too large ({} bytes), possible server error.", size),
-                                ToastLevel::Error,
+                                MessageLevel::Error,
                             ));
                         }
                     }
@@ -95,7 +98,7 @@ impl UpdatesApp {
         Some(())
     }
 
-    pub(super) fn handle_batch_search_queue(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+    pub(super) fn handle_batch_search_queue(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
         // Drain completed batch search promises.
         let mut completed_indices = Vec::new();
         for (i, (serial, promise)) in self.v.batch_search_active.iter().enumerate() {
@@ -168,7 +171,7 @@ impl UpdatesApp {
             } else {
                 format!("Batch search complete: {found} title(s) found.")
             };
-            toasts.push((msg, ToastLevel::Info));
+            messages.push((msg, MessageLevel::Info));
             self.v.batch_search_total = 0; // Reset so the toast doesn't fire again.
         }
     }
@@ -186,24 +189,24 @@ impl UpdatesApp {
                 if !result.warnings.is_empty() {
                     self.show_notifications(
                         format!("Batch import: skipped {} invalid serial(s)", result.warnings.len()),
-                        ToastLevel::Warning,
+                        MessageLevel::Warning,
                     );
                 }
 
                 let queued = self.v.enqueue_batch_search(result.serials);
 
                 if queued == 0 {
-                    self.show_notifications("All serials from the batch file are already loaded.", ToastLevel::Info);
+                    self.show_notifications("All serials from the batch file are already loaded.", MessageLevel::Info);
                     return;
                 }
 
                 self.show_notifications(
                     format!("Batch import: {queued} serial(s) queued for search."),
-                    ToastLevel::Info,
+                    MessageLevel::Info,
                 );
             }
             Err(e) => {
-                self.show_notifications(format!("Failed to import batch file: {e}"), ToastLevel::Error);
+                self.show_notifications(format!("Failed to import batch file: {e}"), MessageLevel::Error);
             }
         }
     }
@@ -257,7 +260,7 @@ impl UpdatesApp {
                     .iter()
                     .any(|e| e.title_id == parse_title_id(&self.v.serial_query));
                 if already_searched {
-                    self.show_notifications("Provided title id results already shown", ToastLevel::Info);
+                    self.show_notifications("Provided title id results already shown", MessageLevel::Info);
                     return;
                 }
 

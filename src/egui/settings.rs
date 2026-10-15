@@ -164,13 +164,6 @@ impl UpdatesApp {
         ui.add_space(3.0);
 
         if ui
-            .checkbox(&mut self.v.modified_settings.show_toasts, "Show in-app toasts")
-            .changed()
-        {
-            self.v.settings_dirty = true;
-        }
-
-        if ui
             .checkbox(&mut self.v.modified_settings.show_notifications, "Show system notifications")
             .changed()
         {

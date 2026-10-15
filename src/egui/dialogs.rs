@@ -1,28 +1,8 @@
-//! The hash mismatch window, and the About and folder-migration sections of the Settings page.
+//! The About and folder-migration sections of the Settings page.
 
 use super::*;
 
 impl UpdatesApp {
-    pub(super) fn draw_hash_mismatch_window(&mut self, ctx: &egui::Context) {
-        egui::Window::new("File integrity check failed").collapsible(false).fixed_size([550.0, 100.0]).show(ctx, | ui | {
-            ui.vertical_centered(| ui | {
-                ui.label(egui::RichText::new("\u{26A0} The integrity check for a downloaded file failed.").color(StatusKind::Attention.color(ui.visuals())).heading());
-                ui.label(egui::RichText::new("Considering the file is smaller than expected, it's likely that Sony's servers are being unreliable.").strong());
-                ui.label(egui::RichText::new("You should try to download the file again, or wait for a few hours before retrying. Sony's servers should eventually be able handle a complete download.").strong());
-
-                ui.small("fix your shit already sony, it's been years of unreliable downloads.");
-            });
-
-            ui.separator();
-
-            ui.vertical_centered(| ui | {
-                if ui.button("Close message").clicked() {
-                    self.v.show_mismatch_warning_window = false;
-                }
-            });
-        });
-    }
-
     pub(super) fn draw_about_section(&mut self, ui: &mut egui::Ui) {
         ui.label(format!("rusty-psn version {}", env!("CARGO_PKG_VERSION")));
         ui.label("Download PlayStation game updates for use with emulators.");
@@ -37,10 +17,10 @@ impl UpdatesApp {
                     let msg = format!(
                         "Migration: {migrated} folder(s) migrated, {skipped} skipped. The log file says why each was skipped."
                     );
-                    self.show_notifications(&msg, ToastLevel::Warning);
+                    self.show_notifications(&msg, MessageLevel::Warning);
                 } else {
                     let msg = format!("Migration complete: {migrated} folder(s) migrated.");
-                    self.show_notifications(&msg, ToastLevel::Success);
+                    self.show_notifications(&msg, MessageLevel::Success);
                 }
                 self.v.migration_promise = None;
                 self.v.migration_listed = false;

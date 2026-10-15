@@ -440,13 +440,19 @@ impl UpdatesApp {
                             }
                         }
                         ActiveDownloadStatus::Failed => {
+                            let incomplete = self
+                                .v
+                                .failed_downloads
+                                .iter()
+                                .any(|f| f.title_id == title_id && f.pkg_id == pkg.id() && f.incomplete);
                             if ui.button("Retry").clicked() {
                                 self.v
                                     .failed_downloads
                                     .retain(|f| !(f.title_id == title_id && f.pkg_id == pkg.id()));
                                 self.queue_download(title_id.to_string(), title.clone(), pkg.clone(), ui);
                             }
-                            status_pill(ui, "Failed", StatusKind::Failed);
+                            let text = if incomplete { "Failed: file incomplete" } else { "Failed" };
+                            status_pill(ui, text, StatusKind::Failed);
                         }
                     }
 

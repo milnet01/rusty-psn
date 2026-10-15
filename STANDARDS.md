@@ -35,7 +35,7 @@ The project uses Cargo feature flags to compile either frontend:
 
 | Feature | Default | Dependencies | Purpose |
 |---|---|---|---|
-| `egui` | Yes | `rfd`, `eframe`, `egui-notify`, `notify-rust` | Desktop GUI application |
+| `egui` | Yes | `rfd`, `eframe`, `notify-rust` | Desktop GUI application |
 | `cli` | No | `crossterm` | Terminal-based interactive interface |
 
 Build commands:
@@ -294,7 +294,6 @@ These are well-known public keys used across PS4/PSVita homebrew/emulation tooli
 UpdatesApp (eframe::App)
   |-- AppSettings (persisted via eframe storage)
   |     |-- pkg_download_path: PathBuf
-  |     |-- show_toasts: bool
   |     |-- show_notifications: bool
   |     |-- directory_format: DirectoryFormat
   |     |-- max_concurrent_downloads: u32
@@ -311,7 +310,7 @@ UpdatesApp (eframe::App)
         |-- completed/failed download/merge lists
         |-- search_promise, batch_search_queue/active
         |-- rpcs3_scan_promise, rpcs3_installed_games
-        |-- clipboard, toasts, egui_ctx
+        |-- clipboard, message_log, egui_ctx
 ```
 
 ### 6.2 State Management
@@ -330,7 +329,7 @@ UpdatesApp (eframe::App)
 - **Settings page**: Downloads, Appearance (theme, text size), Notifications, RPCS3 Integration and Content Library, then folding sections for Migrate downloads and About. The fields scroll above the fixed Save row. Leaving the page drops unsaved changes
 - **Status bar**: Bottom panel with batch progress, download counts, speed (EMA), ETA, aggregate progress bar
 - **RPCS3 library page**: a Scan button, then a grid showing serial, title, installed/available versions, update status
-- **Hash mismatch warning**: Fixed-size modal (`550x100`) explaining Sony server reliability issues
+- **Messages panel** (`src/egui/messages.rs`): above the status bar on every page; folds to one button. Unfolded, it lists the newest 200 messages in a fixed-height box that scrolls, each with a status icon, a word and a colour. A download that failed because the file arrived short also says "Failed: file incomplete" beside its package
 
 ### 6.4 Font Embedding
 
@@ -342,11 +341,7 @@ Both are inserted into egui's `Proportional` font family, with Noto Sans as prio
 
 ### 6.5 Notification System
 
-Two parallel notification systems:
-1. **In-app toasts** (`egui-notify`): Anchored bottom-right, 10-second duration, reversible order
-2. **System notifications** (`notify-rust`): OS-level desktop notifications
-
-Both are independently toggleable in settings.
+Every message goes to the Messages panel (§ 6.3); nothing pops up inside the window. System notifications (`notify-rust`) repeat a message on the desktop when the user turns them on in Settings; they are off by default.
 
 ---
 

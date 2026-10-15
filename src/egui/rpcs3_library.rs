@@ -46,7 +46,7 @@ impl UpdatesApp {
         self.v.rpcs3_detect_promise = Some((purpose, promise));
     }
 
-    pub(super) fn handle_rpcs3_detect_promise(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+    pub(super) fn handle_rpcs3_detect_promise(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
         if !self.v.rpcs3_detect_promise.as_ref().is_some_and(|(_, p)| p.ready().is_some()) {
             return;
         }
@@ -55,11 +55,11 @@ impl UpdatesApp {
             (DetectFor::Scan, Some(installation)) => {
                 self.adopt_detected_rpcs3(installation);
                 self.trigger_rpcs3_scan();
-                toasts.push(("RPCS3 auto-detected and scan started.".to_string(), ToastLevel::Info));
+                messages.push(("RPCS3 auto-detected and scan started.".to_string(), MessageLevel::Info));
             }
-            (DetectFor::Scan, None) => toasts.push((
+            (DetectFor::Scan, None) => messages.push((
                 "RPCS3 not found. Go to Settings to configure the RPCS3 path.".to_string(),
-                ToastLevel::Warning,
+                MessageLevel::Warning,
             )),
             // The Settings page was left while the search ran: nothing is waiting for it.
             (DetectFor::Settings, _) if self.v.page != chrome::Page::Settings => {}
@@ -70,9 +70,9 @@ impl UpdatesApp {
                     self.v.modified_settings.rpcs3_executable = installation.executable;
                 }
             }
-            (DetectFor::Settings, None) => toasts.push((
+            (DetectFor::Settings, None) => messages.push((
                 "RPCS3 not found. Please configure the path manually.".to_string(),
-                ToastLevel::Warning,
+                MessageLevel::Warning,
             )),
         }
     }
@@ -81,7 +81,7 @@ impl UpdatesApp {
         let config_dir = match &self.settings.rpcs3_config_dir {
             Some(dir) => dir.clone(),
             None => {
-                self.show_notifications("RPCS3 not configured. Set the path in Settings.", ToastLevel::Error);
+                self.show_notifications("RPCS3 not configured. Set the path in Settings.", MessageLevel::Error);
                 return;
             }
         };
@@ -115,7 +115,7 @@ impl UpdatesApp {
         }));
     }
 
-    pub(super) fn handle_rpcs3_scan_promise(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+    pub(super) fn handle_rpcs3_scan_promise(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
         let is_ready = self.v.rpcs3_scan_promise.as_ref().is_some_and(|p| p.ready().is_some());
 
         if !is_ready {
@@ -133,13 +133,13 @@ impl UpdatesApp {
 
                 self.v.rpcs3_installed_games = games;
 
-                toasts.push((
+                messages.push((
                     format!("RPCS3 scan: {count} game(s) found, checking {search_count} for updates..."),
-                    ToastLevel::Info,
+                    MessageLevel::Info,
                 ));
             }
             Err(e) => {
-                toasts.push((format!("RPCS3 scan failed: {e}"), ToastLevel::Error));
+                messages.push((format!("RPCS3 scan failed: {e}"), MessageLevel::Error));
             }
         }
     }
@@ -268,25 +268,25 @@ impl UpdatesApp {
         }
     }
 
-    pub(super) fn handle_rpcs3_install_promises(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+    pub(super) fn handle_rpcs3_install_promises(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
         let mut i = 0;
         while i < self.v.rpcs3_install_promises.len() {
             if self.v.rpcs3_install_promises[i].2.ready().is_some() {
                 let (tid, pid, promise) = self.v.rpcs3_install_promises.remove(i);
                 match promise.block_and_take() {
                     Ok(crate::rpcs3::InstallOutcome::Confirmed) => {
-                        toasts.push((format!("Installed {tid} to RPCS3"), ToastLevel::Success));
+                        messages.push((format!("Installed {tid} to RPCS3"), MessageLevel::Success));
                         self.v.rpcs3_installed_pkgs.insert((tid, pid));
                     }
                     // No pill, so the Install button stays for a retry once the folder is set.
-                    Ok(crate::rpcs3::InstallOutcome::Unconfirmed) => toasts.push((
+                    Ok(crate::rpcs3::InstallOutcome::Unconfirmed) => messages.push((
                         format!(
                             "RPCS3 finished installing {tid}, but rusty-psn could not check the result. Set the RPCS3 folder in Settings to check it."
                         ),
-                        ToastLevel::Warning,
+                        MessageLevel::Warning,
                     )),
                     Err(e) => {
-                        toasts.push((format!("RPCS3 install failed: {e}"), ToastLevel::Error));
+                        messages.push((format!("RPCS3 install failed: {e}"), MessageLevel::Error));
                     }
                 }
             } else {

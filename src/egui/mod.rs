@@ -9,7 +9,6 @@ use crate::promise::Promise;
 use bytesize::ByteSize;
 use copypasta::{ClipboardContext, ClipboardProvider};
 use eframe::egui;
-use egui_notify::{Toast, ToastLevel, Toasts};
 use log::{error, info, warn};
 use notify_rust::Notification;
 use serde::{Deserialize, Serialize};
@@ -17,6 +16,7 @@ use tokio::runtime::Handle;
 use tokio::select;
 
 use crate::psn::*;
+use messages::{MessageLevel, MessageLog};
 
 mod chrome;
 mod content_browser;
@@ -24,6 +24,7 @@ mod dialogs;
 mod downloads;
 mod firmware;
 mod history;
+mod messages;
 mod placement;
 mod results;
 mod rpcs3_library;
@@ -78,6 +79,9 @@ const MAX_AUTO_RETRIES: u32 = 3;
 struct FailedDownload {
     title_id: String,
     pkg_id: String,
+    /// The file arrived smaller than Sony said, which usually means its servers dropped the
+    /// connection rather than that the file is bad.
+    incomplete: bool,
 }
 
 struct PendingDownload {
@@ -315,7 +319,6 @@ fn high_contrast_visuals() -> egui::Visuals {
 #[serde(default)]
 struct AppSettings {
     pkg_download_path: PathBuf,
-    show_toasts: bool,
     show_notifications: bool,
     #[serde(deserialize_with = "default_if_unknown")]
     directory_format: crate::utils::DirectoryFormat,
@@ -381,7 +384,6 @@ impl Default for AppSettings {
     fn default() -> AppSettings {
         AppSettings {
             pkg_download_path: default_download_path(),
-            show_toasts: true,
             show_notifications: false,
             directory_format: crate::utils::DirectoryFormat::default(),
             max_concurrent_downloads: default_max_concurrent(),
@@ -405,7 +407,8 @@ impl AppSettings {
 // Values that shouldn't be persisted from run to run.
 struct VolatileData {
     rt_handle: Option<Handle>,
-    toasts: Toasts,
+    /// What the Messages panel lists.
+    message_log: MessageLog,
 
     clipboard: Option<Box<dyn ClipboardProvider>>,
 
@@ -414,7 +417,6 @@ struct VolatileData {
 
     /// The page the sidebar has chosen.
     page: chrome::Page,
-    show_mismatch_warning_window: bool,
     /// Whether the Settings page lists the folders a migration would move.
     migration_listed: bool,
     migration_preview: Vec<(PathBuf, PathBuf)>,
@@ -520,7 +522,7 @@ impl Default for VolatileData {
 
         VolatileData {
             rt_handle: None,
-            toasts: Toasts::default().reverse(true).with_anchor(egui_notify::Anchor::BottomRight),
+            message_log: MessageLog::default(),
 
             clipboard,
 
@@ -528,7 +530,6 @@ impl Default for VolatileData {
             update_results: Vec::new(),
 
             page: chrome::Page::Search,
-            show_mismatch_warning_window: false,
             migration_listed: false,
             migration_preview: Vec::new(),
             migration_scan_root: PathBuf::new(),
@@ -612,23 +613,23 @@ impl eframe::App for UpdatesApp {
 
     // Runs before every `ui` call, and also while the window is hidden, so downloads keep moving when minimised.
     fn logic(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let mut toasts = Vec::new();
+        let mut messages = Vec::new();
 
         // Check the status of the search promise.
-        self.handle_search_promise(&mut toasts);
+        self.handle_search_promise(&mut messages);
         // Process batch search queue (parallel searches with concurrency limit).
-        self.handle_batch_search_queue(&mut toasts);
+        self.handle_batch_search_queue(&mut messages);
         // Check in on active downloads.
-        self.handle_download_promises(&mut toasts);
-        self.handle_merge_promises(&mut toasts);
-        self.handle_rpcs3_detect_promise(&mut toasts);
-        self.handle_rpcs3_scan_promise(&mut toasts);
-        self.handle_firmware_promises(&mut toasts);
-        self.handle_rpcs3_install_promises(&mut toasts);
-        self.handle_content_install_promises(&mut toasts);
-        self.handle_content_scan_promise(&mut toasts);
+        self.handle_download_promises(&mut messages);
+        self.handle_merge_promises(&mut messages);
+        self.handle_rpcs3_detect_promise(&mut messages);
+        self.handle_rpcs3_scan_promise(&mut messages);
+        self.handle_firmware_promises(&mut messages);
+        self.handle_rpcs3_install_promises(&mut messages);
+        self.handle_content_install_promises(&mut messages);
+        self.handle_content_scan_promise(&mut messages);
 
-        for (msg, level) in toasts {
+        for (msg, level) in messages {
             self.show_notifications(msg, level);
         }
     }
@@ -643,9 +644,10 @@ impl eframe::App for UpdatesApp {
         self.handle_keyboard_shortcuts(ctx);
         self.handle_window_placement(ctx);
 
-        // The sidebar and the status bar must come before CentralPanel.
+        // The sidebar, the status bar and the Messages panel must come before CentralPanel.
         self.draw_sidebar(ui);
         self.draw_status_bar(ui);
+        self.draw_messages_panel(ui);
 
         egui::CentralPanel::default().show(ui, |ui| {
             ui.heading(self.v.page.label());
@@ -664,13 +666,7 @@ impl eframe::App for UpdatesApp {
             }
         });
 
-        if self.v.show_mismatch_warning_window {
-            self.draw_hash_mismatch_window(ctx);
-        }
-
         self.poll_migration();
-
-        self.v.toasts.show(ctx);
     }
 }
 
@@ -730,18 +726,10 @@ impl UpdatesApp {
         app
     }
 
-    fn show_notifications<S: Into<String>>(&mut self, msg: S, level: ToastLevel) {
+    fn show_notifications<S: Into<String>>(&mut self, msg: S, level: MessageLevel) {
         let msg = msg.into();
 
-        if self.settings.show_toasts {
-            let mut toast = Toast::basic(&msg);
-            toast.level(level);
-            toast.duration(Some(Duration::from_secs(10)));
-
-            self.v.toasts.add(toast);
-        } else {
-            info!("A toast was supposed to be showed, but they are disabled.")
-        }
+        self.v.message_log.push(level, msg.clone());
 
         if self.settings.show_notifications {
             let mut notification = Notification::new();
@@ -858,19 +846,19 @@ impl UpdatesApp {
 
         if let Err(e) = std::process::Command::new(opener).arg(path).spawn() {
             warn!("Could not open {} with {opener}: {e}", path.display());
-            self.show_notifications(format!("Could not open the folder: {e}"), ToastLevel::Warning);
+            self.show_notifications(format!("Could not open the folder: {e}"), MessageLevel::Warning);
         }
     }
 
     /// Copy text to the clipboard, saying so when that fails.
     fn copy_to_clipboard(&mut self, text: String) {
         let Some(clip) = self.v.clipboard.as_mut() else {
-            self.show_notifications("No clipboard is available.", ToastLevel::Warning);
+            self.show_notifications("No clipboard is available.", MessageLevel::Warning);
             return;
         };
         if let Err(e) = clip.set_contents(text) {
             warn!("Could not copy to the clipboard: {e}");
-            self.show_notifications(format!("Could not copy: {e}"), ToastLevel::Warning);
+            self.show_notifications(format!("Could not copy: {e}"), MessageLevel::Warning);
         }
     }
 }
@@ -912,7 +900,7 @@ mod tests {
         assert!(settings.is_some(), "settings with an unknown theme did not load");
         let settings = settings.unwrap(); // Checked just above.
         assert_eq!(settings.pkg_download_path, PathBuf::from("/games/pkgs"));
-        assert!(!settings.show_toasts);
+        assert!(settings.show_notifications);
         assert_eq!(settings.theme, AppTheme::default());
     }
 
@@ -1061,7 +1049,7 @@ mod tests {
         assert!(settings.is_some(), "settings missing a field did not load");
         let settings = settings.unwrap(); // Checked just above.
         assert_eq!(settings.pkg_download_path, PathBuf::from("/games/pkgs"));
-        assert!(settings.show_toasts);
+        assert!(!settings.show_notifications);
         assert_eq!(settings.directory_format, crate::utils::DirectoryFormat::default());
         assert_eq!(settings.text_size_percent, 100);
     }

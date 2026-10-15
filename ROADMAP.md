@@ -1175,6 +1175,12 @@ Work named by docs/design.md and its review on 2026-10-12.
   The private screenshot display does not pass key presses to the app,
   so the shortcuts are proven by a unit test that presses them inside
   egui.
+  Progress (2026-10-15): step 2 built. A Messages panel above the status
+  bar on every page folds to one button and lists the newest 200
+  messages in a fixed-height box. Every message goes there; egui-notify
+  and the "Show in-app toasts" setting are gone (an older settings file
+  still loads). The File integrity check failed window is now a warning
+  message, and the download's status reads "Failed: file incomplete".
   **Layman:** Nothing pops up and nothing jumps around: every part of the app has its own spot in the main window and can be folded away.
   Kind: ux.
   Source: user-request-2026-10-14.

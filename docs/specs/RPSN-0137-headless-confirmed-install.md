@@ -129,10 +129,10 @@ package `version` and PARAM.SFO's APP_VER share the `XX.YY` form.
 
 ### 4.4 What the user sees
 
-- **Window app.** `Confirmed`: the success toast and the "Installed in
-  RPCS3" pill, as today. `Unconfirmed`: a warning toast saying RPCS3 finished
+- **Window app.** `Confirmed`: a success message and the "Installed in
+  RPCS3" pill. `Unconfirmed`: a warning message saying RPCS3 finished
   but rusty-psn could not check the result until the RPCS3 folder is set in
-  Settings; no pill, so the Install button stays. `Err`: the error toast, as today.
+  Settings; no pill, so the Install button stays. `Err`: an error message.
 - **Command line.** `Confirmed`: "Installed successfully.". `Unconfirmed`: a
   line saying RPCS3 finished and the install was not checked, naming
   `--rpcs3-config-dir`; not counted as a failure. `Err`: counted as a failure,
@@ -199,7 +199,7 @@ exists.
   § 4.4 says.
   *Test:* manual, under Xvfb with a stand-in RPCS3 set as the executable:
   Install, and the content browser's patch Install, each with and without
-  the RPCS3 folder set, show the success toast and the warning toast in turn; `--install` with and without `--rpcs3-config-dir`
+  the RPCS3 folder set, show the success message and the warning message in turn; `--install` with and without `--rpcs3-config-dir`
   prints the two § 4.4 lines.
   *Breaks when:* a caller keeps passing `Unconfirmed` where it knows
   `dev_hdd0`, or reports `Unconfirmed` as success without the warning.
@@ -276,7 +276,7 @@ recipe in its clause.
 | INV-4 | `rpcs3::tests::install_failure_beats_a_matching_version` |
 | INV-5 | `rpcs3::tests::install_without_a_check_is_unconfirmed` |
 | INV-6 | `rpcs3::tests::install_refuses_an_unsafe_serial` |
-| INV-7 | **nothing** — a manual recipe; no test reaches the window app's toasts or the command line's install output |
+| INV-7 | **nothing** — a manual recipe; no test reaches the window app's messages or the command line's install output |
 
 ## 11. Cross-doc impact
 

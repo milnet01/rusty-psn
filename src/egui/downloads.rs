@@ -3,7 +3,7 @@
 use super::*;
 
 impl UpdatesApp {
-    pub(super) fn handle_download_promises(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+    pub(super) fn handle_download_promises(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
         let mut entries_to_remove = Vec::new();
         // Collect downloads to auto-retry (Sony server drops). Processed after the loop
         // to avoid borrow conflicts with self.
@@ -24,9 +24,9 @@ impl UpdatesApp {
                             .completed_paths
                             .insert((download.title_id.clone(), download.pkg_id.clone()), path.clone());
 
-                        toasts.push((
+                        messages.push((
                             format!("{} v{} downloaded successfully!", download.title_id, download.pkg_id),
-                            ToastLevel::Success,
+                            MessageLevel::Success,
                         ));
                         self.v
                             .completed_downloads
@@ -51,7 +51,7 @@ impl UpdatesApp {
                                         download.retry_count + 1,
                                         MAX_AUTO_RETRIES
                                     );
-                                    toasts.push((
+                                    messages.push((
                                         format!(
                                             "{} v{}: Transfer interrupted, retrying ({}/{})...",
                                             download.title_id,
@@ -59,7 +59,7 @@ impl UpdatesApp {
                                             download.retry_count + 1,
                                             MAX_AUTO_RETRIES
                                         ),
-                                        ToastLevel::Warning,
+                                        MessageLevel::Warning,
                                     ));
                                     auto_retry_queue.push((
                                         download.pkg.clone(),
@@ -73,16 +73,25 @@ impl UpdatesApp {
                                     self.v.failed_downloads.push(FailedDownload {
                                         title_id: download.title_id.clone(),
                                         pkg_id: download.pkg_id.clone(),
+                                        incomplete: false,
                                     });
-                                    toasts.push((
+                                    messages.push((
                                         format!(
                                             "Failed to download {} v{}: Hash mismatch.",
                                             download.title_id, download.pkg_id
                                         ),
-                                        ToastLevel::Error,
+                                        MessageLevel::Error,
                                     ));
                                     if *short_on_data {
-                                        self.v.show_mismatch_warning_window = true;
+                                        if let Some(failed) = self.v.failed_downloads.last_mut() {
+                                            failed.incomplete = true;
+                                        }
+                                        messages.push((
+                                            "The file arrived smaller than expected, so Sony's servers were probably \
+                                             unreliable. Retry the download now, or wait a few hours and retry."
+                                                .to_string(),
+                                            MessageLevel::Warning,
+                                        ));
                                     }
                                 }
                             }
@@ -90,30 +99,33 @@ impl UpdatesApp {
                                 self.v.failed_downloads.push(FailedDownload {
                                     title_id: download.title_id.clone(),
                                     pkg_id: download.pkg_id.clone(),
+                                    incomplete: false,
                                 });
-                                toasts.push((
+                                messages.push((
                                     format!("Failed to download {} v{}: {err}", download.title_id, download.pkg_id),
-                                    ToastLevel::Error,
+                                    MessageLevel::Error,
                                 ));
                             }
                             DownloadError::Reqwest(err) => {
                                 self.v.failed_downloads.push(FailedDownload {
                                     title_id: download.title_id.clone(),
                                     pkg_id: download.pkg_id.clone(),
+                                    incomplete: false,
                                 });
-                                toasts.push((
+                                messages.push((
                                     format!("Failed to download {} v{}: {err}", download.title_id, download.pkg_id),
-                                    ToastLevel::Error,
+                                    MessageLevel::Error,
                                 ));
                             }
                             DownloadError::Security(err) => {
                                 self.v.failed_downloads.push(FailedDownload {
                                     title_id: download.title_id.clone(),
                                     pkg_id: download.pkg_id.clone(),
+                                    incomplete: false,
                                 });
-                                toasts.push((
+                                messages.push((
                                     format!("Security check failed for {} v{}: {err}", download.title_id, download.pkg_id),
-                                    ToastLevel::Error,
+                                    MessageLevel::Error,
                                 ));
                             }
                             // Packages are checked by hash instead; only firmware reports this.
@@ -121,13 +133,14 @@ impl UpdatesApp {
                                 self.v.failed_downloads.push(FailedDownload {
                                     title_id: download.title_id.clone(),
                                     pkg_id: download.pkg_id.clone(),
+                                    incomplete: false,
                                 });
-                                toasts.push((
+                                messages.push((
                                     format!(
                                         "Failed to download {} v{}: ended at {received} of {expected} bytes",
                                         download.title_id, download.pkg_id
                                     ),
-                                    ToastLevel::Error,
+                                    MessageLevel::Error,
                                 ));
                             }
                             DownloadError::Cancelled { file_path, abort } => {
@@ -136,9 +149,9 @@ impl UpdatesApp {
                                     if let Some(path) = file_path {
                                         abort_file_cleanup.push(path.clone());
                                     }
-                                    toasts.push((
+                                    messages.push((
                                         format!("{} v{} aborted", download.title_id, download.pkg_id),
-                                        ToastLevel::Warning,
+                                        MessageLevel::Warning,
                                     ));
                                 } else {
                                     info!("Paused download {} {}", download.title_id, download.pkg_id);
@@ -149,7 +162,10 @@ impl UpdatesApp {
                                         pkg: download.pkg.clone(),
                                         file_path: file_path.clone(),
                                     });
-                                    toasts.push((format!("{} v{} paused", download.title_id, download.pkg_id), ToastLevel::Info));
+                                    messages.push((
+                                        format!("{} v{} paused", download.title_id, download.pkg_id),
+                                        MessageLevel::Info,
+                                    ));
                                 }
                             }
                         }
@@ -203,7 +219,7 @@ impl UpdatesApp {
         }
     }
 
-    pub(super) fn handle_merge_promises(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+    pub(super) fn handle_merge_promises(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
         let mut finished_merge_indexes: Vec<usize> = Vec::new();
         for i in 0..self.v.merge_queue.len() {
             let merge = &mut self.v.merge_queue[i];
@@ -212,7 +228,7 @@ impl UpdatesApp {
                     Ok(_) => {
                         info!("Merge completed for {}", merge.title_id);
 
-                        toasts.push((format!("{} merged successfully!", merge.title_id), ToastLevel::Success));
+                        messages.push((format!("{} merged successfully!", merge.title_id), MessageLevel::Success));
                         self.v.completed_merges.push(merge.title_id.clone());
                     }
                     Err(e) => {
@@ -220,17 +236,17 @@ impl UpdatesApp {
 
                         match e {
                             MergeError::FilepathMismatch(reason) | MergeError::PackagesUnmergeable(reason) => {
-                                toasts.push((format!("Failed to merge {}: {reason}", merge.title_id), ToastLevel::Error));
+                                messages.push((format!("Failed to merge {}: {reason}", merge.title_id), MessageLevel::Error));
                             }
                             MergeError::FileMergeFailure => {
-                                toasts.push((
+                                messages.push((
                                     format!("Failed to merge {}. Check the log for details.", merge.title_id),
-                                    ToastLevel::Error,
+                                    MessageLevel::Error,
                                 ));
                             }
                             MergeError::Security(e) => {
                                 error!("Merge for {} refused: {e}", merge.title_id);
-                                toasts.push((format!("Failed to merge {}: {e}", merge.title_id), ToastLevel::Error));
+                                messages.push((format!("Failed to merge {}: {e}", merge.title_id), MessageLevel::Error));
                             }
                         }
 

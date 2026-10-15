@@ -33,7 +33,6 @@ rustls-platform-verifier = "0.7.1"
 
 rfd = { version = "0.17.2", optional = true }
 eframe = { version = "0.36.2", features = ["persistence"], optional = true }
-egui-notify = { version = "0.23.0", optional = true }
 notify-rust = { version = "4.18.2", optional = true }
 
 serde = { version = "1.0.229", default-features = false, features = ["derive"] }
@@ -50,4 +49,4 @@ ron = "0.12.2"
 [features]
 default = ["egui"]
 cli = ["crossterm"]
-egui = ["rfd", "eframe", "egui-notify", "notify-rust"]
+egui = ["rfd", "eframe", "notify-rust"]

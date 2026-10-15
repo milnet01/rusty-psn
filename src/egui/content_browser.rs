@@ -162,18 +162,21 @@ impl UpdatesApp {
         }));
     }
 
-    pub(super) fn handle_content_scan_promise(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+    pub(super) fn handle_content_scan_promise(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
         if !self.v.content_scan_promise.as_ref().is_some_and(|p| p.ready().is_some()) {
             return;
         }
         let promise = self.v.content_scan_promise.take().expect("checked above");
         match promise.block_and_take() {
             Some(library) => self.v.content_library = Some(library),
-            None => toasts.push(("The content folder scan stopped unexpectedly.".to_string(), ToastLevel::Error)),
+            None => messages.push((
+                "The content folder scan stopped unexpectedly.".to_string(),
+                MessageLevel::Error,
+            )),
         }
     }
 
-    pub(super) fn handle_content_install_promises(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+    pub(super) fn handle_content_install_promises(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
         let mut i = 0;
         while i < self.v.content_install_promises.len() {
             if self.v.content_install_promises[i].1.ready().is_some() {
@@ -186,19 +189,19 @@ impl UpdatesApp {
                             .map(|n| n.to_string_lossy().to_string())
                             .unwrap_or_else(|| key.clone());
                         if outcome == crate::rpcs3::InstallOutcome::Confirmed {
-                            toasts.push((format!("Installed: {display}"), ToastLevel::Success));
+                            messages.push((format!("Installed: {display}"), MessageLevel::Success));
                             self.v.content_installed_items.insert(key);
                         } else {
-                            toasts.push((
+                            messages.push((
                                 format!(
                                     "RPCS3 finished installing {display}, but rusty-psn could not check the result. Set the RPCS3 folder in Settings to check it."
                                 ),
-                                ToastLevel::Warning,
+                                MessageLevel::Warning,
                             ));
                         }
                     }
                     Err(e) => {
-                        toasts.push((format!("Install failed: {e}"), ToastLevel::Error));
+                        messages.push((format!("Install failed: {e}"), MessageLevel::Error));
                     }
                 }
             } else {

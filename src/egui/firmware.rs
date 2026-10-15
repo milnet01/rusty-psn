@@ -198,7 +198,7 @@ impl UpdatesApp {
         });
     }
 
-    pub(super) fn handle_firmware_promises(&mut self, toasts: &mut Vec<(String, ToastLevel)>) {
+    pub(super) fn handle_firmware_promises(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
         // Handle firmware fetch promise.
         if let Some(ref promise) = self.v.firmware_fetch_promise {
             if promise.ready().is_some() {
@@ -209,7 +209,7 @@ impl UpdatesApp {
                         self.v.firmware_results = entries;
                     }
                     Err(e) => {
-                        toasts.push((format!("Firmware check failed: {e}"), ToastLevel::Error));
+                        messages.push((format!("Firmware check failed: {e}"), MessageLevel::Error));
                     }
                 }
             }
@@ -221,14 +221,14 @@ impl UpdatesApp {
                 let dl = self.v.firmware_download.take().expect("checked is_some above");
                 match dl.promise.block_and_take() {
                     Ok(()) => {
-                        toasts.push((format!("{} downloaded successfully!", dl.name), ToastLevel::Success));
+                        messages.push((format!("{} downloaded successfully!", dl.name), MessageLevel::Success));
                     }
                     Err(DownloadError::Cancelled { .. }) => {
-                        toasts.push((format!("{} download cancelled.", dl.name), ToastLevel::Info));
+                        messages.push((format!("{} download cancelled.", dl.name), MessageLevel::Info));
                     }
                     Err(e) => {
                         error!("Firmware download failed: {e:?}");
-                        toasts.push((format!("Firmware download failed: {e:?}"), ToastLevel::Error));
+                        messages.push((format!("Firmware download failed: {e:?}"), MessageLevel::Error));
                     }
                 }
             }
