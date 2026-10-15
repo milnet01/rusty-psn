@@ -940,6 +940,24 @@ mod tests {
     }
 
     #[test]
+    fn restoring_defaults_saves_nothing_until_save() {
+        let ctx = egui::Context::default();
+        let mut app = UpdatesApp::default();
+        app.settings.max_concurrent_downloads = 7;
+        app.go_to(chrome::Page::Settings, &ctx);
+
+        app.restore_default_settings(&ctx);
+        assert!(app.v.settings_dirty);
+        assert_eq!(app.settings.max_concurrent_downloads, 7, "the saved settings are untouched");
+
+        app.save_settings();
+        assert_eq!(
+            app.settings.max_concurrent_downloads,
+            AppSettings::default().max_concurrent_downloads
+        );
+    }
+
+    #[test]
     fn leaving_settings_drops_unsaved_changes() {
         // Closing the Settings window discarded its edits; leaving the Settings page must too (RPSN-0157).
         let ctx = egui::Context::default();

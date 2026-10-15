@@ -1187,6 +1187,12 @@ Work named by docs/design.md and its review on 2026-10-12.
   moves the next; the progress bar is last and fixed at 150 points. At
   200% text size the later slots run past the right edge when all are
   filled; step 7's larger window sizes answer that.
+  Progress (2026-10-15): step 4 built. The Settings page's fixed bar
+  holds Save changes and Undo changes (enabled only while something is
+  unsaved), Restore defaults, and words saying "You have unsaved
+  changes" or "All changes saved". Restore defaults now fills in the
+  defaults as unsaved changes instead of saving them at once, so it can
+  be undone.
   **Layman:** Nothing pops up and nothing jumps around: every part of the app has its own spot in the main window and can be folded away.
   Kind: ux.
   Source: user-request-2026-10-14.

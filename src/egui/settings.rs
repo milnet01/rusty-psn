@@ -5,25 +5,25 @@ use super::*;
 impl UpdatesApp {
     pub(super) fn draw_settings_page(&mut self, ui: &mut egui::Ui) {
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+            // The fixed bar: Save and Undo work only while something is unsaved, and the words
+            // after them say which it is (RPSN-0157 step 4).
             ui.horizontal(|ui| {
-                if ui.button("Save settings").clicked() {
+                let dirty = self.v.settings_dirty;
+                if ui.add_enabled(dirty, egui::Button::new("Save changes")).clicked() {
                     self.save_settings();
                 }
-
-                if ui
-                    .add_enabled(self.v.settings_dirty, egui::Button::new("Discard changes"))
-                    .clicked()
-                {
+                if ui.add_enabled(dirty, egui::Button::new("Undo changes")).clicked() {
                     self.cancel_settings(ui.ctx());
                     self.v.modified_settings = self.settings.clone();
                 }
-
-                if ui.button("Restore to defaults").clicked() {
-                    self.v.settings_dirty = false;
-
-                    self.settings = AppSettings::default();
-                    self.v.modified_settings = AppSettings::default();
-                    self.settings.apply_appearance(ui.ctx());
+                if ui.button("Restore defaults").clicked() {
+                    self.restore_default_settings(ui.ctx());
+                }
+                ui.separator();
+                if dirty {
+                    status_pill(ui, "You have unsaved changes", StatusKind::Attention);
+                } else {
+                    status_pill(ui, "All changes saved", StatusKind::Done);
                 }
             });
 
@@ -38,6 +38,14 @@ impl UpdatesApp {
                 });
             });
         });
+    }
+
+    /// Put the defaults in front of the user as unsaved changes, previewing their theme and text
+    /// size. Nothing is saved until Save changes; Undo changes brings the saved settings back.
+    pub(super) fn restore_default_settings(&mut self, ctx: &egui::Context) {
+        self.v.modified_settings = AppSettings::default();
+        self.v.modified_settings.apply_appearance(ctx);
+        self.v.settings_dirty = true;
     }
 
     pub(super) fn save_settings(&mut self) {
