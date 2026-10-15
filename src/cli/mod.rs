@@ -895,6 +895,7 @@ mod tests {
             manifest_url: String::new(),
             offset: 0,
             part_number: number,
+            min_system_version: None,
         }
     }
 

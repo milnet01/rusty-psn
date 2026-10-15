@@ -316,6 +316,9 @@ impl UpdatesApp {
                 if pkg.offset > 0 {
                     ui.label(egui::RichText::new(format!("\u{00B7} offset {}", pkg.offset)).weak().small());
                 }
+                if let Some(system) = &pkg.min_system_version {
+                    ui.label(egui::RichText::new(format!("\u{00B7} needs system {system}")).weak());
+                }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     match download_status {

@@ -60,10 +60,33 @@ fn parse_package_attributes(attributes: Attributes, info: &mut UpdateInfo) -> Re
                     last.manifest_url = value.to_string();
                 }
             }
+            "psp2_system_ver" => {
+                if let Some(last) = info.packages.last_mut() {
+                    let value = attribute
+                        .normalized_value(XmlVersion::Implicit1_0)
+                        .map_err(ParseError::XmlParsing)?;
+                    last.min_system_version = vita_system_version(&value);
+                }
+            }
             _ => {}
         }
     }
     Ok(())
+}
+
+/// A PSVita `psp2_system_ver` as the system shows it. Sony sends a decimal number whose
+/// hexadecimal form holds the version's digits: 23461888 is 0x01660000, system 1.66. Measured on
+/// PCSA00007's update reply, 2026-10-15. `None` for zero or anything else.
+fn vita_system_version(value: &str) -> Option<String> {
+    let hex = format!("{:08x}", value.trim().parse::<u32>().ok().filter(|v| *v != 0)?);
+    let (major, minor) = (&hex[0..2], &hex[2..4]);
+    if !major.bytes().chain(minor.bytes()).all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some(format!(
+        "{}.{minor}",
+        major.trim_start_matches('0').parse::<u32>().unwrap_or(0)
+    ))
 }
 
 pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), ParseError> {
@@ -186,6 +209,15 @@ pub fn parse_response(response: String, info: &mut UpdateInfo) -> Result<(), Par
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vita_system_versions_read_as_the_vita_shows_them() {
+        // PCSA00007's update reply carried psp2_system_ver="23461888" on 2026-10-15 (RPSN-0048).
+        assert_eq!(vita_system_version("23461888").as_deref(), Some("1.66"));
+        assert_eq!(vita_system_version("57933824").as_deref(), Some("3.74")); // 0x03740000
+        assert_eq!(vita_system_version("0"), None);
+        assert_eq!(vita_system_version("junk"), None);
+    }
     use crate::psn::PlatformVariant;
 
     #[test]

@@ -402,6 +402,7 @@ mod tests {
                     manifest_url: String::new(),
                     offset: 0,
                     part_number: None,
+                    min_system_version: None,
                 })
                 .collect(),
             platform_variant: crate::psn::utils::PlatformVariant::PS3,

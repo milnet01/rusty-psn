@@ -390,6 +390,8 @@ pub struct PackageInfo {
     pub manifest_url: String,
     pub offset: u64,
     pub part_number: Option<usize>,
+    /// The oldest PSVita system software the update runs on, such as "1.66" (RPSN-0048).
+    pub min_system_version: Option<String>,
 }
 
 impl PackageInfo {
@@ -403,6 +405,7 @@ impl PackageInfo {
             manifest_url: String::new(),
             offset: 0,
             part_number: None,
+            min_system_version: None,
         }
     }
 
@@ -798,6 +801,8 @@ mod tests {
             Ok(info) => {
                 assert!(!info.packages.is_empty(), "Expected at least one package for PCSA00007");
                 assert_eq!(info.platform_variant, super::utils::PlatformVariant::PSVita);
+                // Its reply says psp2_system_ver="23461888", system 1.66 (RPSN-0048).
+                assert_eq!(info.packages[0].min_system_version.as_deref(), Some("1.66"));
             }
             Err(e) => panic!("Failed to get info for PCSA00007: {:?}", e),
         }

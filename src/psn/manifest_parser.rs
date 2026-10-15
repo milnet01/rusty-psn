@@ -52,6 +52,7 @@ pub fn parse_manifest_response(
             offset: piece.file_offset,
             manifest_url: String::new(),
             part_number,
+            min_system_version: None,
         };
         info.packages.push(part_package);
     }
