@@ -135,19 +135,7 @@ impl UpdatesApp {
                     &counts,
                 );
 
-                // Aggregate progress and speed across all active downloads.
-                let mut total_progress: u64 = 0;
-                let mut total_size: u64 = 0;
-                let mut total_speed: f64 = 0.0;
-                for download in &self.v.download_queue {
-                    total_size += download.size;
-                    let status = download
-                        .progress_status
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    total_progress += status.progress;
-                    total_speed += status.speed_bps;
-                }
+                let (total_progress, total_size, total_speed) = self.download_totals();
 
                 let (sizes, speed, eta) = if total_size > 0 {
                     let sizes = format!("{} / {}", ByteSize::b(total_progress), ByteSize::b(total_size));
@@ -194,6 +182,21 @@ impl UpdatesApp {
                 }
             });
         });
+    }
+
+    /// Bytes arrived, bytes expected and bytes per second, across all active downloads.
+    pub(super) fn download_totals(&self) -> (u64, u64, f64) {
+        let mut totals = (0, 0, 0.0);
+        for download in &self.v.download_queue {
+            let status = download
+                .progress_status
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            totals.0 += status.progress;
+            totals.1 += download.size;
+            totals.2 += status.speed_bps;
+        }
+        totals
     }
 }
 

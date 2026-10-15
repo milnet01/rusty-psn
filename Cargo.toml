@@ -42,6 +42,15 @@ tokio = { version = "1.53.2", default-features = false, features = ["rt", "rt-mu
 # O_NOFOLLOW for download files (src/utils.rs, download_file_options).
 libc = "0.2.190"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# Download progress on the KDE taskbar icon (src/egui/taskbar.rs, RPSN-0073); notify-rust already uses it.
+zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking-api"], optional = true }
+
+[target.'cfg(windows)'.dependencies]
+# Download progress on the taskbar button (src/egui/taskbar.rs, RPSN-0073).
+windows = { version = "0.62.2", features = ["Win32_UI_Shell", "Win32_System_Com"], optional = true }
+raw-window-handle = { version = "0.6.2", optional = true }
+
 [target.'cfg(windows)'.build-dependencies]
 # Embeds resources/icon.ico in the Windows executable (build.rs, RPSN-0078).
 embed-resource = "3.0.12"
@@ -53,4 +62,4 @@ ron = "0.12.2"
 [features]
 default = ["egui"]
 cli = ["crossterm"]
-egui = ["rfd", "eframe", "notify-rust"]
+egui = ["rfd", "eframe", "notify-rust", "zbus", "windows", "raw-window-handle"]

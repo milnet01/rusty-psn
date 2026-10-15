@@ -32,6 +32,7 @@ mod results;
 mod rpcs3_library;
 mod search;
 mod settings;
+mod taskbar;
 mod update_chain;
 
 pub struct DownloadProgressStatus {
@@ -565,6 +566,8 @@ struct VolatileData {
 
     /// Cached egui context for use in code paths without direct UI access (e.g., auto-retry).
     egui_ctx: Option<egui::Context>,
+    /// What the taskbar icon shows of the downloads (RPSN-0073).
+    taskbar: taskbar::TaskbarProgress,
 
     /// Shared HTTP client for all PSN requests. Constructed once, reused across all
     /// searches and downloads. reqwest::Client is cheaply cloneable (Arc internally).
@@ -660,6 +663,7 @@ impl Default for VolatileData {
             content_installed_items: HashSet::new(),
 
             egui_ctx: None,
+            taskbar: taskbar::TaskbarProgress::default(),
 
             psn_client: None,
 
@@ -686,7 +690,7 @@ impl eframe::App for UpdatesApp {
     }
 
     // Runs before every `ui` call, and also while the window is hidden, so downloads keep moving when minimised.
-    fn logic(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn logic(&mut self, _ctx: &egui::Context, frame: &mut eframe::Frame) {
         let mut messages = Vec::new();
 
         // Check the status of the search promise.
@@ -703,6 +707,7 @@ impl eframe::App for UpdatesApp {
         self.handle_content_install_promises(&mut messages);
         self.handle_content_scan_promise(&mut messages);
         self.handle_update_chains(&mut messages);
+        self.update_taskbar_progress(frame);
 
         for (msg, level) in messages {
             self.show_notifications(msg, level);

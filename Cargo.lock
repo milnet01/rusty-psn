@@ -3631,6 +3631,7 @@ dependencies = [
  "log",
  "notify-rust",
  "quick-xml 0.42.0",
+ "raw-window-handle",
  "reqwest",
  "rfd",
  "ron",
@@ -3643,6 +3644,8 @@ dependencies = [
  "sha2",
  "tempfile",
  "tokio",
+ "windows",
+ "zbus",
  "zip",
 ]
 

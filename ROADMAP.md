@@ -825,11 +825,29 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0073] **System tray.**
+- ✅ [RPSN-0073] **Download progress on the taskbar icon, in place of a system tray.**
   Minimize to system tray during long downloads (Linux: `tray-icon`
   crate)
   Checked against the code 2026-10-12: Not done — no system tray.
   Former TODO.md task 9.8.
+  Owner decision (2026-10-15): no tray icon. Research the same day: on
+  Wayland winit 0.30 cannot hide a window (set_visible is unsupported)
+  or un-minimise one, so minimise-to-tray cannot work on the owner's
+  KDE Plasma desktop. Instead the taskbar icon shows download progress:
+  the com.canonical.Unity.LauncherEntry D-Bus signal on Linux (KDE
+  Plasma reads it in applets/taskmanager/smartlauncherbackend.cpp), and
+  ITaskbarList3::SetProgressValue on Windows. The window minimises as
+  normal.
+  Shipped 2026-10-15 as taskbar progress, per the owner's decision:
+  src/egui/taskbar.rs, called from logic() so it runs while minimised,
+  telling the taskbar only when the whole percent changes. Linux sends
+  the LauncherEntry Update signal from its own thread (zbus); Windows
+  uses ITaskbarList3 (windows crate); macOS shows nothing. Checked:
+  dbus-monitor caught the signal on the session bus (progress 0.42,
+  then progress-visible false), and from inside the Flatpak too; the
+  Windows code passes clippy for x86_64-pc-windows-gnu. Owner hand
+  tests: start a download and minimise; the rusty-psn taskbar icon
+  should fill as it runs and clear when it ends, on KDE and on Windows.
   **Layman:** Let the app shrink to the system tray during long downloads.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
