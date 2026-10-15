@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=157 -->
+<!-- ants-roadmap-id-high-water: RPSN=158 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -150,13 +150,17 @@ Restructure download paths to match the user's existing collection layout and im
   Kind: feature.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0013] **Handle the region suffix in title names.**
+- ✅ [RPSN-0013] **Handle the region suffix in title names.**
   Sony's API returns bare titles (e.g., "God of War III") but existing
   folders include region (e.g., "God of War III (USA)"); provide a
   config option or auto-detect region from serial prefix patterns
   Checked against the code 2026-10-12: Not done — no handling of the
   region suffix, and no region detection from the serial.
   Former TODO.md task 2.3.
+  Resolved (2026-10-15, bc2b5fc): where the download folder holds
+  exactly one folder for the game whose name adds a region in brackets
+  ("God of War III (USA)", "(USA, Europe)"), downloads go into it. Only
+  No-Intro / Redump region names count; no config option was needed.
   **Layman:** Match folder names that include the region, such as "(USA)", to the bare names Sony sends.
   Kind: feature.
   Source: todo-md-import-2026-10-12.
@@ -234,11 +238,13 @@ Support downloading updates for multiple games in one operation without manual s
   Kind: feature.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0023] **Add "Download All Missing Updates" - scan existing download folder, compare against queried update info, download only what's missing or incomplete.**
+- ✅ [RPSN-0023] **Add "Download All Missing Updates" - scan existing download folder, compare against queried update info, download only what's missing or incomplete.**
   Checked against the code 2026-10-12: Partly done — "Download All"
   skips complete files by hash; there is no scan of the download
   folder and no missing-only mode.
   Former TODO.md task 3.8.
+  Resolved (2026-10-15, d14b487): Download Missing queues only updates
+  whose file is not already in the download folder at full size.
   **Layman:** A button that downloads only the updates missing from your download folder.
   Kind: feature.
   Source: todo-md-import-2026-10-12.
@@ -835,12 +841,16 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0075] **PSP support.**
+- ✅ [RPSN-0075] **PSP support.**
   PSP uses similar NP serial prefixes (`NPUG`, `NPEH`, etc.) and the
   same update URL format; could be added alongside PSVita with minimal
   effort
   Checked against the code 2026-10-12: Not done — no PSP support.
   Former TODO.md task 9.10.
+  Resolved (2026-10-15, d492d65): PSP serials (UCxx, ULxx, NP?G/H/Z) are
+  their own platform, searched at the PS3 address; NPUG80318's update
+  downloaded and passed its checksum through the command line. Shows the
+  needed PSP system version.
   **Layman:** Add PSP game updates.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -913,10 +923,14 @@ Create a unique, recognizable icon for rusty-psn that displays in the taskbar/ta
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0078] **Embed the icon in the Windows binary using `winres` or `embed-resource` crate in `build.rs`.**
+- ✅ [RPSN-0078] **Embed the icon in the Windows binary using `winres` or `embed-resource` crate in `build.rs`.**
   Checked against the code 2026-10-12: Not done — no build.rs; neither
   winres nor embed-resource is a dependency.
   Former TODO.md task 10.3.
+  Resolved (2026-10-15, 2f483ba): build.rs embeds resources/icon.ico
+  through embed-resource 3.0.12. GitHub run 38711267379 built on
+  windows-latest, and its rusty-psn.exe holds a .rsrc section carrying
+  the icon's image data.
   **Layman:** Build the icon into the Windows program file.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -928,10 +942,13 @@ Create a unique, recognizable icon for rusty-psn that displays in the taskbar/ta
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0080] **Update the macOS `.app` bundle to include the icon in `Info.plist` (`CFBundleIconFile`).**
+- ✅ [RPSN-0080] **Update the macOS `.app` bundle to include the icon in `Info.plist` (`CFBundleIconFile`).**
   Checked against the code 2026-10-12: Not done — resources/Info.plist
   has no CFBundleIconFile.
   Former TODO.md task 10.5.
+  Resolved (2026-10-15, 2f483ba): Info.plist names icon.icns as
+  CFBundleIconFile and the bundle step copies it to Contents/Resources;
+  GitHub run 38711267379's macOS bundle carries both.
   **Layman:** Show the icon on macOS.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -2067,6 +2084,17 @@ reviewer proposed; check both against the code before fixing.
   **Layman:** The app should reopen where you left it, at the same size.
   Kind: fix.
   Source: user-request-2026-10-14.
+  Lanes: Window app.
+
+- ✅ [RPSN-0158] **Offer Install to RPCS3 only on PS3 packages.**
+  The package row in src/egui/results.rs shows Install to RPCS3 on any
+  finished download while RPCS3's executable is set, whatever the
+  platform. RPCS3 emulates the PS3 only, so on a PS4, PSVita or PSP
+  package the button can only fail.
+  Resolved (2026-10-15, 64c7b90): the button shows only for PS3 serials.
+  **Layman:** RPCS3 only runs PS3 games, but the install button also shows on PS4, Vita and PSP updates.
+  Kind: fix.
+  Source: in-session-2026-10-15 (found adding PSP, RPSN-0075).
   Lanes: Window app.
 
 ## 15. RPCS3 source review (2026-10-13)
