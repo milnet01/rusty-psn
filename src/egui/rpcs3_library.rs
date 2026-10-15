@@ -146,7 +146,6 @@ impl UpdatesApp {
 
     pub(super) fn draw_rpcs3_library_page(&mut self, ui: &mut egui::Ui) {
         // Pre-compute outdated games list outside the page closure to minimize cloning.
-        // Only the title_id/title/pkg tuples needed for downloading are cloned, not the full lists.
         let game_count = self.v.rpcs3_installed_games.len();
         let games_to_update: Vec<_> = self
             .v
@@ -157,7 +156,12 @@ impl UpdatesApp {
                 let update = self.v.update_results.iter().find(|u| u.title_id == game.serial)?;
                 let latest_pkg = update.packages.last()?;
                 if crate::rpcs3::compare_versions(installed_ver, &latest_pkg.version) == std::cmp::Ordering::Less {
-                    Some((update.title_id.clone(), update.title(), latest_pkg.clone()))
+                    Some((
+                        update.title_id.clone(),
+                        update.title(),
+                        installed_ver.clone(),
+                        update.packages.clone(),
+                    ))
                 } else {
                     None
                 }
@@ -166,7 +170,7 @@ impl UpdatesApp {
         let outdated_count = games_to_update.len();
 
         // Collect download actions from the page, then apply them after the closure.
-        let mut download_actions: Vec<(String, String, PackageInfo)> = Vec::new();
+        let mut update_all = None;
         let mut scan = false;
 
         ui.vertical(|ui| {
@@ -177,7 +181,7 @@ impl UpdatesApp {
                 ));
 
                 if outdated_count > 0 && ui.button("Update All Outdated").clicked() {
-                    download_actions = games_to_update;
+                    update_all = Some(games_to_update);
                 }
             });
 
@@ -246,10 +250,9 @@ impl UpdatesApp {
         if scan {
             self.scan_or_detect_rpcs3(&ui.ctx().clone());
         }
-
-        // Apply queued download actions after the page closure.
-        for (title_id, title, pkg) in download_actions {
-            self.queue_download_no_ui(title_id, title, pkg);
+        // Download, and install where RPCS3 is set, every outdated game's updates (RPSN-0058).
+        if let Some(games) = update_all {
+            self.start_update_all(games);
         }
     }
 

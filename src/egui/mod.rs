@@ -32,6 +32,7 @@ mod results;
 mod rpcs3_library;
 mod search;
 mod settings;
+mod update_chain;
 
 pub struct DownloadProgressStatus {
     progress: u64,
@@ -547,6 +548,8 @@ struct VolatileData {
         Promise<Result<crate::rpcs3::InstallOutcome, crate::rpcs3::Rpcs3Error>>,
     )>,
     rpcs3_installed_pkgs: HashSet<(String, String)>,
+    /// "Update All Outdated" games whose updates install once downloaded (RPSN-0058).
+    update_chains: Vec<update_chain::UpdateChain>,
 
     // Content browser state.
     content_library: Option<crate::content::ContentLibrary>,
@@ -648,6 +651,7 @@ impl Default for VolatileData {
 
             rpcs3_install_promises: Vec::new(),
             rpcs3_installed_pkgs: HashSet::new(),
+            update_chains: Vec::new(),
 
             content_library: None,
             content_scan_promise: None,
@@ -698,6 +702,7 @@ impl eframe::App for UpdatesApp {
         self.handle_rpcs3_install_promises(&mut messages);
         self.handle_content_install_promises(&mut messages);
         self.handle_content_scan_promise(&mut messages);
+        self.handle_update_chains(&mut messages);
 
         for (msg, level) in messages {
             self.show_notifications(msg, level);
