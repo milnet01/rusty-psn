@@ -22,6 +22,7 @@ mod chrome;
 mod content_browser;
 mod dialogs;
 mod downloads;
+mod downloads_page;
 mod firmware;
 mod history;
 mod messages;
@@ -79,9 +80,18 @@ const MAX_AUTO_RETRIES: u32 = 3;
 struct FailedDownload {
     title_id: String,
     pkg_id: String,
+    title: String,
+    pkg: PackageInfo,
     /// The file arrived smaller than Sony said, which usually means its servers dropped the
     /// connection rather than that the file is bad.
     incomplete: bool,
+}
+
+/// A package downloaded this session, kept whole so the Downloads page can show its row.
+struct FinishedDownload {
+    title_id: String,
+    title: String,
+    pkg: PackageInfo,
 }
 
 struct PendingDownload {
@@ -429,7 +439,7 @@ struct VolatileData {
 
     download_queue: Vec<ActiveDownload>,
     failed_downloads: Vec<FailedDownload>,
-    completed_downloads: Vec<(String, String)>,
+    completed_downloads: Vec<FinishedDownload>,
     /// The file each completed download wrote, keyed by (title id, package id).
     completed_paths: HashMap<(String, String), PathBuf>,
     pending_downloads: VecDeque<PendingDownload>,
@@ -658,6 +668,7 @@ impl eframe::App for UpdatesApp {
                     ui.separator();
                     self.draw_results_list(ctx, ui);
                 }
+                chrome::Page::Downloads => self.draw_downloads_page(ui),
                 chrome::Page::Rpcs3Library => self.draw_rpcs3_library_page(ui),
                 chrome::Page::PatchesAndDlc => self.draw_content_browser_page(ui),
                 chrome::Page::Firmware => self.draw_firmware_page(ui),

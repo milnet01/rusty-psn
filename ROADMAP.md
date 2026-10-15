@@ -1193,6 +1193,13 @@ Work named by docs/design.md and its review on 2026-10-12.
   changes" or "All changes saved". Restore defaults now fills in the
   defaults as unsaved changes instead of saving them at once, so it can
   be undone.
+  Progress (2026-10-15): step 5 built. A Downloads page, second in the
+  sidebar, lists this session's packages in three foldable sections:
+  Needs attention (failed), In progress (downloading, paused, queued)
+  and Finished (newest first). Each row is the Search page's package
+  row, so its Pause, Resume, Retry, Install and Open folder buttons work
+  from either page. Failed and finished downloads now keep their package
+  to make that possible.
   **Layman:** Nothing pops up and nothing jumps around: every part of the app has its own spot in the main window and can be folded away.
   Kind: ux.
   Source: user-request-2026-10-14.

@@ -28,9 +28,11 @@ impl UpdatesApp {
                             format!("{} v{} downloaded successfully!", download.title_id, download.pkg_id),
                             MessageLevel::Success,
                         ));
-                        self.v
-                            .completed_downloads
-                            .push((download.title_id.clone(), download.pkg_id.clone()));
+                        self.v.completed_downloads.push(FinishedDownload {
+                            title_id: download.title_id.clone(),
+                            title: download.title.clone(),
+                            pkg: download.pkg.clone(),
+                        });
                         self.v.download_history.push(DownloadHistoryEntry {
                             title_id: download.title_id.clone(),
                             pkg_id: download.pkg_id.clone(),
@@ -73,6 +75,8 @@ impl UpdatesApp {
                                     self.v.failed_downloads.push(FailedDownload {
                                         title_id: download.title_id.clone(),
                                         pkg_id: download.pkg_id.clone(),
+                                        title: download.title.clone(),
+                                        pkg: download.pkg.clone(),
                                         incomplete: false,
                                     });
                                     messages.push((
@@ -99,6 +103,8 @@ impl UpdatesApp {
                                 self.v.failed_downloads.push(FailedDownload {
                                     title_id: download.title_id.clone(),
                                     pkg_id: download.pkg_id.clone(),
+                                    title: download.title.clone(),
+                                    pkg: download.pkg.clone(),
                                     incomplete: false,
                                 });
                                 messages.push((
@@ -110,6 +116,8 @@ impl UpdatesApp {
                                 self.v.failed_downloads.push(FailedDownload {
                                     title_id: download.title_id.clone(),
                                     pkg_id: download.pkg_id.clone(),
+                                    title: download.title.clone(),
+                                    pkg: download.pkg.clone(),
                                     incomplete: false,
                                 });
                                 messages.push((
@@ -121,6 +129,8 @@ impl UpdatesApp {
                                 self.v.failed_downloads.push(FailedDownload {
                                     title_id: download.title_id.clone(),
                                     pkg_id: download.pkg_id.clone(),
+                                    title: download.title.clone(),
+                                    pkg: download.pkg.clone(),
                                     incomplete: false,
                                 });
                                 messages.push((
@@ -133,6 +143,8 @@ impl UpdatesApp {
                                 self.v.failed_downloads.push(FailedDownload {
                                     title_id: download.title_id.clone(),
                                     pkg_id: download.pkg_id.clone(),
+                                    title: download.title.clone(),
+                                    pkg: download.pkg.clone(),
                                     incomplete: false,
                                 });
                                 messages.push((
@@ -297,9 +309,9 @@ impl UpdatesApp {
             );
         }
 
-        for (title_id, pkg_id) in &self.v.completed_downloads {
+        for finished in &self.v.completed_downloads {
             cache.insert(
-                (title_id.clone(), pkg_id.clone()),
+                (finished.title_id.clone(), finished.pkg.id()),
                 CachedDownloadInfo {
                     status: ActiveDownloadStatus::Completed,
                     ..CachedDownloadInfo::default()
@@ -546,7 +558,11 @@ impl UpdatesApp {
                 .pending_downloads
                 .iter()
                 .any(|p| p.title_id == title_id && p.pkg.id() == pkg_id)
-            || self.v.completed_downloads.iter().any(|(t, p)| t == title_id && *p == pkg_id)
+            || self
+                .v
+                .completed_downloads
+                .iter()
+                .any(|f| f.title_id == title_id && f.pkg.id() == pkg_id)
     }
 
     pub(super) fn get_active_download(&self, title_id: &str, pkg: &PackageInfo) -> Option<&ActiveDownload> {

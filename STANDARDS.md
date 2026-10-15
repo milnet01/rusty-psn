@@ -322,8 +322,9 @@ UpdatesApp (eframe::App)
 
 ### 6.3 UI Layout
 
-- **Sidebar** (`src/egui/chrome.rs`): a fixed left panel choosing the page shown in the central area: Search, RPCS3 library, Patches and DLC, Firmware and History at the top, Settings at the foot. `docs/design.md` § "Window layout" is the rule it follows (RPSN-0157). Ctrl+F goes to Search and focuses the serial box; Escape goes to Search; Ctrl+S opens Settings, or saves on the Settings page
+- **Sidebar** (`src/egui/chrome.rs`): a fixed left panel choosing the page shown in the central area: Search, Downloads, RPCS3 library, Patches and DLC, Firmware and History at the top, Settings at the foot. `docs/design.md` § "Window layout" is the rule it follows (RPSN-0157). Ctrl+F goes to Search and focuses the serial box; Escape goes to Search; Ctrl+S opens Settings, or saves on the Settings page
 - **Search page**: serial input and search button; below it Import Batch, Download All, Download All Latest, Clear results and Open Downloads, wrapping at a large text size
+- **Downloads page** (`src/egui/downloads_page.rs`): foldable sections Needs attention (failed), In progress (downloading, paused, queued) and Finished (newest first), each row the same package row the results list draws, with its buttons
 - **Results list**: Vertical scrollable area with collapsible headers per title (aggregate status in header)
 - **Package entries**: Grouped panels with version, size, SHA1, download/pause/abort/resume buttons, progress bar, Copy URL
 - **Settings page**: Downloads, Appearance (theme, text size), Notifications, RPCS3 Integration and Content Library, then folding sections for Migrate downloads and About. The fields scroll above a fixed bar: Save changes and Undo changes (each enabled only while something is unsaved), Restore defaults (fills in the defaults as unsaved changes), and words saying "You have unsaved changes" or "All changes saved". Leaving the page drops unsaved changes

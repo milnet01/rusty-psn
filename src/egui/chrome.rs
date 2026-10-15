@@ -7,6 +7,7 @@ use super::*;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Page {
     Search,
+    Downloads,
     Rpcs3Library,
     PatchesAndDlc,
     Firmware,
@@ -16,8 +17,9 @@ pub(super) enum Page {
 
 impl Page {
     /// The pages listed at the top of the sidebar, in order. Settings sits apart, at its foot.
-    const TOP: [Page; 5] = [
+    const TOP: [Page; 6] = [
         Page::Search,
+        Page::Downloads,
         Page::Rpcs3Library,
         Page::PatchesAndDlc,
         Page::Firmware,
@@ -27,6 +29,7 @@ impl Page {
     pub(super) fn label(self) -> &'static str {
         match self {
             Page::Search => "Search",
+            Page::Downloads => "Downloads",
             Page::Rpcs3Library => "RPCS3 library",
             Page::PatchesAndDlc => "Patches and DLC",
             Page::Firmware => "Firmware",
