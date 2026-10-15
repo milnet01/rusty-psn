@@ -67,6 +67,8 @@ jobs:
           mkdir rusty-psn.app/Contents/MacOS
 
           cp resources/Info.plist rusty-psn.app/Contents
+          mkdir rusty-psn.app/Contents/Resources
+          cp resources/icon.icns rusty-psn.app/Contents/Resources
           sed -i '' -e 's/%RPSN_VERSION%/'"$RPSN_VERSION"'/g' rusty-psn.app/Contents/Info.plist
 
           cp target/release/universal/rusty-psn rusty-psn.app/Contents/MacOS

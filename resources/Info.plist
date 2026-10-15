@@ -8,6 +8,8 @@
 	<string>rusty-psn</string>
 	<key>CFBundleExecutable</key>
 	<string>rusty-psn</string>
+	<key>CFBundleIconFile</key>
+	<string>icon.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.rainbowcookie.rustypsn</string>
 	<key>CFBundleInfoDictionaryVersion</key>

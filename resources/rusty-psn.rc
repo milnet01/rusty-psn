@@ -1,0 +1,2 @@
+// The Windows executable's icon (build.rs, RPSN-0078).
+1 ICON "icon.ico"

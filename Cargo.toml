@@ -42,6 +42,10 @@ tokio = { version = "1.53.2", default-features = false, features = ["rt", "rt-mu
 # O_NOFOLLOW for download files (src/utils.rs, download_file_options).
 libc = "0.2.190"
 
+[target.'cfg(windows)'.build-dependencies]
+# Embeds resources/icon.ico in the Windows executable (build.rs, RPSN-0078).
+embed-resource = "3.0.12"
+
 [dev-dependencies]
 # Reads stored window-app settings in tests; the same version eframe saves them with.
 ron = "0.12.2"
