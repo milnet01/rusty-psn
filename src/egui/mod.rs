@@ -23,6 +23,7 @@ mod content_browser;
 mod dialogs;
 mod downloads;
 mod downloads_page;
+mod export;
 mod firmware;
 mod history;
 mod messages;

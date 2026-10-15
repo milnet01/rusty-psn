@@ -318,6 +318,10 @@ impl UpdatesApp {
                     }
                 }
 
+                if ui.button("Export results...").clicked() {
+                    self.export_results();
+                }
+
                 if ui.button("Clear results").clicked() {
                     self.v.update_results = Vec::new();
                     self.v.no_update_serials.clear();
