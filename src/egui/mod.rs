@@ -491,7 +491,8 @@ struct VolatileData {
     failed_merges: Vec<String>,
     completed_merges: Vec<String>,
 
-    search_promise: Option<Promise<Result<UpdateInfo, UpdateError>>>,
+    /// Searches typed into the search bar, keyed by serial; several may run at once.
+    search_promises: Vec<(String, Promise<Result<UpdateInfo, UpdateError>>)>,
 
     // Batch search state
     batch_search_queue: VecDeque<String>,
@@ -605,7 +606,7 @@ impl Default for VolatileData {
             failed_merges: Vec::new(),
             completed_merges: Vec::new(),
 
-            search_promise: None,
+            search_promises: Vec::new(),
 
             batch_search_queue: VecDeque::new(),
             batch_search_active: Vec::new(),
@@ -674,7 +675,7 @@ impl eframe::App for UpdatesApp {
         let mut messages = Vec::new();
 
         // Check the status of the search promise.
-        self.handle_search_promise(&mut messages);
+        self.handle_search_promises(&mut messages);
         // Process batch search queue (parallel searches with concurrency limit).
         self.handle_batch_search_queue(&mut messages);
         // Check in on active downloads.

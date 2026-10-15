@@ -26,76 +26,49 @@ impl VolatileData {
 }
 
 impl UpdatesApp {
-    pub(super) fn handle_search_promise(&mut self, messages: &mut Vec<(String, MessageLevel)>) -> Option<()> {
-        let is_ready = {
-            let promise = self.v.search_promise.as_ref()?;
-            promise.ready().is_some()
-        };
-
-        if is_ready {
-            let promise = self.v.search_promise.take()?;
-            let promise_ready = promise.block_and_take();
-
-            match promise_ready {
+    /// Collect every finished search typed into the search bar. Several may run at once
+    /// (RPSN-0069), so each message names its serial.
+    pub(super) fn handle_search_promises(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
+        let mut i = 0;
+        while i < self.v.search_promises.len() {
+            if self.v.search_promises[i].1.ready().is_none() {
+                i += 1;
+                continue;
+            }
+            let (serial, promise) = self.v.search_promises.remove(i);
+            match promise.block_and_take() {
                 Ok(update_info) => {
                     info!("Received search results for serial {}", update_info.title_id);
-                    self.v.update_results.push(update_info);
+                    if !self.v.update_results.iter().any(|u| u.title_id == update_info.title_id) {
+                        self.v.update_results.push(update_info);
+                    }
                 }
-                Err(ref e) => {
-                    match e {
+                Err(e) => {
+                    let text = match &e {
                         UpdateError::UnhandledErrorResponse(e) => {
-                            messages.push((
-                                format!("Unexpected error received in a response from PSN ({e})."),
-                                MessageLevel::Error,
-                            ));
+                            format!("Unexpected error received in a response from PSN ({e}).")
                         }
                         UpdateError::InvalidSerial => {
-                            messages.push((
-                                String::from("The provided serial didn't give any results, double-check your input."),
-                                MessageLevel::Error,
-                            ));
+                            String::from("The provided serial didn't give any results, double-check your input.")
                         }
                         UpdateError::NoUpdatesAvailable => {
-                            messages.push((
-                                String::from("The provided serial doesn't have any available updates."),
-                                MessageLevel::Error,
-                            ));
+                            String::from("The provided serial doesn't have any available updates.")
                         }
-                        UpdateError::Reqwest(e) => {
-                            messages.push((
-                                format!("There was an error completing the request ({e})."),
-                                MessageLevel::Error,
-                            ));
-                        }
-                        UpdateError::XmlParsing(e) => {
-                            messages.push((
-                                format!("Error parsing response from Sony, try again later ({e})."),
-                                MessageLevel::Error,
-                            ));
-                        }
+                        UpdateError::Reqwest(e) => format!("There was an error completing the request ({e})."),
+                        UpdateError::XmlParsing(e) => format!("Error parsing response from Sony, try again later ({e})."),
                         UpdateError::ManifestParsing(e) => {
-                            messages.push((
-                                format!("Error parsing manifest response from Sony, try again later ({e})."),
-                                MessageLevel::Error,
-                            ));
+                            format!("Error parsing manifest response from Sony, try again later ({e}).")
                         }
-                        UpdateError::Security(e) => {
-                            messages.push((format!("Security check failed: {e}"), MessageLevel::Error));
-                        }
+                        UpdateError::Security(e) => format!("Security check failed: {e}"),
                         UpdateError::ResponseTooLarge(size) => {
-                            messages.push((
-                                format!("Response too large ({} bytes), possible server error.", size),
-                                MessageLevel::Error,
-                            ));
+                            format!("Response too large ({size} bytes), possible server error.")
                         }
-                    }
-
-                    error!("Error received from updates query: {e:?}");
+                    };
+                    messages.push((format!("{serial}: {text}"), MessageLevel::Error));
+                    error!("Error received from updates query for {serial}: {e:?}");
                 }
             }
         }
-
-        Some(())
     }
 
     pub(super) fn handle_batch_search_queue(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
@@ -252,7 +225,12 @@ impl UpdatesApp {
 
             ui.separator();
 
-            ui.add_enabled_ui(!self.v.serial_query.is_empty() && self.v.search_promise.is_none(), |ui| {
+            let in_flight = self
+                .v
+                .search_promises
+                .iter()
+                .any(|(s, _)| *s == parse_title_id(&self.v.serial_query));
+            ui.add_enabled_ui(!self.v.serial_query.is_empty() && !in_flight, |ui| {
                 if !input_submitted && !ui.button("Search for updates").clicked() {
                     return;
                 }
@@ -288,7 +266,7 @@ impl UpdatesApp {
                     result
                 });
 
-                self.v.search_promise = Some(promise);
+                self.v.search_promises.push((parse_title_id(&self.v.serial_query), promise));
             });
 
             // Batch search progress indicator (inline in search bar).
@@ -357,6 +335,44 @@ impl UpdatesApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn several_typed_searches_run_at_once() {
+        // Only one search could run at a time (RPSN-0069).
+        let rt = tokio::runtime::Runtime::new().expect("a test runtime starts");
+        let _guard = rt.enter();
+        let (_still_waiting, wait) = tokio::sync::oneshot::channel::<()>();
+
+        let mut app = UpdatesApp::default();
+        app.v.search_promises = vec![
+            (
+                "BLES00001".into(),
+                Promise::spawn_async(async { Err(UpdateError::NoUpdatesAvailable) }),
+            ),
+            (
+                "BLES00002".into(),
+                Promise::spawn_async(async { Err(UpdateError::InvalidSerial) }),
+            ),
+            (
+                "BLES00003".into(),
+                Promise::spawn_async(async move {
+                    let _ = wait.await;
+                    Err(UpdateError::InvalidSerial)
+                }),
+            ),
+        ];
+        while app.v.search_promises[..2].iter().any(|(_, p)| p.ready().is_none()) {
+            std::thread::yield_now();
+        }
+
+        let mut messages = Vec::new();
+        app.handle_search_promises(&mut messages);
+        let texts: Vec<_> = messages.iter().map(|(text, _)| text.as_str()).collect();
+        assert!(texts[0].starts_with("BLES00001: "), "{texts:?}");
+        assert!(texts[1].starts_with("BLES00002: "), "{texts:?}");
+        assert_eq!(app.v.search_promises.len(), 1, "the unfinished search keeps running");
+        assert_eq!(app.v.search_promises[0].0, "BLES00003");
+    }
 
     #[test]
     fn second_batch_joins_a_running_one() {

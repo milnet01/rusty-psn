@@ -308,7 +308,7 @@ UpdatesApp (eframe::App)
         |-- paused_downloads: Vec<PausedDownload>
         |-- merge_queue: Vec<ActiveMerge>
         |-- completed/failed download/merge lists
-        |-- search_promise, batch_search_queue/active
+        |-- search_promises (several at once), batch_search_queue/active
         |-- rpcs3_scan_promise, rpcs3_installed_games
         |-- clipboard, message_log, egui_ctx
 ```
