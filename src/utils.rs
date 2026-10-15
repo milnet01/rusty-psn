@@ -131,11 +131,75 @@ where
     P: AsRef<Path>,
 {
     let base = download_path.as_ref();
-    let sanitized_title = sanitize_title(title);
+    let sanitized_title = title_with_existing_region(base, serial, &sanitize_title(title), format);
     match format {
         DirectoryFormat::SerialOnly => base.join(serial),
         DirectoryFormat::SerialTitle => base.join(format!("{} - {}", serial, sanitized_title)),
         DirectoryFormat::TitleSerial => base.join(&sanitized_title).join(serial),
+    }
+}
+
+/// The region names a folder's bracketed suffix may hold, in the No-Intro and Redump style
+/// ("God of War III (USA)", "(USA, Europe)").
+const REGION_NAMES: [&str; 15] = [
+    "USA",
+    "Europe",
+    "Japan",
+    "Asia",
+    "Korea",
+    "World",
+    "UK",
+    "Australia",
+    "Germany",
+    "France",
+    "Spain",
+    "Italy",
+    "Brazil",
+    "Canada",
+    "China",
+];
+
+/// Whether `suffix` is " (Region)" or " (Region, Region, ...)".
+fn is_region_suffix(suffix: &str) -> bool {
+    suffix
+        .strip_prefix(" (")
+        .and_then(|rest| rest.strip_suffix(')'))
+        .is_some_and(|inner| inner.split(", ").all(|name| REGION_NAMES.contains(&name)))
+}
+
+/// Sony sends a bare title ("God of War III") while a folder the user already has may carry the
+/// region ("God of War III (USA)"). Where the download folder holds exactly such a folder for this
+/// game, its name is the title to use, so downloads join it rather than start a second folder
+/// (RPSN-0013). Otherwise `sanitized_title` unchanged.
+fn title_with_existing_region(download_path: &Path, serial: &str, sanitized_title: &str, format: DirectoryFormat) -> String {
+    let prefix = match format {
+        DirectoryFormat::SerialOnly => return sanitized_title.to_string(),
+        DirectoryFormat::SerialTitle => format!("{serial} - {sanitized_title}"),
+        DirectoryFormat::TitleSerial => sanitized_title.to_string(),
+    };
+    if download_path.join(&prefix).exists() {
+        return sanitized_title.to_string();
+    }
+    let Ok(entries) = std::fs::read_dir(download_path) else {
+        return sanitized_title.to_string();
+    };
+    let mut found: Vec<String> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|t| t.is_dir()))
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter_map(|name| {
+            name.strip_prefix(&prefix)
+                .filter(|rest| is_region_suffix(rest))
+                .map(str::to_string)
+        })
+        .filter(|suffix| {
+            format != DirectoryFormat::TitleSerial || download_path.join(format!("{prefix}{suffix}")).join(serial).is_dir()
+        })
+        .collect();
+    // More than one region folder for the game: nothing says which, so none is chosen.
+    match (found.pop(), found.is_empty()) {
+        (Some(suffix), true) => format!("{sanitized_title}{suffix}"),
+        _ => sanitized_title.to_string(),
     }
 }
 
@@ -435,6 +499,40 @@ fn hash_file_blocking(file: std::fs::File, hash: &str, file_length: u64, suffix_
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_folder_with_a_region_suffix_is_reused() {
+        // Sony sends "God of War III"; the user's folder is "God of War III (USA)" (RPSN-0013).
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("God of War III (USA)/BCUS98111")).unwrap();
+        assert_eq!(
+            create_pkg_path(&root.path(), "BCUS98111", "God of War III", DirectoryFormat::TitleSerial),
+            root.path().join("God of War III (USA)/BCUS98111")
+        );
+
+        std::fs::create_dir(root.path().join("BCUS98111 - God of War III (USA, Europe)")).unwrap();
+        assert_eq!(
+            create_pkg_path(&root.path(), "BCUS98111", "God of War III", DirectoryFormat::SerialTitle),
+            root.path().join("BCUS98111 - God of War III (USA, Europe)")
+        );
+    }
+
+    #[test]
+    fn a_suffix_that_is_not_a_region_is_not_reused() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("God of War III (Demo)/BCUS98111")).unwrap();
+        // Two region folders: nothing says which is meant.
+        std::fs::create_dir(root.path().join("BCUS98111 - God of War III (USA)")).unwrap();
+        std::fs::create_dir(root.path().join("BCUS98111 - God of War III (Europe)")).unwrap();
+        assert_eq!(
+            create_pkg_path(&root.path(), "BCUS98111", "God of War III", DirectoryFormat::TitleSerial),
+            root.path().join("God of War III/BCUS98111")
+        );
+        assert_eq!(
+            create_pkg_path(&root.path(), "BCUS98111", "God of War III", DirectoryFormat::SerialTitle),
+            root.path().join("BCUS98111 - God of War III")
+        );
+    }
 
     #[tokio::test]
     async fn hash_file_accepts_upper_case_checksum() {
