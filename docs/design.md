@@ -7,6 +7,7 @@
 agreed — `~/.claude/workflow.md` § 4 says when it passes.
 
 **Status:** agreed (2026-10-12).
+**Genre:** adr
 
 This records the shape the code already has, plus the rules the owner set
 from 2026-10-12 on. The signs it places are in `docs/discovery.md`.
