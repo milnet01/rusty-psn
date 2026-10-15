@@ -915,6 +915,21 @@ fn default_download_path() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("pkgs"))
 }
 
+/// Runs `future` in the background and asks `ctx` to redraw when it ends. egui draws only on input
+/// or on request, so without this an idle window keeps showing the old state (RPSN-0160).
+fn spawn_redrawing<T: Send + 'static>(
+    ctx: Option<egui::Context>,
+    future: impl std::future::Future<Output = T> + Send + 'static,
+) -> Promise<T> {
+    Promise::spawn_async(async move {
+        let result = future.await;
+        if let Some(ctx) = ctx {
+            ctx.request_repaint();
+        }
+        result
+    })
+}
+
 impl UpdatesApp {
     /// Open a folder in the platform's file manager, saying so when it cannot be started.
     fn open_folder(&mut self, path: &Path) {

@@ -420,7 +420,7 @@ impl UpdatesApp {
                                                 .clone()
                                                 .expect("rt_handle set in UpdatesApp::new before any UI code runs");
                                             let _guard = rt.enter();
-                                            let promise = Promise::spawn_async(async move {
+                                            let promise = spawn_redrawing(Some(ui.ctx().clone()), async move {
                                                 crate::rpcs3::install_pkg(&exe, &pkg_file, check).await
                                             });
                                             self.v.rpcs3_install_promises.push((tid, pid, promise));

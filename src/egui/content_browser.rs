@@ -80,7 +80,7 @@ impl UpdatesApp {
                                                 .clone()
                                                 .expect("rt_handle set in UpdatesApp::new before any UI code runs");
                                             let _guard = rt.enter();
-                                            let promise = Promise::spawn_async(async move {
+                                            let promise = spawn_redrawing(Some(ui.ctx().clone()), async move {
                                                 crate::rpcs3::install_pkg(&exe, &pkg, check)
                                                     .await
                                                     .map_err(|e| crate::content::ContentError::InstallFailed(e.to_string()))
@@ -117,7 +117,7 @@ impl UpdatesApp {
                                                 .clone()
                                                 .expect("rt_handle set in UpdatesApp::new before any UI code runs");
                                             let _guard = rt.enter();
-                                            let promise = Promise::spawn_async(async move {
+                                            let promise = spawn_redrawing(Some(ui.ctx().clone()), async move {
                                                 // A DLC cannot be checked; a clean exit marks it installed, as before
                                                 // (docs/specs/RPSN-0137-headless-confirmed-install.md § 3).
                                                 crate::content::install_dlc_zip(&exe, &zip)

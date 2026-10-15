@@ -938,7 +938,7 @@ Lower priority items that would improve the overall experience.
   Kind: fix.
   Source: in-session-2026-10-15.
 
-- 📋 [RPSN-0160] **Redraw the window when a batch search finishes.**
+- ✅ [RPSN-0160] **Redraw the window when a batch search or an RPCS3 install finishes.**
   Seen 2026-10-15 on a private display, native build and Flatpak alike:
   an RPCS3 library scan of one stand-in game logged "Batch search
   failed for BLUS30443: no updates available" but the row showed
@@ -946,6 +946,13 @@ Lower priority items that would improve the overall experience.
   promise in src/egui/search.rs (UpdateInfo::get_info) never calls
   ctx.request_repaint(); the single search's promise does. Batch
   imports and Update All Outdated use the same queue.
+  Shipped 2026-10-15. The same gap was in the three Install to RPCS3
+  buttons (results list, Patches and DLC: package and DLC zip). All four
+  now start through spawn_redrawing in src/egui/mod.rs, which asks the
+  window to redraw when the task ends. Test:
+  egui::search::tests::a_finished_batch_search_asks_for_a_redraw, seen
+  failing before the fix. On a private display the same one-game scan
+  now shows "No updates" with no further input.
   **Layman:** A library scan's results stay on "Checking..." until the mouse moves; show them as soon as they arrive.
   Kind: fix.
   Source: in-session-2026-10-15.

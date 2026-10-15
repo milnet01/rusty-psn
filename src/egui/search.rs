@@ -146,7 +146,7 @@ impl UpdatesApp {
                 .psn_client
                 .clone()
                 .expect("psn_client set in UpdatesApp::new before any UI code runs");
-            let promise = Promise::spawn_async(async move { UpdateInfo::get_info(query, &c).await });
+            let promise = spawn_redrawing(self.v.egui_ctx.clone(), async move { UpdateInfo::get_info(query, &c).await });
             self.v.batch_search_active.push((serial, promise));
         }
 
@@ -384,6 +384,33 @@ impl UpdatesApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_finished_batch_search_asks_for_a_redraw() {
+        // Without the redraw a library scan shows "Checking..." until the mouse moves (RPSN-0160).
+        let rt = tokio::runtime::Runtime::new().expect("a test runtime starts");
+        let ctx = egui::Context::default();
+        let asked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = asked.clone();
+        ctx.set_request_repaint_callback(move |_| flag.store(true, std::sync::atomic::Ordering::SeqCst));
+        let mut app = UpdatesApp::default();
+        app.v.rt_handle = Some(rt.handle().clone());
+        app.v.psn_client = Some(reqwest::Client::new());
+        app.v.egui_ctx = Some(ctx.clone());
+        // Not a serial, so the search ends at once without the network.
+        app.v.batch_search_queue.push_back("NOT-A-SERIAL".to_string());
+
+        app.handle_batch_search_queue(&mut Vec::new());
+        assert!(
+            !asked.load(std::sync::atomic::Ordering::SeqCst),
+            "nothing asked for a redraw yet"
+        );
+        while app.v.batch_search_active.iter().any(|(_, p)| p.ready().is_none()) {
+            std::thread::yield_now();
+        }
+
+        assert!(asked.load(std::sync::atomic::Ordering::SeqCst));
+    }
 
     #[test]
     fn a_full_size_file_counts_as_downloaded() {
