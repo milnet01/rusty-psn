@@ -952,13 +952,20 @@ Lower priority items that would improve the overall experience.
   Source: ants-projects-hub-website session request 2026-10-12 (user asked it).
   Lanes: Docs.
 
-- 📋 [RPSN-0159] **Write log files to the app's data folder, not the folder it starts in.**
+- ✅ [RPSN-0159] **Write log files to the app's data folder, not the folder it starts in.**
   On Linux and Windows `init_log` in src/main.rs logs to
   `FileSpec::default()`, the current folder, so each run leaves a
   rusty-psn_<date>.log wherever it was started: the home folder from
   the menu, the project folder in development. The macOS branch already
   uses dirs::data_local_dir()/rusty-psn. Use one rule for all three,
   and keep only the newest few logs.
+  Shipped 2026-10-15: every platform logs to
+  dirs::data_local_dir()/rusty-psn/logs/ (logs_dir in src/main.rs), and
+  each start keeps the newest 10 logs (prune_logs). Checked: three runs
+  of the cli build from an empty folder left it empty and put three logs
+  in the data folder; with 15 logs there, one more run left 10, the
+  oldest gone. Old logs already in the project folder and the home
+  folder are left alone.
   **Layman:** Stop the app leaving a new log file in whatever folder it was started from.
   Kind: fix.
   Source: in-session-2026-10-15.

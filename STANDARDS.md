@@ -226,8 +226,8 @@ PackageInfo {
 - **Log level**: `info` (configurable via `Logger::try_with_str`)
 - **Stdout duplication**: Only errors are duplicated to stdout (`Duplicate::Error`)
 - **Opt-out**: `--no-log-file` CLI flag disables file logging
-- **macOS**: Logs written to `dirs::data_local_dir()/rusty-psn/`
-- **Other platforms**: Logs written to current working directory
+- **Location**: `dirs::data_local_dir()/rusty-psn/logs/` on every platform, or `logs/` in the current folder where there is none (`logs_dir` in `src/main.rs`, RPSN-0159)
+- **Kept**: the newest 10 log files; each start deletes older ones (`prune_logs`)
 - Log file naming: `rusty-psn_YYYY-MM-DD_HH-MM-SS.log`
 
 ### 4.7 File & Path Handling
@@ -487,7 +487,7 @@ add `--no-default-features --features cli` for the command-line build.
 | Behavior | macOS | Linux | Windows |
 |---|---|---|---|
 | Default download path | `~/Downloads/rusty-psn/pkgs/` | `pkgs/` (relative) | `pkgs/` (relative) |
-| Log file location | `~/Library/Application Support/rusty-psn/` | Current directory | Current directory |
+| Log file location | `~/Library/Application Support/rusty-psn/logs/` | `~/.local/share/rusty-psn/logs/` | `%LOCALAPPDATA%\rusty-psn\logs\` |
 | Console window (release) | Hidden (egui) | N/A | Hidden via `windows_subsystem = "windows"` |
 | App bundle | `.app` with `Info.plist` | Raw binary | Raw `.exe` |
 | Universal binary | arm64 + x86_64 via `lipo` | amd64 only | x86_64 only |

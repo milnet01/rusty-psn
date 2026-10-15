@@ -3,7 +3,6 @@
 
 use clap::Parser;
 use flexi_logger::{Logger, LoggerHandle};
-#[cfg(any(feature = "cli", target_os = "macos"))]
 use std::path::PathBuf;
 #[cfg(feature = "egui")]
 use std::sync::Arc;
@@ -241,25 +240,24 @@ fn wayland_unreachable(
     !socket.is_some_and(|path| std::os::unix::net::UnixStream::connect(path).is_ok())
 }
 
-#[cfg(target_os = "macos")]
+/// How many log files are kept: this run's and the newest ones before it.
+const LOGS_KEPT: usize = 10;
+
+/// Starts logging to a new file in the app's own data folder (RPSN-0159), or to nothing with
+/// `--no-log-file`. Before, Linux and Windows wrote each run's log into the folder the app was
+/// started from.
 fn init_log(no_log_file: bool) -> LoggerHandle {
     let mut logger = Logger::try_with_str("info").expect("Failed to create logger");
 
     if no_log_file {
         logger = logger.do_not_log();
     } else {
-        // Falls back to current directory if platform data dir is unavailable.
-        let mut logs_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
-        logs_dir.push("rusty-psn");
-
-        match std::fs::create_dir_all(&logs_dir) {
-            Ok(_) => {} // Logger not started yet, can't log here.
-            Err(e) => match e.kind() {
-                std::io::ErrorKind::AlreadyExists => {}
-                _ => panic!("{}", e),
-            },
+        let logs_dir = logs_dir(dirs::data_local_dir());
+        // Logger not started yet, so a failure here can only be reported on stderr.
+        if let Err(e) = std::fs::create_dir_all(&logs_dir) {
+            eprintln!("Could not create the log folder {}: {e}", logs_dir.display());
         }
-
+        prune_logs(&logs_dir, LOGS_KEPT - 1);
         logger = logger.log_to_file(flexi_logger::FileSpec::default().directory(logs_dir));
     }
 
@@ -269,20 +267,78 @@ fn init_log(no_log_file: bool) -> LoggerHandle {
         .expect("Failed to start logger!")
 }
 
-#[cfg(not(target_os = "macos"))]
-fn init_log(no_log_file: bool) -> LoggerHandle {
-    let mut logger = Logger::try_with_str("info").expect("Failed to create logger");
+/// `<data_local>/rusty-psn/logs`, or `logs` in the current folder where the platform has no
+/// data folder.
+fn logs_dir(data_local: Option<PathBuf>) -> PathBuf {
+    data_local.map_or_else(|| PathBuf::from("logs"), |dir| dir.join("rusty-psn").join("logs"))
+}
 
-    if no_log_file {
-        logger = logger.do_not_log();
-    } else {
-        logger = logger.log_to_file(flexi_logger::FileSpec::default());
+/// Deletes all but the newest `keep` of this app's log files in `dir`. flexi_logger names each
+/// `rusty-psn_<YYYY-MM-DD_HH-MM-SS>.log`, so name order is age order.
+fn prune_logs(dir: &std::path::Path, keep: usize) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut logs: Vec<PathBuf> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("rusty-psn_") && name.ends_with(".log"))
+                && path.is_file()
+        })
+        .collect();
+    logs.sort();
+    let excess = logs.len().saturating_sub(keep);
+    for old in &logs[..excess] {
+        if let Err(e) = std::fs::remove_file(old) {
+            eprintln!("Could not delete the old log {}: {e}", old.display());
+        }
+    }
+}
+
+#[cfg(test)]
+mod log_tests {
+    use super::*;
+
+    #[test]
+    fn logs_go_to_the_apps_data_folder() {
+        assert_eq!(logs_dir(Some(PathBuf::from("/d"))), PathBuf::from("/d/rusty-psn/logs"));
+        assert_eq!(logs_dir(None), PathBuf::from("logs"));
     }
 
-    logger
-        .duplicate_to_stdout(flexi_logger::Duplicate::Error)
-        .start()
-        .expect("Failed to start logger!")
+    #[test]
+    fn pruning_keeps_the_newest_logs_and_nothing_else_is_touched() {
+        let dir = tempfile::tempdir().unwrap();
+        let names = [
+            "rusty-psn_2026-10-14_10-00-00.log",
+            "rusty-psn_2026-10-15_09-00-00.log",
+            "rusty-psn_2026-10-15_10-00-00.log",
+            "other.log",
+            "rusty-psn_notes.txt",
+        ];
+        for name in names {
+            std::fs::write(dir.path().join(name), b"").unwrap();
+        }
+
+        prune_logs(dir.path(), 2);
+
+        let mut left: Vec<String> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        left.sort();
+        assert_eq!(
+            left,
+            [
+                "other.log",
+                "rusty-psn_2026-10-15_09-00-00.log",
+                "rusty-psn_2026-10-15_10-00-00.log",
+                "rusty-psn_notes.txt",
+            ]
+        );
+    }
 }
 
 #[cfg(all(test, feature = "cli"))]
