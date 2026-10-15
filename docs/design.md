@@ -111,15 +111,21 @@ sets for a second reason to change.
   window, on every page; a status that belongs to one item, such as a
   failed download, also shows beside that item. Choosing a page, folding
   or unfolding, and the user changing the text size or theme are the only
-  things that move another part. A status, a progress bar or a message
-  updates in its place without shifting anything around it. Where the
+  things that move another part. A status or a progress bar updates in its
+  place without shifting anything around it. A list, such as the messages
+  or the downloads, keeps one fixed box: a new row, or a download moving
+  to its Finished section, changes only what is inside that box. Where the
   window cannot show everything, its starting and smallest sizes are made
   bigger, or a list scrolls inside its own fixed box; the app does not
   resize its window while it runs. Every message reaches the Messages
   panel whatever the settings say, so the "Show in-app toasts" setting
-  goes; a settings file that still holds it loads with it ignored. The
+  goes; a settings file that still holds it loads with it ignored.
+  Drop-down lists, hover hints and right-click menus stay: each opens only
+  when the user acts on it, and closes without moving anything. The
   desktop's file and folder pickers are the exception: they belong to the
-  system, not the app. So are system notifications, which the user turns
+  system, not the app. So is the error box shown when the app cannot set
+  up its network connection at startup: the main window never opens, and
+  the app closes after it. So are system notifications, which the user turns
   on in Settings and which repeat a message the Messages panel shows. The
   owner set this on 2026-10-14 (RPSN-0157); the code does not follow it
   yet.
@@ -154,3 +160,4 @@ None recorded as an ADR yet.
 | 7 | 2026-10-14 | 2 (both lanes held every question) | 1 | 0 | 0 | — | Converged: gate on the RPSN-0146 amendment (Content is a part of its own; new Content code goes in src/content.rs); no finding landed in it. 1 verified, 1 fixed, 0 dismissed, out of radius: both lanes found RPCS3 allowed Files only while src/rpcs3/sfo.rs calls security::strip_control; now Security and Files, fixed in-run as a record of existing code (rule 14 code-exists exception). Filed: src/promise.rs belongs to no part (RPSN-0155). Open questions resolved clean: the content browser marks a DLC installed on a clean exit, as RPSN-0137 § 3 chose; copy_pkg_file runs only inside merge_parts after containment; the default layout is SerialTitle (ID - Title); merge_parts' fixed layouts are in tests; RPCS3's get_dir_entries lists top-level files only. The project's check-doc.py ran degraded (no Genre: line), so paths and symbols were checked by hand. Second share: 0 of 1 verified findings landed in the gated span. |
 | 8 | 2026-10-14 | 2 (both lanes held every question) | 0 | 0 | 2 | — | 2 verified, 2 fixed, 0 dismissed. Gate on the RPSN-0157 Window layout bullet. Both lanes found it never said what becomes of the saved "Show in-app toasts" setting: now it goes, and an older settings file loads with it ignored (run: a RON settings file with an unknown field loads). From a lane's open question: "the window is made bigger" left open whether the app resizes itself; now it opens bigger and does not resize while running. Open questions resolved clean: the File integrity check failed window only informs (its one button closes it); system notifications are off by default. Not checkable here: RPCS3 source at 6fe3c87. Surfaced to the owner: the system-notification exception is the author's, not the owner's words. |
 | 9 | 2026-10-14 | 2 (both lanes held every question) | 0 | 0 | 3 | — | 3 verified, 3 fixed, 0 dismissed. One lane: changing the text size re-lays out every part, so the live preview needed naming; now the user changing text size or theme, and choosing a page, may move parts. Both lanes asked where a message's place is; with no spec planned that is a Q3, now one Messages panel at the foot of every page, plus a status beside its own item. One lane: eframe restores the last window size, so "opens bigger" became bigger starting and smallest sizes. Also corrected by narrowing: the intro's rule dates. The packet carried RPSN-0157's old "specced together" text; the roadmap had already been corrected. Not checkable here: RPCS3 source at 6fe3c87. A third loop is owed (ADR cap 3). |
+| 10 | 2026-10-15 | 2 (both lanes held every question) | 0 | 1 | 2 | — | 3 verified, 3 fixed, 0 dismissed. Found while building the packet: the bullet forbade every dialog, but `src/main.rs` shows an error box when the network client cannot be built at startup, before any window exists; it is now an exception. One lane: whether a row moving inside a list counts as moving a part, which the planned Downloads sections and the Messages panel both decide; now a list keeps one fixed box and its rows change only inside it. One lane: drop-down lists, hover hints and right-click menus were neither allowed nor forbidden; now they stay. Measured: a RON settings string holding `show_toasts`, at the start, middle or end, loads into a struct without it, keeping every other value (ron 0.12.2, serde 1.0.229). Open questions resolved clean: the user resizing the window and eframe restoring a saved size build the same either way. Cap reached (3 for an ADR, loops 8 to 10); these 3 fixes were read by no lane. Calm cap: 1 of 3 final-loop findings landed on text this run wrote (loop 9's list of what may move). The gated span is the whole bullet, so the share inside it carries no information. Final sweep: no other copy of the changed wording in the project's Markdown. Surfaced to the owner: the list-box and drop-down rulings are the author's, from the approved mockups. |
