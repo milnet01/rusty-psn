@@ -808,6 +808,25 @@ mod tests {
         }
     }
 
+    // PSVita: Persona 4 Golden. On 2026-10-15 Sony answered with an empty reply: no updates (RPSN-0044).
+    #[tokio::test]
+    async fn vita_persona_4_golden_has_no_updates() {
+        let result = super::UpdateInfo::get_info("PCSE00120".to_string(), &test_client()).await;
+        assert!(
+            matches!(result, Err(super::UpdateError::NoUpdatesAvailable)),
+            "{:?}",
+            result.err()
+        );
+    }
+
+    // PSVita: PCSA00126, listed on the roadmap as Killzone Mercenary, whose serial is PCSA00107. On
+    // 2026-10-15 Sony answered "Not found", which reads as a serial with no results (RPSN-0044).
+    #[tokio::test]
+    async fn vita_unknown_serial_reads_as_no_results() {
+        let result = super::UpdateInfo::get_info("PCSA00126".to_string(), &test_client()).await;
+        assert!(matches!(result, Err(super::UpdateError::InvalidSerial)), "{:?}", result.err());
+    }
+
     // PSVita: Killzone Mercenary (known to have updates)
     #[tokio::test]
     async fn parse_vita_killzone() {
