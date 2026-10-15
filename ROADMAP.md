@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=158 -->
+<!-- ants-roadmap-id-high-water: RPSN=160 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -834,7 +834,7 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0074] **Flatpak/Snap packaging.**
+- ✅ [RPSN-0074] **Flatpak/Snap packaging.**
   For easier Linux distribution alongside the current
   AppImage-targeted binary
   Checked against the code 2026-10-12: Not done — no Flatpak or Snap
@@ -859,6 +859,16 @@ Lower priority items that would improve the overall experience.
   ($HOME/.config, $HOME/.cache); the app's own settings then live apart
   from the native build's. Verify with a build on a private display and
   a scan of a stand-in RPCS3 folder.
+  Shipped 2026-10-15: packaging/flatpak/ (manifest, metainfo, README),
+  built and installed for this user as io.github.milnet01.RustyPsn.
+  src/sandbox.rs runs RPCS3, flatpak, which, journalctl and dbus-send
+  on the host through flatpak-spawn --host, and reads the host's
+  XDG_*_HOME from HOST_XDG_*_HOME. Checked on a private display: the
+  Flatpak auto-detected a stand-in RPCS3 through the host's
+  XDG_CONFIG_HOME and scanned its one game. Owner hand test: start
+  rusty-psn from the menu (the Flatpak entry), install one update into
+  RPCS3, and confirm RPCS3 shows it. Settings are the Flatpak's own, so
+  set the RPCS3 folder once in its Settings page.
   **Layman:** Offer Flatpak or Snap packages for easier Linux installs.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -916,6 +926,29 @@ Lower priority items that would improve the overall experience.
   Kind: marketing.
   Source: ants-projects-hub-website session request 2026-10-12 (user asked it).
   Lanes: Docs.
+
+- 📋 [RPSN-0159] **Write log files to the app's data folder, not the folder it starts in.**
+  On Linux and Windows `init_log` in src/main.rs logs to
+  `FileSpec::default()`, the current folder, so each run leaves a
+  rusty-psn_<date>.log wherever it was started: the home folder from
+  the menu, the project folder in development. The macOS branch already
+  uses dirs::data_local_dir()/rusty-psn. Use one rule for all three,
+  and keep only the newest few logs.
+  **Layman:** Stop the app leaving a new log file in whatever folder it was started from.
+  Kind: fix.
+  Source: in-session-2026-10-15.
+
+- 📋 [RPSN-0160] **Redraw the window when a batch search finishes.**
+  Seen 2026-10-15 on a private display, native build and Flatpak alike:
+  an RPCS3 library scan of one stand-in game logged "Batch search
+  failed for BLUS30443: no updates available" but the row showed
+  "Checking..." until a click 15 s later redrew it. The batch search
+  promise in src/egui/search.rs (UpdateInfo::get_info) never calls
+  ctx.request_repaint(); the single search's promise does. Batch
+  imports and Update All Outdated use the same queue.
+  **Layman:** A library scan's results stay on "Checking..." until the mouse moves; show them as soon as they arrive.
+  Kind: fix.
+  Source: in-session-2026-10-15.
 
 ## 10. Custom Application Icon [P2]
 

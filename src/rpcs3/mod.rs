@@ -351,8 +351,9 @@ static INSTALLS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// The file RPCS3 locks while it runs, `<cache dir>/RPCS3.buf`, or `None` where it cannot be
 /// named. The cache dir follows `fs::get_cache_dir` in Utilities/File.cpp, RPCS3 commit 6fe3c87.
+/// RPCS3 runs on the host, so the host's variables decide it, even from inside a Flatpak.
 fn instance_lock_path(rpcs3_executable: &Path) -> Option<PathBuf> {
-    lock_path_from(rpcs3_executable, |key| std::env::var_os(key))
+    lock_path_from(rpcs3_executable, crate::sandbox::host_env)
 }
 
 fn lock_path_from(rpcs3_executable: &Path, env: impl Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
@@ -496,11 +497,14 @@ async fn install_pkg_guarded(
 /// Run RPCS3 headless with `flag` and `path` (`--installpkg` or `--installfw`), waiting for it
 /// to exit. If `rpcs3_executable` is the Flatpak sentinel `flatpak:net.rpcs3.RPCS3`, runs via
 /// `flatpak run`. The caller holds `INSTALLS` and has checked RPCS3 is not open.
+/// From inside this app's own Flatpak, RPCS3 runs on the host (RPSN-0074).
 async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Result<(), Rpcs3Error> {
     let exe_str = rpcs3_executable.to_string_lossy();
     let is_flatpak = exe_str.starts_with("flatpak:");
 
-    if !is_flatpak && !rpcs3_executable.exists() {
+    // A sandbox cannot see the host's /usr, where `which rpcs3` may have found it; there a
+    // missing RPCS3 shows as flatpak-spawn's failed exit instead.
+    if !is_flatpak && !crate::sandbox::in_flatpak() && !rpcs3_executable.exists() {
         return Err(Rpcs3Error::InstallFailed(format!(
             "RPCS3 executable not found: {}",
             rpcs3_executable.display()
@@ -513,21 +517,19 @@ async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Resul
         path.display()
     );
 
-    let output = if is_flatpak {
+    let mut command = if is_flatpak {
         let app_id = exe_str.strip_prefix("flatpak:").unwrap_or("net.rpcs3.RPCS3");
-        tokio::process::Command::new("flatpak")
-            .args(["run", app_id, "--headless", flag])
-            .arg(path)
-            .output()
-            .await
+        let mut command = crate::sandbox::host_command("flatpak");
+        command.args(["run", app_id]);
+        command
     } else {
-        tokio::process::Command::new(rpcs3_executable)
-            .args(["--headless", flag])
-            .arg(path)
-            .output()
-            .await
-    }
-    .map_err(|e| Rpcs3Error::InstallFailed(format!("failed to launch RPCS3: {e}")))?;
+        crate::sandbox::host_command(rpcs3_executable)
+    };
+    command.args(["--headless", flag]).arg(path);
+    let output = tokio::process::Command::from(command)
+        .output()
+        .await
+        .map_err(|e| Rpcs3Error::InstallFailed(format!("failed to launch RPCS3: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

@@ -1,0 +1,52 @@
+# A local Flatpak of the window app (RPSN-0074). Not for Flathub: it fetches crates during the
+# build and may start RPCS3 outside its sandbox. How to build and install it: README.md here.
+app-id: io.github.milnet01.RustyPsn
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: rusty-psn
+rename-desktop-file: rusty-psn.desktop
+rename-icon: rusty-psn
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # RPCS3's folders, AppImages and the download folder can be anywhere on the host.
+  - --filesystem=host
+  # RPCS3's own Flatpak keeps its folders here; --filesystem=host leaves ~/.var/app out.
+  - --filesystem=~/.var/app/net.rpcs3.RPCS3
+  # flatpak-spawn --host: runs RPCS3, `flatpak run`, `which`, `journalctl` and `dbus-send` on
+  # the host (src/sandbox.rs).
+  - --talk-name=org.freedesktop.Flatpak
+  - --talk-name=org.freedesktop.Notifications
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  # A local build may fetch crates; Flathub would need them vendored instead.
+  build-args:
+    - --share=network
+  env:
+    CARGO_HOME: /run/build/rusty-psn/cargo
+modules:
+  - name: rusty-psn
+    buildsystem: simple
+    build-commands:
+      - cargo build --release --locked
+      - install -Dm755 target/release/rusty-psn /app/bin/rusty-psn
+      - install -Dm644 resources/rusty-psn.desktop /app/share/applications/rusty-psn.desktop
+      - install -Dm644 resources/icon.svg /app/share/icons/hicolor/scalable/apps/rusty-psn.svg
+      - |
+        for size in 48 64 128 256 512; do
+          install -Dm644 resources/icon-$size.png /app/share/icons/hicolor/${size}x${size}/apps/rusty-psn.png
+        done
+      - install -Dm644 packaging/flatpak/io.github.milnet01.RustyPsn.metainfo.xml /app/share/metainfo/io.github.milnet01.RustyPsn.metainfo.xml
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - target
+          - .git
+          - .flatpak-builder

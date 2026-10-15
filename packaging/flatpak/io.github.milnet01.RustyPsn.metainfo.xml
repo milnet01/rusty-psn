@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.milnet01.RustyPsn</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>rusty-psn</name>
+  <summary>Download PlayStation game updates for use with emulators</summary>
+  <description>
+    <p>
+      rusty-psn fetches game updates for PS3, PS4, PS Vita and PSP games straight from Sony's
+      update servers. It can scan an RPCS3 library, download what each game is missing, and
+      install the packages into RPCS3.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.milnet01.RustyPsn.desktop</launchable>
+  <url type="homepage">https://github.com/milnet01/rusty-psn</url>
+  <developer id="io.github.milnet01">
+    <name>milnet01</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+</component>

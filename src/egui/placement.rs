@@ -10,7 +10,6 @@
 use super::*;
 
 use std::io::Write;
-use std::process::Command;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 /// The key the saved position is stored under, beside eframe's own window settings.
@@ -72,7 +71,7 @@ fn frame_position() -> Option<(i32, i32)> {
     }
     let deadline = Instant::now() + ANSWER_TIMEOUT;
     loop {
-        let output = Command::new("journalctl")
+        let output = crate::sandbox::host_command("journalctl")
             .args(["--user", "-b", "--since", &since, "-o", "cat"])
             .output()
             .ok()?;
@@ -139,7 +138,11 @@ for (var i = 0; i < wins.length; i++) {{
 /// Loads, runs and unloads a one-shot KWin script over D-Bus. True means KWin accepted it, never
 /// that it did anything: `dbus-send` fails only when the call did not land, such as with no KWin.
 fn run_kwin_script(js: &str) -> bool {
-    let mut file = match tempfile::Builder::new().prefix("rusty_psn_place_").suffix(".js").tempfile() {
+    let mut file = match tempfile::Builder::new()
+        .prefix("rusty_psn_place_")
+        .suffix(".js")
+        .tempfile_in(crate::sandbox::host_visible_temp_dir())
+    {
         Ok(file) => file,
         Err(e) => {
             warn!("Could not create a KWin script file: {e}");
@@ -154,7 +157,7 @@ fn run_kwin_script(js: &str) -> bool {
         return false;
     };
     let dbus = |args: &[&str]| {
-        Command::new("dbus-send")
+        crate::sandbox::host_command("dbus-send")
             .args([
                 "--session",
                 "--dest=org.kde.KWin",

@@ -26,6 +26,7 @@ from 2026-10-12 on. The signs it places are in `docs/discovery.md`.
 | Security | Allowed Sony hosts, path containment, game ID validation, redirect policy | `src/security.rs` |
 | Files | Download paths and folder layouts, creating package files, hashing, migrating old layouts | `src/utils.rs` |
 | Promise | Lets a front end's frame or loop poll a background task's result without waiting | `src/promise.rs` |
+| Sandbox | Inside the Flatpak (RPSN-0074): running host programs through `flatpak-spawn --host` and reading the host's XDG folders | `src/sandbox.rs` |
 
 ## What may depend on what
 
@@ -36,13 +37,14 @@ from 2026-10-12 on. The signs it places are in `docs/discovery.md`.
   them. **No other part may use a front end.**
 - **The front ends never use each other.**
 - **PSN** may use Security and Files.
-- **RPCS3** may use Security and Files. **It must never use PSN
+- **RPCS3** may use Security, Files and Sandbox. **It must never use PSN
   directly**: RPCS3 support has to work on packages that came from anywhere.
 - **Content** may use RPCS3.
 - **Batch** may use PSN and Security.
 - **Security uses no other part.** It is the base every check rests on.
 - **Files** may use Security.
 - **Promise uses no other part.**
+- **Sandbox uses no other part.**
 
 **No two-way dependency may be added.** Files has its own error type
 (`FileError`), which PSN converts into its `DownloadError`.

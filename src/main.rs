@@ -30,6 +30,7 @@ mod egui;
 mod promise;
 mod psn;
 mod rpcs3;
+mod sandbox;
 mod security;
 mod utils;
 

@@ -62,7 +62,7 @@ fn detect_executable(config_dir: &std::path::Path) -> Option<PathBuf> {
             return Some(path);
         }
         // Check if Flatpak is available
-        if let Ok(output) = std::process::Command::new("flatpak")
+        if let Ok(output) = crate::sandbox::host_command("flatpak")
             .args(["info", "net.rpcs3.RPCS3"])
             .output()
         {
@@ -103,10 +103,10 @@ fn detect_executable(config_dir: &std::path::Path) -> Option<PathBuf> {
     None
 }
 
-/// `which rpcs3`, or `None` where it finds nothing.
+/// `which rpcs3` on the host, or `None` where it finds nothing.
 #[cfg(unix)]
 fn rpcs3_on_path() -> Option<PathBuf> {
-    let output = std::process::Command::new("which").arg("rpcs3").output().ok()?;
+    let output = crate::sandbox::host_command("which").arg("rpcs3").output().ok()?;
     let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
     (output.status.success() && !path.is_empty()).then(|| PathBuf::from(path))
 }
@@ -216,7 +216,7 @@ fn get_candidate_paths() -> Vec<PathBuf> {
         for search_dir in &appimage_search_dirs {
             exe_dirs.extend(appimage_dirs(search_dir));
         }
-        let xdg_config = std::env::var_os("XDG_CONFIG_HOME")
+        let xdg_config = crate::sandbox::host_env("XDG_CONFIG_HOME")
             .filter(|dir| !dir.is_empty())
             .map(PathBuf::from);
         paths.extend(linux_config_candidates(&exe_dirs, xdg_config, home));
