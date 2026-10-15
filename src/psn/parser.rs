@@ -60,6 +60,15 @@ fn parse_package_attributes(attributes: Attributes, info: &mut UpdateInfo) -> Re
                     last.manifest_url = value.to_string();
                 }
             }
+            // PSP updates write it plainly ("06.10").
+            "psp_system_ver" => {
+                if let Some(last) = info.packages.last_mut() {
+                    let value = attribute
+                        .normalized_value(XmlVersion::Implicit1_0)
+                        .map_err(ParseError::XmlParsing)?;
+                    last.min_system_version = psp_system_version(&value);
+                }
+            }
             "psp2_system_ver" => {
                 if let Some(last) = info.packages.last_mut() {
                     let value = attribute
@@ -72,6 +81,17 @@ fn parse_package_attributes(attributes: Attributes, info: &mut UpdateInfo) -> Re
         }
     }
     Ok(())
+}
+
+/// A PSP `psp_system_ver` ("06.10") as the system shows it ("6.10"), or `None` if it is not
+/// digits around one dot.
+fn psp_system_version(value: &str) -> Option<String> {
+    let (major, minor) = value.trim().split_once('.')?;
+    if major.is_empty() || minor.is_empty() || !major.bytes().chain(minor.bytes()).all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let major = major.trim_start_matches('0');
+    Some(format!("{}.{minor}", if major.is_empty() { "0" } else { major }))
 }
 
 /// A PSVita `psp2_system_ver` as the system shows it. Sony sends a decimal number whose
@@ -217,6 +237,14 @@ mod tests {
         assert_eq!(vita_system_version("57933824").as_deref(), Some("3.74")); // 0x03740000
         assert_eq!(vita_system_version("0"), None);
         assert_eq!(vita_system_version("junk"), None);
+    }
+
+    #[test]
+    fn psp_system_versions_read_as_the_psp_shows_them() {
+        // NPUG80318's update reply carried psp_system_ver="06.10" on 2026-10-15 (RPSN-0075).
+        assert_eq!(psp_system_version("06.10").as_deref(), Some("6.10"));
+        assert_eq!(psp_system_version("6.60").as_deref(), Some("6.60"));
+        assert_eq!(psp_system_version("x.10"), None);
     }
     use crate::psn::PlatformVariant;
 

@@ -794,6 +794,29 @@ mod tests {
         }
     }
 
+    // PSP: LocoRoco Midnight Carnival, a PSN PSP game with one update (RPSN-0075).
+    #[tokio::test]
+    async fn parse_psp_locoroco() {
+        match super::UpdateInfo::get_info("NPUG80318".to_string(), &test_client()).await {
+            Ok(info) => {
+                assert_eq!(info.platform_variant, super::utils::PlatformVariant::PSP);
+                assert_eq!(info.packages[0].min_system_version.as_deref(), Some("6.10"));
+            }
+            Err(e) => panic!("Failed to get info for NPUG80318: {:?}", e),
+        }
+    }
+
+    #[test]
+    fn psp_serials_are_told_from_ps3_ones() {
+        use super::utils::{get_platform_variant, PlatformVariant};
+        for psp in ["UCUS98711", "ULUS10336", "ULJM05800", "NPUG80318", "NPEH00020", "NPUZ00001"] {
+            assert_eq!(get_platform_variant(psp), Some(PlatformVariant::PSP), "{psp}");
+        }
+        for ps3 in ["NPUB30826", "NPEA00001", "BLUS31147", "BCUS98124"] {
+            assert_eq!(get_platform_variant(ps3), Some(PlatformVariant::PS3), "{ps3}");
+        }
+    }
+
     // PSVita: Hustle Kings (known to have 1 update)
     #[tokio::test]
     async fn parse_vita_hustle_kings() {

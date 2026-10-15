@@ -9,7 +9,7 @@
 | **Language** | Rust (Edition 2021) |
 | **License** | MIT (Copyright 2022 RainbowCookie32) |
 | **Repository** | https://github.com/RainbowCookie32/rusty-psn |
-| **Purpose** | Download PS3, PS4, & PSVita game update packages (.pkg) from Sony's PSN servers for use with emulators (primarily RPCS3) |
+| **Purpose** | Download PS3, PS4, PSVita & PSP game update packages (.pkg) from Sony's PSN servers for use with emulators (primarily RPCS3) |
 
 ---
 
@@ -53,6 +53,7 @@ Build commands:
 ### 3.1 Platform Variants
 
 ```
+PlatformVariant::PSP    - Serial prefixes: UC*, UL*, and NP? followed by G, H or Z (checked first)
 PlatformVariant::PS3    - Serial prefixes: NP*, BL*, BC*
 PlatformVariant::PS4    - Serial prefix: CUSA*
 PlatformVariant::PSVita - Serial prefixes: PCS*, VC*, VL*
@@ -77,7 +78,7 @@ get_platform_variant() -> PS3 or PS4 (or invalid)
     |
     v
 get_update_info_url() -> construct API URL
-    |                     PS3:    https://a0.ww.np.dl.playstation.net/tpl/np/{id}/{id}-ver.xml
+    |                     PS3, PSP: https://a0.ww.np.dl.playstation.net/tpl/np/{id}/{id}-ver.xml
     |                     PS4:    https://gs-sec.ww.np.dl.playstation.net/plo/np/{id}/{hmac}/{id}-ver.xml
     |                     PSVita: https://gs-sec.ww.np.dl.playstation.net/pl/np/{id}/{hmac}/{id}-ver.xml
     v
@@ -457,6 +458,9 @@ docker run --rm -v ${PWD}/pkgs:/rusty-psn/pkgs rusty-psn -t "SERIAL1 SERIAL2"
 | `parse_tokyo_jungle` | NPUA80523 | PS3 |
 | `parse_vita_hustle_kings` | PCSA00007 | PSVita |
 | `parse_vita_killzone` | PCSA00107 | PSVita |
+| `vita_persona_4_golden_has_no_updates` | PCSE00120 | PSVita |
+| `vita_unknown_serial_reads_as_no_results` | PCSA00126 | PSVita |
+| `parse_psp_locoroco` | NPUG80318 | PSP |
 
 **Unit tests** sit in a `#[cfg(test)] mod tests` beside the code they cover.
 `cargo test --bin rusty-psn -- --list` lists every test in the window-app build;

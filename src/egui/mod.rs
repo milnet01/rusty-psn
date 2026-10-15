@@ -882,6 +882,7 @@ fn platform_color(variant: utils::PlatformVariant) -> egui::Color32 {
         utils::PlatformVariant::PS3 => egui::Color32::from_rgb(27, 102, 191),
         utils::PlatformVariant::PS4 => egui::Color32::from_rgb(0, 55, 145),
         utils::PlatformVariant::PSVita => egui::Color32::from_rgb(0, 144, 168),
+        utils::PlatformVariant::PSP => egui::Color32::from_rgb(90, 90, 110),
     }
 }
 

@@ -18,6 +18,9 @@ pub enum PlatformVariant {
     PS3,
     PS4,
     PSVita,
+    // Display prints the variant's name, so it is spelt as users see it.
+    #[allow(clippy::upper_case_acronyms)]
+    PSP,
 }
 
 impl fmt::Display for PlatformVariant {
@@ -27,6 +30,14 @@ impl fmt::Display for PlatformVariant {
 }
 
 pub fn get_platform_variant(title_id: &str) -> Option<PlatformVariant> {
+    // PSP (RPSN-0075): discs are UCxx and ULxx; PSN games and minis are NP, a region letter, then
+    // G, H or Z (NPUG, NPEH, NPUZ), where PS3's own PSN serials have A or B.
+    let bytes = title_id.as_bytes();
+    let psp_psn = title_id.starts_with("NP") && matches!(bytes.get(3), Some(b'G' | b'H' | b'Z'));
+    if title_id.starts_with("UC") || title_id.starts_with("UL") || psp_psn {
+        return Some(PlatformVariant::PSP);
+    }
+
     if ["NP", "BL", "BC"].iter().any(|&prefix| title_id.starts_with(prefix)) {
         return Some(PlatformVariant::PS3);
     }
@@ -45,7 +56,8 @@ pub fn get_platform_variant(title_id: &str) -> Option<PlatformVariant> {
 
 pub fn get_update_info_url(title_id: &str, platform_variant: PlatformVariant) -> Result<String, UpdateError> {
     match platform_variant {
-        PlatformVariant::PS3 => Ok(format!(
+        // PSP updates are listed at the same address as PS3's: measured 2026-10-15 with NPUG80318.
+        PlatformVariant::PS3 | PlatformVariant::PSP => Ok(format!(
             "https://a0.ww.np.dl.playstation.net/tpl/np/{0}/{0}-ver.xml",
             title_id
         )),
