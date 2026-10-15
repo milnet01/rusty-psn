@@ -432,7 +432,8 @@ const CHUNK_SIZE: usize = 1024 * 1024 * 128;
 /// URL, and that client does not verify Sony's certificates (`psn::build_psn_client`).
 /// So a match proves the file arrived intact, not that nobody altered the reply.
 pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Result<bool, FileError> {
-    // Last 0x20 bytes are the SHA1 hash for PS3 updates. PS4 updates don't include hash suffix.
+    // Last 0x20 bytes are the SHA1 hash for PS3 and PSVita updates (PSVita checked on PCSA00007 01.01,
+    // RPSN-0045). PS4 updates don't include hash suffix.
     let suffix_size: u64 = if hash_whole_file { 0 } else { 0x20 };
 
     // If the file size is below the length of the embedded sha1-hash suffix,

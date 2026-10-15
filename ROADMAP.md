@@ -515,11 +515,19 @@ Add PlayStation Vita game update downloads. Research status: **confirmed feasibl
   Kind: feature.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0045] **Test whether Vita `.pkg` files use SHA1 suffix verification (like PS3) or whole-file hashing (like PS4).**
+- ✅ [RPSN-0045] **Test whether Vita `.pkg` files use SHA1 suffix verification (like PS3) or whole-file hashing (like PS4).**
   Checked against the code 2026-10-12: Not done — Vita uses the
   PS3-style suffix hash (hash_whole_file=false); nothing shows it was
   tested.
   Former TODO.md task 6.5.
+  Answered 2026-10-15: PS3-style suffix, so hash_whole_file=false is
+  right for Vita. The cli build downloaded PCSA00007 01.01 (13977360
+  bytes) and logged "Hash for PCSA00007 01.01 matched". Checked by hand:
+  the file starts 7f504b47 (the PS3 PKG magic), SHA1 of all but the
+  last 0x20 bytes is 25e00e3c...40ee136d, which is exactly the first 20
+  of those 0x20 bytes; SHA1 of the whole file differs (2da63c02...).
+  The comment on hash_file in src/utils.rs now says so. No new test:
+  it would need a 14 MB download from Sony on every run.
   **Layman:** Confirm Vita downloads are checked for damage the right way.
   Kind: feature.
   Source: todo-md-import-2026-10-12.
