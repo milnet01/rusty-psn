@@ -815,12 +815,19 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0072] **Localization.**
+- 🚫 [RPSN-0072] **Localization.**
   The GUI embeds Japanese fonts already; add basic i18n framework for
   UI strings
   Checked against the code 2026-10-12: Not done — no translation
   framework.
   Former TODO.md task 9.7.
+  Owner decision (2026-10-15): parked. Nobody is translating the app,
+  and a framework with English alone would add a step to every new
+  on-screen word for no visible gain. Build it when someone offers a
+  translation.
+  Owner (2026-10-15, later the same day): dropped, not parked. This is
+  the owner's personal copy of someone else's app and is not offered to
+  anyone, so a translation would have no audience.
   **Layman:** Prepare the app for translation into other languages.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
