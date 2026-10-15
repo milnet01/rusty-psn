@@ -15,9 +15,10 @@ pub enum DirectoryFormat {
     /// `{serial}/` — e.g., `BLUS31147/`
     SerialOnly,
     /// `{serial} - {title}/` — e.g., `BLUS31147 - Batman Arkham Origins/`
-    #[default]
     SerialTitle,
-    /// `{title}/{serial}/` — e.g., `Batman - Arkham Origins/BLUS31147/`
+    /// `{title}/{serial}/` — e.g., `Batman - Arkham Origins/BLUS31147/`. The default, as
+    /// discovery S4 and CLAUDE.md rule 6 prefer (RPSN-0084).
+    #[default]
     TitleSerial,
 }
 

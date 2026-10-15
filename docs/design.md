@@ -64,7 +64,7 @@ sets for a second reason to change.
 | S1 — every listed update downloads in full and matches Sony's checksum | PSN, with Files for hashing |
 | S2 — a dropped connection resumes and still ends verified | PSN |
 | S3 — a multi-part PS4 update ends up as one package | PSN |
-| S4 — downloads land only in the chosen folder, Title / ID / files by default | Files, with Security for containment. Both apps still default to ID - Title; a roadmap item makes Title / ID the default, the layout `CLAUDE.md` rule 6 prefers |
+| S4 — downloads land only in the chosen folder, Title / ID / files by default | Files, with Security for containment. Both apps default to Title / ID, the layout `CLAUDE.md` rule 6 prefers |
 | S5 — PS3, PS4 and PSVita IDs each return their updates | PSN |
 | S6 — a downloaded update installs into RPCS3 and shows the new version | RPCS3 |
 | S7 — a library scan marks every game correctly | RPCS3, with PSN for the latest version, joined in the window app |

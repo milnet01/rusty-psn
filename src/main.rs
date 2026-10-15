@@ -64,7 +64,7 @@ struct Args {
     #[cfg(feature = "cli")]
     #[clap(
         long,
-        default_value = "serial-title",
+        default_value = "title-serial",
         value_parser = ["serial-only", "serial-title", "title-serial"],
         help = "Directory format: serial-only, serial-title, or title-serial"
     )]
@@ -288,6 +288,17 @@ mod tests {
 
     fn parses(args: &[&str]) -> bool {
         Args::try_parse_from(std::iter::once("rusty-psn").chain(args.iter().copied())).is_ok()
+    }
+
+    #[test]
+    fn the_default_directory_format_is_title_then_serial() {
+        // Discovery S4: Title / ID / files unless the user picks another layout (RPSN-0084).
+        let args = Args::try_parse_from(["rusty-psn", "-t", "NPUB30826"]).expect("a serial alone parses");
+        assert_eq!(args.directory_format, "title-serial");
+        assert_eq!(
+            crate::utils::DirectoryFormat::default(),
+            crate::utils::DirectoryFormat::TitleSerial
+        );
     }
 
     #[test]
