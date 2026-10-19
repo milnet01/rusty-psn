@@ -2,11 +2,19 @@
 
 use super::*;
 
+/// The README's Disclaimer section says the same (RPSN-0166).
+const DISCLAIMER: &str = "We do not condone piracy. rusty-psn only downloads official game updates and system software \
+                          from Sony's own servers; it includes no games. Updates are only useful with a game you own. \
+                          rusty-psn is not affiliated with or endorsed by Sony Interactive Entertainment. PlayStation \
+                          is a trademark of Sony Interactive Entertainment.";
+
 impl UpdatesApp {
     pub(super) fn draw_about_section(&mut self, ui: &mut egui::Ui) {
         ui.label(format!("rusty-psn version {}", env!("CARGO_PKG_VERSION")));
         ui.label("Download PlayStation game updates for use with emulators.");
         ui.hyperlink_to("GitHub Repository", "https://github.com/RainbowCookie32/rusty-psn");
+        ui.add_space(6.0);
+        ui.label(DISCLAIMER);
     }
 
     /// Report a finished migration, even when its dialog was closed while it ran.
@@ -94,5 +102,20 @@ impl UpdatesApp {
                 }
             });
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_readme_carries_the_about_disclaimer() {
+        let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+        let readme = words(include_str!("../../README.md"));
+        assert!(
+            readme.contains(&words(DISCLAIMER)),
+            "README.md's Disclaimer section differs from DISCLAIMER"
+        );
     }
 }

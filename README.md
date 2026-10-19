@@ -4,6 +4,14 @@ A simple tool to grab updates for PS3 & PS4 games, directly from Sony's servers
 using their updates API. Available for both Linux and Windows, in both GUI and
 CLI alternatives.
 
+## Disclaimer
+
+We do not condone piracy. rusty-psn only downloads official game updates and
+system software from Sony's own servers; it includes no games. Updates are only
+useful with a game you own. rusty-psn is not affiliated with or endorsed by Sony
+Interactive Entertainment. PlayStation is a trademark of Sony Interactive
+Entertainment.
+
 ## Usage
 
 Go to the

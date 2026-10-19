@@ -1034,6 +1034,9 @@ Lower priority items that would improve the overall experience.
   Owner (2026-10-15): the download waits for everything on the roadmap
   (PS5 updates and the end-to-end checks included). Order: all other
   work, then this release; RPSN-0163's translations come after it.
+  2026-10-19: after the first release, message ants-projects-hub-website
+  with its version and the disclaimer wording change (RPSN-0166: "game
+  updates and system software", name "rusty-psn").
   **Layman:** Publish your version of rusty-psn for others to download, clearly marked as an unofficial fork.
   Kind: release.
   Source: user-request-2026-10-15.
@@ -1070,7 +1073,7 @@ Lower priority items that would improve the overall experience.
   Kind: doc-fix.
   Source: in-session-2026-10-15.
 
-- 📋 [RPSN-0166] **Show a no-piracy and not-Sony disclaimer in the app and the README.**
+- ✅ [RPSN-0166] **Show a no-piracy and not-Sony disclaimer in the app and the README.**
   Suggested wording (house style for the website and trailers):
   "We do not condone piracy. Rusty PSN only downloads official game
   updates from Sony's own servers; it includes no games. Updates are
@@ -1082,6 +1085,13 @@ Lower priority items that would improve the overall experience.
   About part of Settings, per docs/design.md "Window layout". After
   release, message ants-projects-hub-website with the version and any
   changed wording.
+  2026-10-19: DISCLAIMER in src/egui/dialogs.rs, shown in Settings,
+  About rusty-psn; README.md has a Disclaimer section, and a test fails
+  if the two differ. Wording change from the website's: "game updates
+  and system software", since the app also downloads PS3, PS4 and Vita
+  firmware from Sony; the app's own name "rusty-psn". The message to
+  ants-projects-hub-website goes with the first fork release
+  (RPSN-0162).
   **Layman:** The app and its README say plainly that it fetches only Sony's official updates, holds no games, and is not made by Sony.
   Kind: doc.
   Source: user-request-2026-10-16 (via ants-projects-hub-website).
