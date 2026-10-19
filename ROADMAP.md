@@ -1057,6 +1057,17 @@ Lower priority items that would improve the overall experience.
   wider. The minimum exists so the status bar's fixed slots fit at 100%
   text size (RPSN-0157 step 7); a fix must keep that or let the slots
   wrap.
+  2026-10-19, part 1 shipped in 215c35f: start 1240x860, min 960x600,
+  status bar wraps (test
+  a_narrow_window_wraps_the_status_bar_instead_of_cutting_it_off). NOT
+  done: on the Windows test PC (1280x1024, work area 1280x984, fresh
+  profile) the window opens at 104,104 with outer size 1256x899, so its
+  right edge (1360) and bottom (1003) are still off screen. Next: open
+  it centred on a first start (eframe NativeOptions `centered: true`, or
+  a clamped with_position), keeping a saved position, and the KDE
+  placement in src/egui/placement.rs, working. Re-test with the
+  ui.ps1-style check: the window's BoundingRectangle must sit inside
+  Screen.WorkingArea.
   **Layman:** On a small screen the app's window is wider than the screen, so its right edge is cut off.
   Kind: ux.
   Source: in-session-2026-10-15.
