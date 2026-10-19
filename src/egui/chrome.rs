@@ -114,9 +114,10 @@ impl UpdatesApp {
 
     /// Every slot keeps its width whatever it shows, so a changing count or speed never moves the
     /// slots after it (RPSN-0157). Each width is the width of the longest text the slot expects.
+    /// A window too narrow for one row wraps the slots onto a second (RPSN-0164).
     pub(super) fn draw_status_bar(&mut self, ui: &mut egui::Ui) {
         egui::Panel::bottom("status_bar").show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 let active = self.v.download_queue.len();
                 let completed = self.v.completed_downloads.len();
                 let failed = self.v.failed_downloads.len();
@@ -171,14 +172,18 @@ impl UpdatesApp {
                 };
                 status_slot(ui, "Batch: 9999/9999 searched", &batch);
 
+                // The bar's space is kept while idle, so starting a download never wraps it onto a
+                // new row and moves the panels above.
                 if total_size > 0 {
                     let fraction = total_progress as f32 / total_size as f32;
                     ui.add(
                         egui::ProgressBar::new(fraction)
-                            .desired_width(150.0)
+                            .desired_width(PROGRESS_BAR_WIDTH)
                             .show_percentage()
                             .animate(true),
                     );
+                } else {
+                    ui.allocate_space(egui::vec2(PROGRESS_BAR_WIDTH, ui.spacing().interact_size.y));
                 }
             });
         });
@@ -199,6 +204,8 @@ impl UpdatesApp {
         totals
     }
 }
+
+const PROGRESS_BAR_WIDTH: f32 = 150.0;
 
 /// A status bar label as wide as `widest` would be, whatever `text` is.
 fn status_slot(ui: &mut egui::Ui, widest: &str, text: &str) {
@@ -232,6 +239,55 @@ mod tests {
         // Nothing draws these textures; epaint panics if they are dropped unapplied.
         output.textures_delta.clear();
         end
+    }
+
+    /// The right edge of everything the sidebar and status bar paint in a window `width` points
+    /// wide, and the status bar's height.
+    fn status_bar_extent(width: f32) -> (f32, f32) {
+        let ctx = egui::Context::default();
+        let mut app = crate::egui::UpdatesApp::default();
+        let input = || egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(width, 700.0))),
+            ..Default::default()
+        };
+        let mut height = 0.0;
+        // The first pass only measures; panels settle on the second.
+        let mut output = ctx.run_ui(input(), |ui| {
+            app.draw_sidebar(ui);
+            app.draw_status_bar(ui);
+        });
+        output.textures_delta.clear();
+        let mut output = ctx.run_ui(input(), |ui| {
+            app.draw_sidebar(ui);
+            let before = ui.available_rect_before_wrap().height();
+            app.draw_status_bar(ui);
+            height = before - ui.available_rect_before_wrap().height();
+        });
+        // Nothing draws these textures; epaint panics if they are dropped unapplied.
+        output.textures_delta.clear();
+        let right = output
+            .shapes
+            .iter()
+            .map(|clipped| clipped.shape.visual_bounding_rect().max.x)
+            .fold(0.0, f32::max);
+        (right, height)
+    }
+
+    #[test]
+    fn a_narrow_window_wraps_the_status_bar_instead_of_cutting_it_off() {
+        // The panel's top border line is drawn half a point past the window's edge.
+        const BORDER: f32 = 1.0;
+        let (wide_right, wide_height) = status_bar_extent(1600.0);
+        let (narrow_right, narrow_height) = status_bar_extent(960.0);
+        assert!(wide_right <= 1600.0 + BORDER);
+        assert!(
+            narrow_right <= 960.0 + BORDER,
+            "the status bar reaches {narrow_right} in a 960-wide window"
+        );
+        assert!(
+            narrow_height > wide_height,
+            "a 960-wide window should need a second status bar row"
+        );
     }
 
     #[test]
