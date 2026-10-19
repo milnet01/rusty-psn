@@ -486,7 +486,8 @@ add `--no-default-features --features cli` for the command-line build.
 
 | Behavior | macOS | Linux | Windows |
 |---|---|---|---|
-| Default download path | `~/Downloads/rusty-psn/pkgs/` | `pkgs/` (relative) | `pkgs/` (relative) |
+| Default download path (window app) | `~/Downloads/rusty-psn/pkgs/` | `~/Downloads/rusty-psn/pkgs/` | `%USERPROFILE%\Downloads\rusty-psn\pkgs\` |
+| Default download path (command line) | `pkgs/` (relative) | `pkgs/` (relative) | `pkgs/` (relative) |
 | Log file location | `~/Library/Application Support/rusty-psn/logs/` | `~/.local/share/rusty-psn/logs/` | `%LOCALAPPDATA%\rusty-psn\logs\` |
 | Console window (release) | Hidden (egui) | N/A | Hidden via `windows_subsystem = "windows"` |
 | App bundle | `.app` with `Info.plist` | Raw binary | Raw `.exe` |

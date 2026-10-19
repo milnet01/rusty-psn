@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=165 -->
+<!-- ants-roadmap-id-high-water: RPSN=166 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1058,14 +1058,33 @@ Lower priority items that would improve the overall experience.
   Kind: ux.
   Source: in-session-2026-10-15.
 
-- 📋 [RPSN-0165] **Correct STANDARDS.md § 12's default download path.**
+- ✅ [RPSN-0165] **Correct STANDARDS.md § 12's default download path.**
   § 12 says Linux and Windows default to `pkgs/` (relative).
   default_download_path in src/egui/mod.rs uses
   dirs::download_dir()/rusty-psn/pkgs on every platform (seen on
   Windows 2026-10-15: C:\Users\<user>\Downloads\rusty-psn\pkgs).
+  2026-10-19: § 12 now has one row for the window app
+  (Downloads/rusty-psn/pkgs on every system) and one for the command
+  line (pkgs/ relative, src/cli).
   **Layman:** One line in the coding notes names the wrong default download folder.
   Kind: doc-fix.
   Source: in-session-2026-10-15.
+
+- 📋 [RPSN-0166] **Show a no-piracy and not-Sony disclaimer in the app and the README.**
+  Suggested wording (house style for the website and trailers):
+  "We do not condone piracy. Rusty PSN only downloads official game
+  updates from Sony's own servers; it includes no games. Updates are
+  only useful with a game you own. Rusty PSN is not affiliated with or
+  endorsed by Sony Interactive Entertainment. PlayStation is a
+  trademark of Sony Interactive Entertainment."
+  Check each fact against the code first (does anything else get
+  downloaded?). Place it where it is seen without a new pop-up: the
+  About part of Settings, per docs/design.md "Window layout". After
+  release, message ants-projects-hub-website with the version and any
+  changed wording.
+  **Layman:** The app and its README say plainly that it fetches only Sony's official updates, holds no games, and is not made by Sony.
+  Kind: doc.
+  Source: user-request-2026-10-16 (via ants-projects-hub-website).
 
 ## 10. Custom Application Icon [P2]
 
