@@ -2450,7 +2450,7 @@ reviewer proposed; check both against the code before fixing.
   missing behind `flatpak`"). Check before launch, for example with
   `flatpak info <app id>`. Build after RPSN-0168.
   **Layman:** If RPCS3 is set up as a Flatpak but is missing, the app should say so instead of reporting an install it could not check.
-  Kind: fix.
+  Kind: review-fix.
   Source: review-contract-rpsn0137-loop3-2026-10-22.
   Lanes: RPCS3.
 
