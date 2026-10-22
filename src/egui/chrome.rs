@@ -26,15 +26,15 @@ impl Page {
         Page::History,
     ];
 
-    pub(super) fn label(self) -> &'static str {
+    pub(super) fn label(self) -> String {
         match self {
-            Page::Search => "Search",
-            Page::Downloads => "Downloads",
-            Page::Rpcs3Library => "RPCS3 library",
-            Page::PatchesAndDlc => "Patches and DLC",
-            Page::Firmware => "Firmware",
-            Page::History => "History",
-            Page::Settings => "Settings",
+            Page::Search => tr!("chrome-page-search"),
+            Page::Downloads => tr!("chrome-page-downloads"),
+            Page::Rpcs3Library => tr!("chrome-page-rpcs3-library"),
+            Page::PatchesAndDlc => tr!("chrome-page-patches-and-dlc"),
+            Page::Firmware => tr!("chrome-page-firmware"),
+            Page::History => tr!("chrome-page-history"),
+            Page::Settings => tr!("chrome-page-settings"),
         }
     }
 }
@@ -124,17 +124,26 @@ impl UpdatesApp {
                 let pending = self.v.pending_downloads.len();
                 let paused = self.v.paused_downloads.len();
                 let counts = if active > 0 || completed > 0 || failed > 0 || pending > 0 || paused > 0 {
-                    format!(
-                        "Downloads: {active} active, {completed} completed, {failed} failed, {pending} queued, {paused} paused"
+                    tr!(
+                        "chrome-status-downloads",
+                        active = active.to_string(),
+                        completed = completed.to_string(),
+                        failed = failed.to_string(),
+                        pending = pending.to_string(),
+                        paused = paused.to_string()
                     )
                 } else {
-                    "Ready".to_string()
+                    tr!("chrome-status-ready")
                 };
-                status_slot(
-                    ui,
-                    "Downloads: 99 active, 999 completed, 999 failed, 999 queued, 999 paused",
-                    &counts,
+                let widest_counts = tr!(
+                    "chrome-status-downloads",
+                    active = "99",
+                    completed = "999",
+                    failed = "999",
+                    pending = "999",
+                    paused = "999"
                 );
+                status_slot(ui, &widest_counts, &counts);
 
                 let (total_progress, total_size, total_speed) = self.download_totals();
 
@@ -143,11 +152,12 @@ impl UpdatesApp {
                     let (speed, eta) = if total_speed > 0.0 {
                         let remaining = total_size.saturating_sub(total_progress) as f64;
                         let eta_secs = (remaining / total_speed) as u64;
-                        let eta = if eta_secs < 3600 {
-                            format!("ETA: {}:{:02}", eta_secs / 60, eta_secs % 60)
+                        let time = if eta_secs < 3600 {
+                            format!("{}:{:02}", eta_secs / 60, eta_secs % 60)
                         } else {
-                            format!("ETA: {}:{:02}:{:02}", eta_secs / 3600, (eta_secs % 3600) / 60, eta_secs % 60)
+                            format!("{}:{:02}:{:02}", eta_secs / 3600, (eta_secs % 3600) / 60, eta_secs % 60)
                         };
+                        let eta = tr!("chrome-status-eta", time = time);
                         (format!("{}/s", ByteSize::b(total_speed as u64)), eta)
                     } else {
                         (String::new(), String::new())
@@ -159,18 +169,22 @@ impl UpdatesApp {
                 ui.separator();
                 status_slot(ui, "999.9 GiB / 999.9 GiB", &sizes);
                 status_slot(ui, "999.9 MiB/s", &speed);
-                status_slot(ui, "ETA: 999:59:59", &eta);
+                status_slot(ui, &tr!("chrome-status-eta", time = "999:59:59"), &eta);
                 ui.separator();
                 // Batch search progress.
                 let batch_total = self.v.batch_search_total;
                 let batch_done = self.v.batch_search_completed;
                 let batch_active = self.v.batch_search_active.len();
                 let batch = if batch_total > 0 && (batch_done < batch_total || batch_active > 0) {
-                    format!("Batch: {batch_done}/{batch_total} searched")
+                    tr!(
+                        "chrome-status-batch",
+                        done = batch_done.to_string(),
+                        total = batch_total.to_string()
+                    )
                 } else {
                     String::new()
                 };
-                status_slot(ui, "Batch: 9999/9999 searched", &batch);
+                status_slot(ui, &tr!("chrome-status-batch", done = "9999", total = "9999"), &batch);
 
                 // The bar's space is kept while idle, so starting a download never wraps it onto a
                 // new row and moves the panels above.

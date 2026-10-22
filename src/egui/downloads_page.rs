@@ -57,23 +57,23 @@ impl UpdatesApp {
     pub(super) fn draw_downloads_page(&mut self, ui: &mut egui::Ui) {
         let [attention, in_progress, finished] = self.download_sections();
         if attention.is_empty() && in_progress.is_empty() && finished.is_empty() {
-            ui.label("Nothing downloaded yet this session. Search for a game and press Download on a package.");
+            ui.label(tr!("downloads-page-empty"));
             return;
         }
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-            for (name, rows) in [
-                ("Needs attention", attention),
-                ("In progress", in_progress),
-                ("Finished", finished),
+            for (salt, name, rows) in [
+                ("Needs attention", tr!("downloads-page-attention"), attention),
+                ("In progress", tr!("downloads-page-in-progress"), in_progress),
+                ("Finished", tr!("downloads-page-finished"), finished),
             ] {
-                egui::CollapsingHeader::new(format!("{name} ({})", rows.len()))
-                    .id_salt(name)
+                egui::CollapsingHeader::new(tr!("downloads-page-section", name = name, count = rows.len().to_string()))
+                    .id_salt(salt)
                     .default_open(true)
                     .show(ui, |ui| {
                         if rows.is_empty() {
-                            ui.weak("None.");
-                        } else if name == "Needs attention" && ui.button("Retry all failed").clicked() {
+                            ui.weak(tr!("downloads-page-none"));
+                        } else if salt == "Needs attention" && ui.button(tr!("downloads-page-retry-all")).clicked() {
                             self.retry_all_failed();
                         }
                         for (title_id, title, pkg) in rows {

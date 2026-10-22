@@ -2,19 +2,14 @@
 
 use super::*;
 
-/// The README's Disclaimer section says the same (RPSN-0166).
-const DISCLAIMER: &str = "We do not condone piracy. rusty-psn only downloads official game updates and system software \
-                          from Sony's own servers; it includes no games. Updates are only useful with a game you own. \
-                          rusty-psn is not affiliated with or endorsed by Sony Interactive Entertainment. PlayStation \
-                          is a trademark of Sony Interactive Entertainment.";
-
 impl UpdatesApp {
     pub(super) fn draw_about_section(&mut self, ui: &mut egui::Ui) {
-        ui.label(format!("rusty-psn version {}", env!("CARGO_PKG_VERSION")));
-        ui.label("Download PlayStation game updates for use with emulators.");
-        ui.hyperlink_to("GitHub Repository", "https://github.com/RainbowCookie32/rusty-psn");
+        ui.label(tr!("dialogs-version", version = env!("CARGO_PKG_VERSION")));
+        ui.label(tr!("dialogs-tagline"));
+        ui.hyperlink_to(tr!("dialogs-github"), "https://github.com/RainbowCookie32/rusty-psn");
         ui.add_space(6.0);
-        ui.label(DISCLAIMER);
+        // The README's Disclaimer section says the same (RPSN-0166).
+        ui.label(tr!("dialogs-disclaimer"));
     }
 
     /// Report a finished migration, even when its dialog was closed while it ran.
@@ -22,12 +17,14 @@ impl UpdatesApp {
         if let Some(promise) = &self.v.migration_promise {
             if let Some(&(migrated, skipped)) = promise.ready() {
                 if skipped > 0 {
-                    let msg = format!(
-                        "Migration: {migrated} folder(s) migrated, {skipped} skipped. The log file says why each was skipped."
+                    let msg = tr!(
+                        "dialogs-migration-done-skipped",
+                        migrated = migrated.to_string(),
+                        skipped = skipped.to_string()
                     );
                     self.show_notifications(&msg, MessageLevel::Warning);
                 } else {
-                    let msg = format!("Migration complete: {migrated} folder(s) migrated.");
+                    let msg = tr!("dialogs-migration-done", migrated = migrated.to_string());
                     self.show_notifications(&msg, MessageLevel::Success);
                 }
                 self.v.migration_promise = None;
@@ -40,7 +37,7 @@ impl UpdatesApp {
     /// are listed first, and nothing moves until the user presses Migrate.
     pub(super) fn draw_migration_section(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
-            if self.v.migration_promise.is_none() && ui.button("Look for folders to migrate").clicked() {
+            if self.v.migration_promise.is_none() && ui.button(tr!("dialogs-migration-look")).clicked() {
                 self.v.migration_preview =
                     crate::utils::detect_migratable_directories(&self.settings.pkg_download_path, self.settings.directory_format);
                 self.v.migration_scan_root = self.settings.pkg_download_path.clone();
@@ -48,7 +45,7 @@ impl UpdatesApp {
             }
 
             if self.v.migration_promise.is_some() {
-                ui.label("Migration in progress...");
+                ui.label(tr!("dialogs-migration-running"));
                 ui.spinner();
                 return;
             }
@@ -58,15 +55,18 @@ impl UpdatesApp {
             }
 
             if self.v.migration_preview.is_empty() {
-                ui.label("No folders found that need migration.");
-                ui.label(format!("Current format: {}", self.settings.directory_format));
+                ui.label(tr!("dialogs-migration-none"));
+                ui.label(tr!(
+                    "dialogs-migration-current-format",
+                    format = self.settings.directory_format.to_string()
+                ));
                 return;
             }
 
-            ui.label(format!(
-                "Found {} folder(s) to migrate to \"{}\" format:",
-                self.v.migration_preview.len(),
-                self.settings.directory_format
+            ui.label(tr!(
+                "dialogs-migration-found",
+                count = self.v.migration_preview.len().to_string(),
+                format = self.settings.directory_format.to_string()
             ));
             ui.add_space(5.0);
 
@@ -81,7 +81,7 @@ impl UpdatesApp {
             ui.add_space(5.0);
             ui.separator();
             ui.horizontal(|ui| {
-                if ui.button("Migrate").clicked() {
+                if ui.button(tr!("dialogs-migrate")).clicked() {
                     let migrations = self.v.migration_preview.clone();
                     let download_path = self.v.migration_scan_root.clone();
                     let ctx = ui.ctx().clone();
@@ -97,7 +97,7 @@ impl UpdatesApp {
                         outcome
                     }));
                 }
-                if ui.button("Cancel").clicked() {
+                if ui.button(tr!("common-cancel")).clicked() {
                     self.v.migration_listed = false;
                 }
             });
@@ -107,15 +107,13 @@ impl UpdatesApp {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn the_readme_carries_the_about_disclaimer() {
         let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
         let readme = words(include_str!("../../README.md"));
         assert!(
-            readme.contains(&words(DISCLAIMER)),
-            "README.md's Disclaimer section differs from DISCLAIMER"
+            readme.contains(&words(&tr!("dialogs-disclaimer"))),
+            "README.md's Disclaimer section differs from dialogs-disclaimer in i18n/en/rusty-psn.ftl"
         );
     }
 }

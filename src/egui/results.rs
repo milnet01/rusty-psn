@@ -50,20 +50,25 @@ impl UpdatesApp {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
 
-                ui.label(egui::RichText::new("Filter:").strong());
+                ui.label(egui::RichText::new(tr!("common-filter")).strong());
                 let filter_resp = ui.add(
                     egui::TextEdit::singleline(&mut self.v.results_filter)
                         .desired_width(200.0)
-                        .hint_text("Serial or title…"),
+                        .hint_text(tr!("results-filter-hint")),
                 );
-                filter_resp.on_hover_text("Show only results whose serial or title contains this text");
-                if !self.v.results_filter.is_empty() && ui.small_button("\u{2715}").on_hover_text("Clear filter").clicked() {
+                filter_resp.on_hover_text(tr!("results-filter-tooltip"));
+                if !self.v.results_filter.is_empty()
+                    && ui
+                        .small_button("\u{2715}")
+                        .on_hover_text(tr!("results-clear-filter"))
+                        .clicked()
+                {
                     self.v.results_filter.clear();
                 }
 
                 ui.separator();
 
-                ui.label(egui::RichText::new("Sort by:").strong());
+                ui.label(egui::RichText::new(tr!("results-sort-by")).strong());
                 egui::ComboBox::from_id_salt("results_sort")
                     .selected_text(self.v.results_sort_by.label())
                     .width(140.0)
@@ -80,8 +85,8 @@ impl UpdatesApp {
                     });
 
                 let (arrow, hover) = match self.v.results_sort_direction {
-                    SortDirection::Ascending => ("\u{2191}", "Ascending — click to flip to descending"),
-                    SortDirection::Descending => ("\u{2193}", "Descending — click to flip to ascending"),
+                    SortDirection::Ascending => ("\u{2191}", tr!("results-ascending-hint")),
+                    SortDirection::Descending => ("\u{2193}", tr!("results-descending-hint")),
                 };
                 if ui
                     .add(egui::Button::new(egui::RichText::new(arrow).strong().size(15.0)))
@@ -98,10 +103,12 @@ impl UpdatesApp {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let total = self.v.update_results.len();
                     let visible = indices.len();
-                    let text = if visible == total {
-                        format!("{total} result{}", if total == 1 { "" } else { "s" })
+                    let text = if visible != total {
+                        tr!("results-showing", visible = visible.to_string(), total = total.to_string())
+                    } else if total == 1 {
+                        tr!("results-count-one", total = total.to_string())
                     } else {
-                        format!("Showing {visible} of {total}")
+                        tr!("results-count-other", total = total.to_string())
                     };
                     ui.label(egui::RichText::new(text).weak());
                 });
@@ -115,7 +122,7 @@ impl UpdatesApp {
             if indices.is_empty() && !self.v.update_results.is_empty() {
                 ui.add_space(20.0);
                 ui.vertical_centered(|ui| {
-                    ui.label(egui::RichText::new("No results match the current filter.").weak());
+                    ui.label(egui::RichText::new(tr!("results-no-match")).weak());
                 });
                 return;
             }
@@ -176,9 +183,12 @@ impl UpdatesApp {
                 }
                 ui.label(egui::RichText::new(title_id).monospace().weak());
                 ui.label(egui::RichText::new("\u{00B7}").weak());
-                ui.label(
-                    egui::RichText::new(format!("{update_count} update{}", if update_count == 1 { "" } else { "s" })).weak(),
-                );
+                let updates = if update_count == 1 {
+                    tr!("results-update-count-one", count = update_count.to_string())
+                } else {
+                    tr!("results-update-count-other", count = update_count.to_string())
+                };
+                ui.label(egui::RichText::new(updates).weak());
                 ui.label(egui::RichText::new("\u{00B7}").weak());
                 ui.label(egui::RichText::new(format!("{}", ByteSize::b(total_updates_size))).weak());
 
@@ -194,9 +204,9 @@ impl UpdatesApp {
                             .all(|pkg| self.cached_download_info(title_id, pkg).status == ActiveDownloadStatus::Completed);
                         let is_mergeable = is_multipart && all_pkgs_completed;
                         let hover_text = if is_multipart {
-                            "All parts need to be completed for merge to be available"
+                            tr!("results-merge-needs-all")
                         } else {
-                            "This PS4 update is not a multipart update"
+                            tr!("results-merge-not-multipart")
                         };
 
                         let merge_status = self.title_merge_status(update);
@@ -204,19 +214,19 @@ impl UpdatesApp {
                             ActiveMergeStatus::Merging(progress) => {
                                 let width = ui.available_width().min(150.0);
                                 ui.add(egui::ProgressBar::new(progress).desired_width(width).show_percentage());
-                                status_pill(ui, "Merging parts…", StatusKind::Working);
+                                status_pill(ui, &tr!("results-merging-parts"), StatusKind::Working);
                             }
                             ActiveMergeStatus::Merged => {
-                                status_pill(ui, "Parts merged", StatusKind::Done);
+                                status_pill(ui, &tr!("results-parts-merged"), StatusKind::Done);
                             }
                             ActiveMergeStatus::Failed => {
-                                status_pill(ui, "Parts merge failed", StatusKind::Failed);
+                                status_pill(ui, &tr!("results-parts-merge-failed"), StatusKind::Failed);
                             }
                             _ => {}
                         }
 
                         let merge_btn = ui
-                            .add_enabled(is_mergeable, egui::Button::new("Merge parts"))
+                            .add_enabled(is_mergeable, egui::Button::new(tr!("results-merge-parts")))
                             .on_disabled_hover_text(hover_text);
                         if merge_btn.clicked() {
                             self.v.merge_queue.push(self.start_merge_parts(update.clone(), ui));
@@ -226,8 +236,8 @@ impl UpdatesApp {
                     // Primary action: download just the latest package.
                     if let Some(latest_pkg) = update.packages.last() {
                         let resp = ui
-                            .button("Download latest")
-                            .on_hover_text("Queue only the most recent update");
+                            .button(tr!("results-download-latest"))
+                            .on_hover_text(tr!("results-download-latest-hint"));
                         if resp.clicked() && self.get_active_download(title_id, latest_pkg).is_none() {
                             info!("Downloading latest update {} for serial {title_id}", latest_pkg.id());
                             self.queue_download(title_id.to_string(), title.clone(), latest_pkg.clone(), ui);
@@ -235,7 +245,9 @@ impl UpdatesApp {
                     }
 
                     // Secondary action: download every update.
-                    let resp = ui.button("Download all").on_hover_text("Queue every update for this title");
+                    let resp = ui
+                        .button(tr!("results-download-all"))
+                        .on_hover_text(tr!("results-download-all-hint"));
                     if resp.clicked() {
                         info!("Downloading all updates for serial {title_id} ({update_count})");
                         for pkg in update.packages.iter() {
@@ -250,25 +262,47 @@ impl UpdatesApp {
 
                     // Aggregate status pill (rendered to the left of the action buttons).
                     if completed_count == update_count {
-                        status_pill(ui, "All downloaded", StatusKind::Done);
+                        status_pill(ui, &tr!("results-all-downloaded"), StatusKind::Done);
                     } else if failed_count > 0 {
                         let text = if completed_count > 0 {
-                            format!("{completed_count}/{update_count} done · {failed_count} failed")
+                            tr!(
+                                "results-done-failed",
+                                completed = completed_count.to_string(),
+                                total = update_count.to_string(),
+                                failed = failed_count.to_string()
+                            )
                         } else {
-                            format!("{failed_count} failed")
+                            tr!("results-failed-count", failed = failed_count.to_string())
                         };
                         status_pill(ui, &text, StatusKind::Failed);
                     } else if in_progress_count > 0 {
                         let text = if completed_count > 0 {
-                            format!("{completed_count}/{update_count} done · {in_progress_count} active")
+                            tr!(
+                                "results-done-active",
+                                completed = completed_count.to_string(),
+                                total = update_count.to_string(),
+                                active = in_progress_count.to_string()
+                            )
                         } else {
-                            format!("{in_progress_count} downloading")
+                            tr!("results-downloading-count", count = in_progress_count.to_string())
                         };
                         status_pill(ui, &text, StatusKind::Active);
                     } else if paused_count > 0 {
-                        status_pill(ui, &format!("{paused_count} paused"), StatusKind::Paused);
+                        status_pill(
+                            ui,
+                            &tr!("results-paused-count", count = paused_count.to_string()),
+                            StatusKind::Paused,
+                        );
                     } else if completed_count > 0 {
-                        status_pill(ui, &format!("{completed_count}/{update_count} done"), StatusKind::Done);
+                        status_pill(
+                            ui,
+                            &tr!(
+                                "results-done-count",
+                                completed = completed_count.to_string(),
+                                total = update_count.to_string()
+                            ),
+                            StatusKind::Done,
+                        );
                     }
                 });
             })
@@ -308,10 +342,14 @@ impl UpdatesApp {
 
             // Row 1: identity (version + Latest badge) on the left; status + actions on the right.
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(format!("v{}", pkg.id())).strong().size(14.0));
+                ui.label(
+                    egui::RichText::new(tr!("results-version", version = pkg.id()))
+                        .strong()
+                        .size(14.0),
+                );
                 if is_latest {
                     ui.label(
-                        egui::RichText::new("\u{2605} Latest")
+                        egui::RichText::new(tr!("results-latest"))
                             .color(latest_badge_color(ui.visuals()))
                             .strong()
                             .small(),
@@ -319,41 +357,47 @@ impl UpdatesApp {
                 }
                 ui.label(egui::RichText::new(format!("{}", ByteSize::b(pkg.size))).weak());
                 if pkg.offset > 0 {
-                    ui.label(egui::RichText::new(format!("\u{00B7} offset {}", pkg.offset)).weak().small());
+                    ui.label(
+                        egui::RichText::new(tr!("results-offset", offset = pkg.offset.to_string()))
+                            .weak()
+                            .small(),
+                    );
                 }
                 if let Some(system) = &pkg.min_system_version {
-                    ui.label(egui::RichText::new(format!("\u{00B7} needs system {system}")).weak());
+                    ui.label(egui::RichText::new(tr!("results-needs-system", version = system.as_str())).weak());
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     match download_status {
                         ActiveDownloadStatus::NotStarted => {
-                            if ui.button("Download").clicked() {
+                            if ui.button(tr!("common-download")).clicked() {
                                 download_clicked = true;
                             }
                         }
                         ActiveDownloadStatus::Pending => {
-                            if ui.button("Cancel").clicked() {
+                            if ui.button(tr!("common-cancel")).clicked() {
                                 self.v
                                     .pending_downloads
                                     .retain(|p| !(p.title_id == title_id && p.pkg.id() == pkg.id()));
                             }
-                            status_pill(ui, "Queued", StatusKind::Queued);
+                            status_pill(ui, &tr!("results-queued"), StatusKind::Queued);
                         }
                         ActiveDownloadStatus::Downloading(_) | ActiveDownloadStatus::Resuming(_, _) => {
-                            abort_clicked = ui.button("Abort").clicked();
-                            pause_clicked = ui.button("Pause").clicked();
+                            abort_clicked = ui.button(tr!("results-abort")).clicked();
+                            pause_clicked = ui.button(tr!("results-pause")).clicked();
                             let label = match download_status {
-                                ActiveDownloadStatus::Resuming(_, offset) => format!("Resuming from {}", ByteSize::b(offset)),
-                                _ => "Downloading".to_string(),
+                                ActiveDownloadStatus::Resuming(_, offset) => {
+                                    tr!("results-resuming", offset = ByteSize::b(offset).to_string())
+                                }
+                                _ => tr!("results-downloading"),
                             };
                             status_pill(ui, &label, StatusKind::Active);
                         }
                         ActiveDownloadStatus::Verifying => {
-                            status_pill(ui, "Verifying", StatusKind::Working);
+                            status_pill(ui, &tr!("results-verifying"), StatusKind::Working);
                         }
                         ActiveDownloadStatus::Paused => {
-                            if ui.button("Abort").clicked() {
+                            if ui.button(tr!("results-abort")).clicked() {
                                 let file_path = self
                                     .v
                                     .paused_downloads
@@ -375,13 +419,13 @@ impl UpdatesApp {
                                     }
                                 }
                             }
-                            if ui.button("Resume").clicked() {
+                            if ui.button(tr!("results-resume")).clicked() {
                                 self.v
                                     .paused_downloads
                                     .retain(|p| !(p.title_id == title_id && p.pkg_id == pkg.id()));
                                 self.queue_download(title_id.to_string(), title.clone(), pkg.clone(), ui);
                             }
-                            status_pill(ui, "Paused", StatusKind::Paused);
+                            status_pill(ui, &tr!("results-paused"), StatusKind::Paused);
                         }
                         ActiveDownloadStatus::Completed => {
                             let install_key = (title_id.to_string(), pkg.id());
@@ -394,7 +438,7 @@ impl UpdatesApp {
 
                             if !is_installing && !is_installed && rpcs3_can_install(title_id) {
                                 if let Some(rpcs3_exe) = &self.settings.rpcs3_executable {
-                                    if ui.button("Install to RPCS3").clicked() {
+                                    if ui.button(tr!("common-install-to-rpcs3")).clicked() {
                                         // Install exactly the file this download wrote.
                                         let pkg_file = self
                                             .v
@@ -429,7 +473,7 @@ impl UpdatesApp {
                                 }
                             }
 
-                            if ui.button("Open folder").clicked() {
+                            if ui.button(tr!("results-open-folder")).clicked() {
                                 let folder = crate::utils::create_pkg_path(
                                     &self.settings.pkg_download_path,
                                     title_id,
@@ -440,11 +484,11 @@ impl UpdatesApp {
                             }
 
                             if is_installed {
-                                status_pill(ui, "Installed in RPCS3", StatusKind::Done);
+                                status_pill(ui, &tr!("results-installed-in-rpcs3"), StatusKind::Done);
                             } else if is_installing {
-                                status_pill(ui, "Installing…", StatusKind::Working);
+                                status_pill(ui, &tr!("common-installing"), StatusKind::Working);
                             } else {
-                                status_pill(ui, "Completed", StatusKind::Done);
+                                status_pill(ui, &tr!("results-completed"), StatusKind::Done);
                             }
                         }
                         ActiveDownloadStatus::Failed => {
@@ -453,23 +497,27 @@ impl UpdatesApp {
                                 .failed_downloads
                                 .iter()
                                 .any(|f| f.title_id == title_id && f.pkg_id == pkg.id() && f.incomplete);
-                            if ui.button("Retry").clicked() {
+                            if ui.button(tr!("results-retry")).clicked() {
                                 self.v
                                     .failed_downloads
                                     .retain(|f| !(f.title_id == title_id && f.pkg_id == pkg.id()));
                                 self.queue_download(title_id.to_string(), title.clone(), pkg.clone(), ui);
                             }
-                            let text = if incomplete { "Failed: file incomplete" } else { "Failed" };
-                            status_pill(ui, text, StatusKind::Failed);
+                            let text = if incomplete {
+                                tr!("results-failed-incomplete")
+                            } else {
+                                tr!("results-failed")
+                            };
+                            status_pill(ui, &text, StatusKind::Failed);
                         }
                     }
 
                     // Per-package merge status (only meaningful for PS4 multipart entries).
                     match self.pkg_merge_status(title_id, pkg) {
                         ActiveMergeStatus::NotMergeable | ActiveMergeStatus::NotStarted => {}
-                        ActiveMergeStatus::Failed => status_pill(ui, "Merge failed", StatusKind::Failed),
-                        ActiveMergeStatus::Merged => status_pill(ui, "Merged", StatusKind::Done),
-                        ActiveMergeStatus::Merging(_) => status_pill(ui, "Merging…", StatusKind::Working),
+                        ActiveMergeStatus::Failed => status_pill(ui, &tr!("results-merge-failed"), StatusKind::Failed),
+                        ActiveMergeStatus::Merged => status_pill(ui, &tr!("results-merged"), StatusKind::Done),
+                        ActiveMergeStatus::Merging(_) => status_pill(ui, &tr!("results-merging"), StatusKind::Working),
                     }
                 });
             });
@@ -489,20 +537,20 @@ impl UpdatesApp {
 
             // Optional details — hidden by default to keep SHA-1 / URL noise out of the way for
             // typical use, but one click away for power users.
-            egui::CollapsingHeader::new(egui::RichText::new("Details").weak())
+            egui::CollapsingHeader::new(egui::RichText::new(tr!("results-details")).weak())
                 .id_salt(format!("pkg_details_{title_id}_{}", pkg.id()))
                 .default_open(false)
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("SHA-1:").weak());
+                        ui.label(egui::RichText::new(tr!("results-sha1")).weak());
                         ui.label(egui::RichText::new(&pkg.sha1sum).monospace().small());
-                        if ui.small_button("Copy").clicked() {
+                        if ui.small_button(tr!("results-copy")).clicked() {
                             self.copy_to_clipboard(pkg.sha1sum.clone());
                         }
                     });
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("Source URL:").weak());
-                        if ui.small_button("Copy URL").clicked() {
+                        ui.label(egui::RichText::new(tr!("results-source-url")).weak());
+                        if ui.small_button(tr!("results-copy-url")).clicked() {
                             self.copy_to_clipboard(pkg.url.clone());
                         }
                     });
@@ -539,7 +587,11 @@ impl UpdatesApp {
             } else {
                 format!("{}:{:02}:{:02}", eta_secs / 3600, (eta_secs % 3600) / 60, eta_secs % 60)
             };
-            ui.label(format!("{}/s - ETA {eta_str}", ByteSize::b(cached.speed_bps as u64)));
+            ui.label(tr!(
+                "results-speed-eta",
+                speed = format!("{}/s", ByteSize::b(cached.speed_bps as u64)),
+                eta = eta_str
+            ));
         }
     }
 }

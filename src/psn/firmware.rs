@@ -135,11 +135,11 @@ pub enum FirmwareType {
 impl fmt::Display for FirmwareType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Full => write!(f, "Full Update"),
-            Self::Patch => write!(f, "Incremental Patch"),
-            Self::Recovery => write!(f, "Recovery Image"),
-            Self::SystemData => write!(f, "System Data"),
-            Self::PreInstall => write!(f, "Pre-install Data"),
+            Self::Full => f.write_str(&tr!("firmware-type-full")),
+            Self::Patch => f.write_str(&tr!("firmware-type-patch")),
+            Self::Recovery => f.write_str(&tr!("firmware-type-recovery")),
+            Self::SystemData => f.write_str(&tr!("firmware-type-system-data")),
+            Self::PreInstall => f.write_str(&tr!("firmware-type-pre-install")),
         }
     }
 }
@@ -276,11 +276,11 @@ pub enum FirmwareError {
 impl fmt::Display for FirmwareError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Reqwest(e) => write!(f, "Network error: {e}"),
-            Self::ParseFailed(msg) => write!(f, "Parse error: {msg}"),
-            Self::Security(e) => write!(f, "Security check failed: {e}"),
-            Self::NoFirmwareFound => write!(f, "No firmware found for this region"),
-            Self::ResponseTooLarge(size) => write!(f, "Response too large ({size} bytes)"),
+            Self::Reqwest(e) => f.write_str(&tr!("error-firmware-network", reason = e.to_string())),
+            Self::ParseFailed(msg) => f.write_str(&tr!("error-firmware-parse", reason = msg.as_str())),
+            Self::Security(e) => f.write_str(&tr!("error-firmware-security", reason = e.to_string())),
+            Self::NoFirmwareFound => f.write_str(&tr!("error-firmware-none")),
+            Self::ResponseTooLarge(size) => f.write_str(&tr!("error-firmware-too-large", size = size.to_string())),
         }
     }
 }
@@ -507,7 +507,7 @@ fn parse_xml_firmware(body: &str, console: FirmwareConsole, region: FirmwareRegi
                 }
             }
             Ok(Event::Eof) => break,
-            Err(e) => return Err(FirmwareError::ParseFailed(format!("XML error: {e}"))),
+            Err(e) => return Err(FirmwareError::ParseFailed(tr!("error-firmware-xml", reason = e.to_string()))),
             _ => {}
         }
         event_buf.clear();

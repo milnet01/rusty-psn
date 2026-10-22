@@ -25,7 +25,11 @@ impl UpdatesApp {
                             .insert((download.title_id.clone(), download.pkg_id.clone()), path.clone());
 
                         messages.push((
-                            format!("{} v{} downloaded successfully!", download.title_id, download.pkg_id),
+                            tr!(
+                                "downloads-done",
+                                serial = download.title_id.as_str(),
+                                version = download.pkg_id.as_str()
+                            ),
                             MessageLevel::Success,
                         ));
                         self.v.completed_downloads.push(FinishedDownload {
@@ -57,12 +61,12 @@ impl UpdatesApp {
                                         MAX_AUTO_RETRIES
                                     );
                                     messages.push((
-                                        format!(
-                                            "{} v{}: Transfer interrupted, retrying ({}/{})...",
-                                            download.title_id,
-                                            download.pkg_id,
-                                            download.retry_count + 1,
-                                            MAX_AUTO_RETRIES
+                                        tr!(
+                                            "downloads-retrying",
+                                            serial = download.title_id.as_str(),
+                                            version = download.pkg_id.as_str(),
+                                            attempt = (download.retry_count + 1).to_string(),
+                                            max = MAX_AUTO_RETRIES.to_string()
                                         ),
                                         MessageLevel::Warning,
                                     ));
@@ -83,9 +87,10 @@ impl UpdatesApp {
                                         incomplete: false,
                                     });
                                     messages.push((
-                                        format!(
-                                            "Failed to download {} v{}: Hash mismatch.",
-                                            download.title_id, download.pkg_id
+                                        tr!(
+                                            "downloads-hash-mismatch",
+                                            serial = download.title_id.as_str(),
+                                            version = download.pkg_id.as_str()
                                         ),
                                         MessageLevel::Error,
                                     ));
@@ -93,12 +98,7 @@ impl UpdatesApp {
                                         if let Some(failed) = self.v.failed_downloads.last_mut() {
                                             failed.incomplete = true;
                                         }
-                                        messages.push((
-                                            "The file arrived smaller than expected, so Sony's servers were probably \
-                                             unreliable. Retry the download now, or wait a few hours and retry."
-                                                .to_string(),
-                                            MessageLevel::Warning,
-                                        ));
+                                        messages.push((tr!("downloads-short-hint"), MessageLevel::Warning));
                                     }
                                 }
                             }
@@ -111,7 +111,12 @@ impl UpdatesApp {
                                     incomplete: false,
                                 });
                                 messages.push((
-                                    format!("Failed to download {} v{}: {err}", download.title_id, download.pkg_id),
+                                    tr!(
+                                        "downloads-failed",
+                                        serial = download.title_id.as_str(),
+                                        version = download.pkg_id.as_str(),
+                                        reason = err.to_string()
+                                    ),
                                     MessageLevel::Error,
                                 ));
                             }
@@ -124,7 +129,12 @@ impl UpdatesApp {
                                     incomplete: false,
                                 });
                                 messages.push((
-                                    format!("Failed to download {} v{}: {err}", download.title_id, download.pkg_id),
+                                    tr!(
+                                        "downloads-failed",
+                                        serial = download.title_id.as_str(),
+                                        version = download.pkg_id.as_str(),
+                                        reason = err.to_string()
+                                    ),
                                     MessageLevel::Error,
                                 ));
                             }
@@ -137,7 +147,12 @@ impl UpdatesApp {
                                     incomplete: false,
                                 });
                                 messages.push((
-                                    format!("Security check failed for {} v{}: {err}", download.title_id, download.pkg_id),
+                                    tr!(
+                                        "downloads-security-failed",
+                                        serial = download.title_id.as_str(),
+                                        version = download.pkg_id.as_str(),
+                                        reason = err.to_string()
+                                    ),
                                     MessageLevel::Error,
                                 ));
                             }
@@ -151,9 +166,12 @@ impl UpdatesApp {
                                     incomplete: false,
                                 });
                                 messages.push((
-                                    format!(
-                                        "Failed to download {} v{}: ended at {received} of {expected} bytes",
-                                        download.title_id, download.pkg_id
+                                    tr!(
+                                        "downloads-incomplete",
+                                        serial = download.title_id.as_str(),
+                                        version = download.pkg_id.as_str(),
+                                        received = received.to_string(),
+                                        expected = expected.to_string()
                                     ),
                                     MessageLevel::Error,
                                 ));
@@ -165,7 +183,11 @@ impl UpdatesApp {
                                         abort_file_cleanup.push(path.clone());
                                     }
                                     messages.push((
-                                        format!("{} v{} aborted", download.title_id, download.pkg_id),
+                                        tr!(
+                                            "downloads-aborted",
+                                            serial = download.title_id.as_str(),
+                                            version = download.pkg_id.as_str()
+                                        ),
                                         MessageLevel::Warning,
                                     ));
                                 } else {
@@ -178,7 +200,11 @@ impl UpdatesApp {
                                         file_path: file_path.clone(),
                                     });
                                     messages.push((
-                                        format!("{} v{} paused", download.title_id, download.pkg_id),
+                                        tr!(
+                                            "downloads-paused",
+                                            serial = download.title_id.as_str(),
+                                            version = download.pkg_id.as_str()
+                                        ),
                                         MessageLevel::Info,
                                     ));
                                 }
@@ -243,13 +269,23 @@ impl UpdatesApp {
                     Ok(_) => {
                         info!("Merge completed for {}", merge.title_id);
 
-                        messages.push((format!("{} merged successfully!", merge.title_id), MessageLevel::Success));
+                        messages.push((
+                            tr!("downloads-merged", serial = merge.title_id.as_str()),
+                            MessageLevel::Success,
+                        ));
                         self.v.completed_merges.push(merge.title_id.clone());
                     }
                     Err(e) => {
                         self.v.failed_merges.push(merge.title_id.clone());
 
-                        messages.push((format!("Failed to merge {}: {e}", merge.title_id), MessageLevel::Error));
+                        messages.push((
+                            tr!(
+                                "downloads-merge-failed",
+                                serial = merge.title_id.as_str(),
+                                reason = e.to_string()
+                            ),
+                            MessageLevel::Error,
+                        ));
 
                         error!("Could not merge files for {}, reason: {:?}", merge.title_id, e);
                     }

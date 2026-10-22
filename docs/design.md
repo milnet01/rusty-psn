@@ -27,6 +27,7 @@ from 2026-10-12 on. The signs it places are in `docs/discovery.md`.
 | Files | Download paths and folder layouts, creating package files, hashing, migrating old layouts | `src/utils.rs` |
 | Promise | Lets a front end's frame or loop poll a background task's result without waiting | `src/promise.rs` |
 | Sandbox | Inside the Flatpak (RPSN-0074): running host programs through `flatpak-spawn --host` and reading the host's XDG folders | `src/sandbox.rs` |
+| Text | The English on-screen text and the `tr!` macro (RPSN-0072) | `src/i18n.rs`, `i18n/en/rusty-psn.ftl` |
 
 ## What may depend on what
 
@@ -41,10 +42,12 @@ from 2026-10-12 on. The signs it places are in `docs/discovery.md`.
   directly**: RPCS3 support has to work on packages that came from anywhere.
 - **Content** may use RPCS3.
 - **Batch** may use PSN and Security.
-- **Security uses no other part.** It is the base every check rests on.
+- **Security uses only Text.** It is the base every check rests on.
 - **Files** may use Security.
 - **Promise uses no other part.**
 - **Sandbox uses no other part.**
+- **Text uses no other part.** Entry, the front ends, PSN, RPCS3, Content,
+  Batch, Security and Files may use it.
 
 **No two-way dependency may be added.** Files has its own error type
 (`FileError`), which PSN converts into its `DownloadError`.

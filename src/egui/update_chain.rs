@@ -105,10 +105,7 @@ impl UpdatesApp {
             }
         }
         if !can_install {
-            self.show_notifications(
-                "Downloading only: set RPCS3's executable in Settings to install the updates too.",
-                MessageLevel::Info,
-            );
+            self.show_notifications(tr!("update-chain-download-only"), MessageLevel::Info);
         }
     }
 
@@ -135,7 +132,7 @@ impl UpdatesApp {
                     ChainState::DownloadFailed => {
                         let chain = self.v.update_chains.remove(i);
                         messages.push((
-                            format!("Not installing {}: one of its updates failed to download.", chain.title_id),
+                            tr!("update-chain-download-failed", serial = chain.title_id),
                             MessageLevel::Warning,
                         ));
                         continue;
@@ -176,22 +173,32 @@ impl UpdatesApp {
     fn report_chain(&mut self, title_id: &str, title: &str, result: ChainResult, messages: &mut Vec<(String, MessageLevel)>) {
         match result {
             Ok((version, crate::rpcs3::InstallOutcome::Confirmed)) => {
-                messages.push((format!("{title_id} {title} is now at version {version} in RPCS3."), MessageLevel::Success));
+                messages.push((
+                    tr!(
+                        "update-chain-done",
+                        serial = title_id,
+                        title = title,
+                        version = version.as_str()
+                    ),
+                    MessageLevel::Success,
+                ));
                 if let Some(game) = self.v.rpcs3_installed_games.iter_mut().find(|g| g.serial == title_id) {
                     game.installed_version = Some(version.clone());
                 }
                 self.v.rpcs3_installed_pkgs.insert((title_id.to_string(), version));
             }
-            Ok((_, crate::rpcs3::InstallOutcome::Unconfirmed)) => messages.push((
-                format!(
-                    "RPCS3 finished installing the updates for {title_id}, but rusty-psn could not check them. Set the RPCS3 folder in Settings to check it."
-                ),
-                MessageLevel::Warning,
-            )),
+            Ok((_, crate::rpcs3::InstallOutcome::Unconfirmed)) => {
+                messages.push((tr!("update-chain-unchecked", serial = title_id), MessageLevel::Warning))
+            }
             Err((version, e)) => {
                 error!("Installing update {version} of {title_id} failed: {e}");
                 messages.push((
-                    format!("Installing update {version} of {title_id} failed, so later updates were not installed: {e}"),
+                    tr!(
+                        "update-chain-failed",
+                        version = version,
+                        serial = title_id,
+                        reason = e.to_string()
+                    ),
                     MessageLevel::Error,
                 ));
             }

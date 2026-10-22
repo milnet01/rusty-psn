@@ -57,31 +57,39 @@ pub enum Rpcs3Error {
 impl fmt::Display for Rpcs3Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Rpcs3Error::NotFound => write!(f, "RPCS3 installation not found"),
-            Rpcs3Error::ConfigNotFound(p) => write!(f, "RPCS3 config file not found: {}", p.display()),
-            Rpcs3Error::SfoParseFailed(p, reason) => write!(f, "Failed to parse {}: {reason}", p.display()),
-            Rpcs3Error::YamlParseFailed(reason) => write!(f, "Failed to parse RPCS3 config: {reason}"),
-            Rpcs3Error::InstallFailed(reason) => write!(f, "RPCS3 installation failed: {reason}"),
+            Rpcs3Error::NotFound => f.write_str(&tr!("error-rpcs3-not-found")),
+            Rpcs3Error::ConfigNotFound(p) => f.write_str(&tr!("error-rpcs3-config-not-found", path = p.display().to_string())),
+            Rpcs3Error::SfoParseFailed(p, reason) => f.write_str(&tr!(
+                "error-rpcs3-sfo",
+                path = p.display().to_string(),
+                reason = reason.as_str()
+            )),
+            Rpcs3Error::YamlParseFailed(reason) => f.write_str(&tr!("error-rpcs3-yaml", reason = reason.as_str())),
+            Rpcs3Error::InstallFailed(reason) => f.write_str(&tr!("error-rpcs3-install", reason = reason.as_str())),
             Rpcs3Error::NotInstalled {
                 serial,
                 found: Some(found),
-            } => {
-                write!(f, "RPCS3 finished, but {serial} still reports version {found}")
-            }
+            } => f.write_str(&tr!(
+                "error-rpcs3-not-installed",
+                serial = serial.as_str(),
+                found = found.as_str()
+            )),
             Rpcs3Error::NotInstalled { serial, found: None } => {
-                write!(f, "RPCS3 finished, but no installed version of {serial} was found")
+                f.write_str(&tr!("error-rpcs3-not-installed-none", serial = serial.as_str()))
             }
             Rpcs3Error::FirmwareNotInstalled {
                 expected,
                 found: Some(found),
-            } => {
-                write!(f, "RPCS3 finished, but its firmware is {found}, not {expected}")
-            }
+            } => f.write_str(&tr!(
+                "error-rpcs3-firmware-not-installed",
+                found = found.as_str(),
+                expected = expected.as_str()
+            )),
             Rpcs3Error::FirmwareNotInstalled { expected, found: None } => {
-                write!(f, "RPCS3 finished, but no installed firmware was found (expected {expected})")
+                f.write_str(&tr!("error-rpcs3-firmware-not-installed-none", expected = expected.as_str()))
             }
-            Rpcs3Error::AlreadyRunning => write!(f, "RPCS3 is open. Close RPCS3, then install again"),
-            Rpcs3Error::Io(e) => write!(f, "I/O error: {e}"),
+            Rpcs3Error::AlreadyRunning => f.write_str(&tr!("error-rpcs3-already-running")),
+            Rpcs3Error::Io(e) => f.write_str(&tr!("error-rpcs3-io", reason = e.to_string())),
         }
     }
 }
@@ -437,16 +445,19 @@ async fn install_pkg_guarded(
     lock_file: Option<&Path>,
 ) -> Result<InstallOutcome, Rpcs3Error> {
     if !pkg_path.exists() {
-        return Err(Rpcs3Error::InstallFailed(format!(
-            "PKG path not found: {}",
-            pkg_path.display()
+        return Err(Rpcs3Error::InstallFailed(tr!(
+            "error-rpcs3-pkg-missing",
+            path = pkg_path.display().to_string()
         )));
     }
 
     // The serial is joined onto dev_hdd0/game, so it must be a serial before anything runs.
     if let InstallCheck::AppVersion { serial, .. } = &check {
         if !looks_like_serial(serial) {
-            return Err(Rpcs3Error::InstallFailed(format!("not a game serial: {serial:?}")));
+            return Err(Rpcs3Error::InstallFailed(tr!(
+                "error-rpcs3-not-a-serial",
+                serial = format!("{serial:?}")
+            )));
         }
     }
 
@@ -508,7 +519,7 @@ async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Resul
     // /usr, where `which rpcs3` may have found it, so there the host looks.
     if let Some(app_id) = flatpak_app_id {
         if !host_succeeds("flatpak", &["info".as_ref(), app_id.as_ref()]).await {
-            return Err(Rpcs3Error::InstallFailed(format!("RPCS3 Flatpak {app_id} is not installed")));
+            return Err(Rpcs3Error::InstallFailed(tr!("error-rpcs3-flatpak-missing", app = app_id)));
         }
     } else {
         let found = if crate::sandbox::in_flatpak() {
@@ -517,9 +528,9 @@ async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Resul
             rpcs3_executable.exists()
         };
         if !found {
-            return Err(Rpcs3Error::InstallFailed(format!(
-                "RPCS3 executable not found: {}",
-                rpcs3_executable.display()
+            return Err(Rpcs3Error::InstallFailed(tr!(
+                "error-rpcs3-exe-missing",
+                path = rpcs3_executable.display().to_string()
             )));
         }
     }
@@ -541,7 +552,7 @@ async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Resul
     let output = tokio::process::Command::from(command)
         .output()
         .await
-        .map_err(|e| Rpcs3Error::InstallFailed(format!("failed to launch RPCS3: {e}")))?;
+        .map_err(|e| Rpcs3Error::InstallFailed(tr!("error-rpcs3-launch-failed", reason = e.to_string())))?;
 
     // Logged only: RPCS3 0.0.43 exits 143 after a good install and after a refused one, so what
     // it left behind decides (RPSN-0137 INV-8, RPSN-0168).
@@ -596,9 +607,9 @@ async fn install_firmware_guarded(
     lock_file: Option<&Path>,
 ) -> Result<InstallOutcome, Rpcs3Error> {
     if !pup_path.is_file() {
-        return Err(Rpcs3Error::InstallFailed(format!(
-            "firmware file not found: {}",
-            pup_path.display()
+        return Err(Rpcs3Error::InstallFailed(tr!(
+            "error-rpcs3-firmware-file-missing",
+            path = pup_path.display().to_string()
         )));
     }
 

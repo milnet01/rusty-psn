@@ -25,9 +25,9 @@ pub enum DirectoryFormat {
 impl fmt::Display for DirectoryFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DirectoryFormat::SerialOnly => write!(f, "Serial only"),
-            DirectoryFormat::SerialTitle => write!(f, "Serial - Title"),
-            DirectoryFormat::TitleSerial => write!(f, "Title / Serial"),
+            DirectoryFormat::SerialOnly => f.write_str(&tr!("directory-format-serial-only")),
+            DirectoryFormat::SerialTitle => f.write_str(&tr!("directory-format-serial-title")),
+            DirectoryFormat::TitleSerial => f.write_str(&tr!("directory-format-title-serial")),
         }
     }
 }

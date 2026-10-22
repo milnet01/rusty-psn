@@ -6,8 +6,8 @@ impl UpdatesApp {
     pub(super) fn draw_content_browser_page(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
             if self.settings.content_directory.is_none() {
-                ui.label("No content directory configured. Set it on the Settings page, under Content Library.");
-                if ui.button("Open Settings").clicked() {
+                ui.label(tr!("content-browser-no-dir"));
+                if ui.button(tr!("content-browser-open-settings")).clicked() {
                     self.go_to(chrome::Page::Settings, &ui.ctx().clone());
                 }
                 return;
@@ -17,16 +17,16 @@ impl UpdatesApp {
 
             // Toolbar
             ui.horizontal(|ui| {
-                ui.label("Filter:");
+                ui.label(tr!("common-filter"));
                 ui.text_edit_singleline(&mut self.v.content_filter);
-                if ui.button("Rescan").clicked() {
+                if ui.button(tr!("content-browser-rescan")).clicked() {
                     self.start_content_scan();
                 }
             });
             ui.separator();
 
             let Some(ref library) = self.v.content_library else {
-                ui.label("Loading...");
+                ui.label(tr!("content-browser-loading"));
                 return;
             };
 
@@ -39,7 +39,11 @@ impl UpdatesApp {
                 .map(|(i, _)| i)
                 .collect();
 
-            ui.label(format!("{} game(s) shown (of {})", filtered_games.len(), library.games.len()));
+            ui.label(tr!(
+                "content-browser-shown",
+                shown = filtered_games.len().to_string(),
+                total = library.games.len().to_string()
+            ));
             ui.add_space(3.0);
 
             egui::ScrollArea::vertical().show(ui, |ui| {
@@ -51,7 +55,10 @@ impl UpdatesApp {
                         .show(ui, |ui| {
                             // Patches section
                             if !game.patches.is_empty() {
-                                ui.label(egui::RichText::new(format!("Patches ({})", game.patches.len())).underline());
+                                ui.label(
+                                    egui::RichText::new(tr!("content-browser-patches", count = game.patches.len().to_string()))
+                                        .underline(),
+                                );
                                 for patch in &game.patches {
                                     ui.horizontal(|ui| {
                                         ui.label(format!("  {} / {}", patch.serial, patch.pkg_filename));
@@ -60,10 +67,10 @@ impl UpdatesApp {
                                         let is_installing = self.v.content_install_promises.iter().any(|(k, _)| *k == patch_key);
 
                                         if is_installed {
-                                            status_pill(ui, "Installed", StatusKind::Done);
+                                            status_pill(ui, &tr!("content-browser-installed"), StatusKind::Done);
                                         } else if is_installing {
-                                            status_pill(ui, "Installing…", StatusKind::Working);
-                                        } else if has_rpcs3 && ui.small_button("Install").clicked() {
+                                            status_pill(ui, &tr!("common-installing"), StatusKind::Working);
+                                        } else if has_rpcs3 && ui.small_button(tr!("content-browser-install")).clicked() {
                                             let exe =
                                                 self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
                                             let pkg = patch.pkg_path.clone();
@@ -94,7 +101,10 @@ impl UpdatesApp {
 
                             // DLC section
                             if !game.dlc.is_empty() {
-                                ui.label(egui::RichText::new(format!("DLC ({})", game.dlc.len())).underline());
+                                ui.label(
+                                    egui::RichText::new(tr!("content-browser-dlc", count = game.dlc.len().to_string()))
+                                        .underline(),
+                                );
                                 for dlc_item in &game.dlc {
                                     ui.horizontal(|ui| {
                                         ui.label(format!("  {} ({})", dlc_item.zip_filename, ByteSize::b(dlc_item.size)));
@@ -103,10 +113,10 @@ impl UpdatesApp {
                                         let is_installing = self.v.content_install_promises.iter().any(|(k, _)| *k == dlc_key);
 
                                         if is_installed {
-                                            status_pill(ui, "Installed", StatusKind::Done);
+                                            status_pill(ui, &tr!("content-browser-installed"), StatusKind::Done);
                                         } else if is_installing {
-                                            status_pill(ui, "Installing…", StatusKind::Working);
-                                        } else if has_rpcs3 && ui.small_button("Install").clicked() {
+                                            status_pill(ui, &tr!("common-installing"), StatusKind::Working);
+                                        } else if has_rpcs3 && ui.small_button(tr!("content-browser-install")).clicked() {
                                             let exe =
                                                 self.settings.rpcs3_executable.clone().expect("has_rpcs3 checked it is set");
                                             let zip = dlc_item.zip_path.clone();
@@ -169,10 +179,7 @@ impl UpdatesApp {
         let promise = self.v.content_scan_promise.take().expect("checked above");
         match promise.block_and_take() {
             Some(library) => self.v.content_library = Some(library),
-            None => messages.push((
-                "The content folder scan stopped unexpectedly.".to_string(),
-                MessageLevel::Error,
-            )),
+            None => messages.push((tr!("content-browser-scan-stopped"), MessageLevel::Error)),
         }
     }
 
@@ -189,19 +196,17 @@ impl UpdatesApp {
                             .map(|n| n.to_string_lossy().to_string())
                             .unwrap_or_else(|| key.clone());
                         if outcome == crate::rpcs3::InstallOutcome::Confirmed {
-                            messages.push((format!("Installed: {display}"), MessageLevel::Success));
+                            messages.push((tr!("content-browser-install-done", name = display), MessageLevel::Success));
                             self.v.content_installed_items.insert(key);
                         } else {
-                            messages.push((
-                                format!(
-                                    "RPCS3 finished installing {display}, but rusty-psn could not check the result. Set the RPCS3 folder in Settings to check it."
-                                ),
-                                MessageLevel::Warning,
-                            ));
+                            messages.push((tr!("common-install-unchecked", name = display), MessageLevel::Warning));
                         }
                     }
                     Err(e) => {
-                        messages.push((format!("Install failed: {e}"), MessageLevel::Error));
+                        messages.push((
+                            tr!("content-browser-install-failed", reason = e.to_string()),
+                            MessageLevel::Error,
+                        ));
                     }
                 }
             } else {

@@ -219,6 +219,12 @@ PackageInfo {
 | Modules | snake_case | `manifest_parser`, `psn` |
 | Feature flags | lowercase | `egui`, `cli` |
 
+**On-screen text.** Every text the window app shows, and the `Display`
+text of a shared-part type a front end shows, comes from `i18n/en/rusty-psn.ftl`
+through `tr!` (`src/i18n.rs`, RPSN-0072). Proper names, data, log lines and
+the command line's own messages stay literal. Text that becomes a path,
+URL, file name or setting is never translated.
+
 ### 4.6 Logging
 
 - **Facade**: `log` crate macros (`info!`, `warn!`, `error!`)

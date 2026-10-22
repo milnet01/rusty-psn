@@ -180,7 +180,7 @@ fn main() {
                 rfd::MessageDialog::new()
                     .set_level(rfd::MessageLevel::Error)
                     .set_title("rusty-psn")
-                    .set_description(format!("rusty-psn could not set up its network connection: {e}"))
+                    .set_description(tr!("main-network-failed", reason = e.to_string()))
                     .show();
                 notify_main.notify_one();
                 let _ = rt_thread.join();

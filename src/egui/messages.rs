@@ -19,12 +19,12 @@ pub(super) enum MessageLevel {
 }
 
 impl MessageLevel {
-    fn status(self) -> (StatusKind, &'static str) {
+    fn status(self) -> (StatusKind, String) {
         match self {
-            MessageLevel::Info => (StatusKind::Queued, "Note"),
-            MessageLevel::Success => (StatusKind::Done, "Done"),
-            MessageLevel::Warning => (StatusKind::Attention, "Warning"),
-            MessageLevel::Error => (StatusKind::Failed, "Error"),
+            MessageLevel::Info => (StatusKind::Queued, tr!("messages-level-note")),
+            MessageLevel::Success => (StatusKind::Done, tr!("messages-level-done")),
+            MessageLevel::Warning => (StatusKind::Attention, tr!("messages-level-warning")),
+            MessageLevel::Error => (StatusKind::Failed, tr!("messages-level-error")),
         }
     }
 }
@@ -61,10 +61,17 @@ impl UpdatesApp {
         egui::Panel::bottom("messages").resizable(false).show(ui, |ui| {
             ui.horizontal(|ui| {
                 let arrow = if log.folded { "\u{25B6}" } else { "\u{25BC}" }; // ▶ or ▼
-                if ui.button(format!("{arrow} Messages ({})", log.len())).clicked() {
+                if ui
+                    .button(format!("{arrow} {}", tr!("messages-title", count = log.len().to_string())))
+                    .clicked()
+                {
                     log.folded = !log.folded;
                 }
-                if !log.folded && ui.add_enabled(log.len() > 0, egui::Button::new("Clear")).clicked() {
+                if !log.folded
+                    && ui
+                        .add_enabled(log.len() > 0, egui::Button::new(tr!("common-clear")))
+                        .clicked()
+                {
                     log.messages.clear();
                 }
             });
@@ -79,12 +86,12 @@ impl UpdatesApp {
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     if log.messages.is_empty() {
-                        ui.weak("No messages yet.");
+                        ui.weak(tr!("messages-empty"));
                     }
                     for message in &log.messages {
                         let (kind, word) = message.level.status();
                         ui.horizontal_wrapped(|ui| {
-                            status_pill(ui, word, kind);
+                            status_pill(ui, &word, kind);
                             ui.label(&message.text);
                         });
                     }

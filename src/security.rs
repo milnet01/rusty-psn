@@ -35,15 +35,13 @@ pub enum SecurityError {
 impl fmt::Display for SecurityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SecurityError::DisallowedDomain(url) => {
-                write!(f, "URL points to a non-PlayStation domain: {url}")
-            }
-            SecurityError::PathEscape { attempted, boundary } => {
-                write!(f, "Path {:?} escapes the download directory {:?}", attempted, boundary)
-            }
-            SecurityError::InvalidSerial(reason) => {
-                write!(f, "Invalid serial: {reason}")
-            }
+            SecurityError::DisallowedDomain(url) => f.write_str(&tr!("error-security-domain", url = url.as_str())),
+            SecurityError::PathEscape { attempted, boundary } => f.write_str(&tr!(
+                "error-security-path-escape",
+                attempted = format!("{attempted:?}"),
+                boundary = format!("{boundary:?}")
+            )),
+            SecurityError::InvalidSerial(reason) => f.write_str(&tr!("error-security-serial", reason = reason.as_str())),
         }
     }
 }
@@ -171,20 +169,18 @@ pub fn validate_path_containment(target: &Path, base_dir: &Path) -> Result<(), S
 /// Must be 9 alphanumeric characters starting with a known prefix.
 pub fn validate_serial(serial: &str) -> Result<(), SecurityError> {
     if serial.len() > 20 {
-        return Err(SecurityError::InvalidSerial("input too long".to_string()));
+        return Err(SecurityError::InvalidSerial(tr!("error-security-serial-too-long")));
     }
 
     if serial.len() != 9 {
-        return Err(SecurityError::InvalidSerial(format!(
-            "expected 9 characters, got {}",
-            serial.len()
+        return Err(SecurityError::InvalidSerial(tr!(
+            "error-security-serial-length",
+            length = serial.len().to_string()
         )));
     }
 
     if !serial.chars().all(|c| c.is_ascii_alphanumeric()) {
-        return Err(SecurityError::InvalidSerial(
-            "must contain only alphanumeric characters".to_string(),
-        ));
+        return Err(SecurityError::InvalidSerial(tr!("error-security-serial-characters")));
     }
 
     if !VALID_PREFIXES.iter().any(|prefix| serial.starts_with(prefix)) {

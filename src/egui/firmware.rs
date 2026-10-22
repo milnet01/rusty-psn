@@ -13,7 +13,7 @@ impl UpdatesApp {
             let regions = crate::psn::firmware::FirmwareRegion::all();
 
             ui.horizontal(|ui| {
-                ui.label("Console:");
+                ui.label(tr!("firmware-console"));
                 egui::ComboBox::from_id_salt("fw_console")
                     .selected_text(consoles[self.v.firmware_console_idx].to_string())
                     .show_ui(ui, |ui| {
@@ -22,7 +22,7 @@ impl UpdatesApp {
                         }
                     });
 
-                ui.label("Region:");
+                ui.label(tr!("firmware-region"));
                 egui::ComboBox::from_id_salt("fw_region")
                     .selected_text(regions[self.v.firmware_region_idx].to_string())
                     .show_ui(ui, |ui| {
@@ -33,7 +33,7 @@ impl UpdatesApp {
 
                 let fetching = self.v.firmware_fetch_promise.is_some();
                 ui.add_enabled_ui(!fetching, |ui| {
-                    if ui.button("Check for Firmware").clicked() {
+                    if ui.button(tr!("firmware-check")).clicked() {
                         let console = consoles[self.v.firmware_console_idx];
                         let region = regions[self.v.firmware_region_idx];
                         let client = self
@@ -62,14 +62,14 @@ impl UpdatesApp {
             });
 
             if self.settings.rpcs3_config_dir.is_some() {
-                let installed = self.v.rpcs3_firmware_version.as_deref().unwrap_or("none");
-                ui.label(format!("Firmware installed in RPCS3: {installed}"));
+                let installed = self.v.rpcs3_firmware_version.clone().unwrap_or_else(|| tr!("firmware-none"));
+                ui.label(tr!("firmware-installed-version", version = installed));
             }
 
             ui.separator();
 
             if self.v.firmware_results.is_empty() && self.v.firmware_fetch_promise.is_none() {
-                ui.label("Select a console and region, then click \"Check for Firmware\".");
+                ui.label(tr!("firmware-hint"));
             }
 
             if !self.v.firmware_results.is_empty() {
@@ -78,9 +78,9 @@ impl UpdatesApp {
                         .striped(true)
                         .min_col_width(80.0)
                         .show(ui, |ui| {
-                            ui.strong("Type");
-                            ui.strong("Version");
-                            ui.strong("Size");
+                            ui.strong(tr!("firmware-type"));
+                            ui.strong(tr!("common-version"));
+                            ui.strong(tr!("common-size"));
                             ui.strong("");
                             ui.end_row();
 
@@ -97,14 +97,14 @@ impl UpdatesApp {
                                 ui.horizontal(|ui| {
                                     let downloading = self.v.firmware_download.is_some();
                                     ui.add_enabled_ui(!downloading, |ui| {
-                                        if ui.button("Download").clicked() {
+                                        if ui.button(tr!("common-download")).clicked() {
                                             download_fw = Some(entry.clone());
                                         }
                                     });
                                     if self.can_install_firmware(entry) {
                                         if self.v.firmware_install_promise.is_some() {
-                                            status_pill(ui, "Installing…", StatusKind::Working);
-                                        } else if ui.button("Install to RPCS3").clicked() {
+                                            status_pill(ui, &tr!("common-installing"), StatusKind::Working);
+                                        } else if ui.button(tr!("common-install-to-rpcs3")).clicked() {
                                             install_fw = Some(entry.clone());
                                         }
                                     }
@@ -118,7 +118,7 @@ impl UpdatesApp {
             // Active firmware download progress.
             if let Some(dl) = &self.v.firmware_download {
                 ui.separator();
-                ui.label(format!("Downloading: {}", dl.name));
+                ui.label(tr!("firmware-downloading", name = dl.name.as_str()));
 
                 let status = dl.progress_status.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 let progress = status.progress;
@@ -134,14 +134,14 @@ impl UpdatesApp {
                         ByteSize::b(speed as u64),
                     )));
                 } else {
-                    ui.add(egui::ProgressBar::new(0.0).text(format!(
-                        "{} downloaded ({}/s)",
-                        ByteSize::b(progress),
-                        ByteSize::b(speed as u64),
+                    ui.add(egui::ProgressBar::new(0.0).text(tr!(
+                        "firmware-downloaded-unknown-size",
+                        done = ByteSize::b(progress).to_string(),
+                        speed = ByteSize::b(speed as u64).to_string()
                     )));
                 }
 
-                if ui.button("Cancel").clicked() {
+                if ui.button(tr!("common-cancel")).clicked() {
                     dl.cancel_signal.store(CANCEL_ABORT, Ordering::Relaxed);
                 }
             }
@@ -266,17 +266,13 @@ impl UpdatesApp {
         if self.v.firmware_install_promise.as_ref().is_some_and(|p| p.ready().is_some()) {
             let promise = self.v.firmware_install_promise.take().expect("checked is_some above");
             match promise.block_and_take() {
-                Ok(crate::rpcs3::InstallOutcome::Confirmed) => {
-                    messages.push(("Firmware installed in RPCS3.".to_string(), MessageLevel::Success))
+                Ok(crate::rpcs3::InstallOutcome::Confirmed) => messages.push((tr!("firmware-installed"), MessageLevel::Success)),
+                Ok(crate::rpcs3::InstallOutcome::Unconfirmed) => {
+                    messages.push((tr!("firmware-install-unchecked"), MessageLevel::Warning))
                 }
-                Ok(crate::rpcs3::InstallOutcome::Unconfirmed) => messages.push((
-                    "RPCS3 finished, but the firmware install could not be checked until the RPCS3 folder is set in Settings."
-                        .to_string(),
-                    MessageLevel::Warning,
-                )),
                 Err(e) => {
                     error!("Firmware install failed: {e}");
-                    messages.push((format!("Firmware install failed: {e}"), MessageLevel::Error));
+                    messages.push((tr!("firmware-install-failed", reason = e.to_string()), MessageLevel::Error));
                 }
             }
             self.read_rpcs3_firmware_version();
@@ -292,7 +288,7 @@ impl UpdatesApp {
                         self.v.firmware_results = entries;
                     }
                     Err(e) => {
-                        messages.push((format!("Firmware check failed: {e}"), MessageLevel::Error));
+                        messages.push((tr!("firmware-check-failed", reason = e.to_string()), MessageLevel::Error));
                     }
                 }
             }
@@ -304,14 +300,17 @@ impl UpdatesApp {
                 let dl = self.v.firmware_download.take().expect("checked is_some above");
                 match dl.promise.block_and_take() {
                     Ok(()) => {
-                        messages.push((format!("{} downloaded successfully!", dl.name), MessageLevel::Success));
+                        messages.push((tr!("firmware-download-done", name = dl.name), MessageLevel::Success));
                     }
                     Err(DownloadError::Cancelled { .. }) => {
-                        messages.push((format!("{} download cancelled.", dl.name), MessageLevel::Info));
+                        messages.push((tr!("firmware-download-cancelled", name = dl.name), MessageLevel::Info));
                     }
                     Err(e) => {
                         error!("Firmware download failed: {e:?}");
-                        messages.push((format!("Firmware download failed: {e:?}"), MessageLevel::Error));
+                        messages.push((
+                            tr!("firmware-download-failed", reason = format!("{e:?}")),
+                            MessageLevel::Error,
+                        ));
                     }
                 }
             }

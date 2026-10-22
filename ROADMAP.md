@@ -823,7 +823,7 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 🚧 [RPSN-0072] **Localization.**
+- ✅ [RPSN-0072] **Localization.**
   The GUI embeds Japanese fonts already; add basic i18n framework for
   UI strings
   Checked against the code 2026-10-12: Not done — no translation
@@ -861,6 +861,18 @@ Lower priority items that would improve the overall experience.
   take the before/after demoreel shots (INV-6), and a changelog entry.
   Numbers go into tr! as text (to_string) so Fluent cannot regroup
   digits.
+  Shipped 2026-10-22: every window-app text, src/main.rs's start-up
+  dialog, and the Display text of PsnClientError, MergeError,
+  FirmwareError, FirmwareType, Rpcs3Error, ContentError, SecurityError,
+  BatchFileError and DirectoryFormat (with the sentences built into
+  their payloads) come from i18n/en/rusty-psn.ftl through tr!.
+  the_window_app_has_no_inline_text runs (no #[ignore]). Left literal on
+  purpose: proper names, data, log-only reasons (SFO and vfs.yml parse
+  reasons), RedirectError/TooManyRedirects (reqwest's own text). INV-6:
+  each sidebar page captured with demoreel before and after under the
+  same scratch HOME; compare -metric AE gives 0 differing pixels on all
+  seven. STANDARDS.md § 4.5 gains the on-screen text rule;
+  docs/design.md gains the Text part.
   **Layman:** Prepare the app for translation into other languages.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.

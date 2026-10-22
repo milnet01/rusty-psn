@@ -62,22 +62,22 @@ impl UpdatesApp {
                 Err(e) => {
                     let text = match &e {
                         UpdateError::UnhandledErrorResponse(e) => {
-                            format!("Unexpected error received in a response from PSN ({e}).")
+                            tr!("search-error-psn-response", reason = e.as_str())
                         }
                         UpdateError::InvalidSerial => {
-                            String::from("The provided serial didn't give any results, double-check your input.")
+                            tr!("search-error-invalid-serial")
                         }
                         UpdateError::NoUpdatesAvailable => {
-                            String::from("The provided serial doesn't have any available updates.")
+                            tr!("search-error-no-updates")
                         }
-                        UpdateError::Reqwest(e) => format!("There was an error completing the request ({e})."),
-                        UpdateError::XmlParsing(e) => format!("Error parsing response from Sony, try again later ({e})."),
+                        UpdateError::Reqwest(e) => tr!("search-error-request", reason = e.to_string()),
+                        UpdateError::XmlParsing(e) => tr!("search-error-xml", reason = e.to_string()),
                         UpdateError::ManifestParsing(e) => {
-                            format!("Error parsing manifest response from Sony, try again later ({e}).")
+                            tr!("search-error-manifest", reason = e.to_string())
                         }
-                        UpdateError::Security(e) => format!("Security check failed: {e}"),
+                        UpdateError::Security(e) => tr!("search-error-security", reason = e.to_string()),
                         UpdateError::ResponseTooLarge(size) => {
-                            format!("Response too large ({size} bytes), possible server error.")
+                            tr!("search-error-too-large", size = size.to_string())
                         }
                     };
                     messages.push((format!("{serial}: {text}"), MessageLevel::Error));
@@ -159,9 +159,13 @@ impl UpdatesApp {
             let errors = self.v.batch_search_errors.len();
             let found = self.v.batch_search_total.saturating_sub(errors);
             let msg = if errors > 0 {
-                format!("Batch search complete: {found} found, {errors} failed.")
+                tr!(
+                    "search-batch-done-failed",
+                    found = found.to_string(),
+                    failed = errors.to_string()
+                )
             } else {
-                format!("Batch search complete: {found} title(s) found.")
+                tr!("search-batch-done", found = found.to_string())
             };
             messages.push((msg, MessageLevel::Info));
             self.v.batch_search_total = 0; // Reset so the toast doesn't fire again.
@@ -184,13 +188,19 @@ impl UpdatesApp {
             }
         }
         self.show_notifications(
-            format!("Download Missing: {queued} queued, {present} already in the download folder."),
+            tr!(
+                "search-download-missing-done",
+                queued = queued.to_string(),
+                present = present.to_string()
+            ),
             MessageLevel::Info,
         );
     }
 
     pub(super) fn trigger_batch_import(&mut self) {
-        let file = rfd::FileDialog::new().add_filter("Text files", &["txt"]).pick_file();
+        let file = rfd::FileDialog::new()
+            .add_filter(tr!("search-text-files"), &["txt"])
+            .pick_file();
 
         let path = match file {
             Some(p) => p,
@@ -201,7 +211,7 @@ impl UpdatesApp {
             Ok(result) => {
                 if !result.warnings.is_empty() {
                     self.show_notifications(
-                        format!("Batch import: skipped {} invalid serial(s)", result.warnings.len()),
+                        tr!("search-batch-skipped", count = result.warnings.len().to_string()),
                         MessageLevel::Warning,
                     );
                 }
@@ -209,17 +219,14 @@ impl UpdatesApp {
                 let queued = self.v.enqueue_batch_search(result.serials);
 
                 if queued == 0 {
-                    self.show_notifications("All serials from the batch file are already loaded.", MessageLevel::Info);
+                    self.show_notifications(tr!("search-batch-all-loaded"), MessageLevel::Info);
                     return;
                 }
 
-                self.show_notifications(
-                    format!("Batch import: {queued} serial(s) queued for search."),
-                    MessageLevel::Info,
-                );
+                self.show_notifications(tr!("search-batch-queued", count = queued.to_string()), MessageLevel::Info);
             }
             Err(e) => {
-                self.show_notifications(format!("Failed to import batch file: {e}"), MessageLevel::Error);
+                self.show_notifications(tr!("search-batch-import-failed", reason = e.to_string()), MessageLevel::Error);
             }
         }
     }
@@ -227,7 +234,7 @@ impl UpdatesApp {
     pub(super) fn draw_search_bar(&mut self, ui: &mut egui::Ui) {
         // Row 1: Serial search input.
         ui.horizontal(|ui| {
-            ui.label("Title Serial:");
+            ui.label(tr!("search-title-serial"));
 
             let serial_input = ui.text_edit_singleline(&mut self.v.serial_query);
             if self.v.focus_search_bar {
@@ -239,7 +246,7 @@ impl UpdatesApp {
             serial_input.context_menu(|ui| {
                 ui.add_enabled_ui(self.v.clipboard.is_some(), |ui| {
                     if let Some(clip_ctx) = self.v.clipboard.as_mut() {
-                        if ui.button("Paste").clicked() {
+                        if ui.button(tr!("search-paste")).clicked() {
                             match clip_ctx.get_contents() {
                                 Ok(contents) => self.v.serial_query.push_str(&contents),
                                 Err(e) => {
@@ -251,7 +258,7 @@ impl UpdatesApp {
                         }
 
                         ui.add_enabled_ui(!self.v.serial_query.is_empty(), |ui| {
-                            if ui.button("Clear").clicked() {
+                            if ui.button(tr!("common-clear")).clicked() {
                                 self.v.serial_query = String::new();
                                 ui.close();
                             }
@@ -268,7 +275,7 @@ impl UpdatesApp {
                 .iter()
                 .any(|(s, _)| *s == parse_title_id(&self.v.serial_query));
             ui.add_enabled_ui(!self.v.serial_query.is_empty() && !in_flight, |ui| {
-                if !input_submitted && !ui.button("Search for updates").clicked() {
+                if !input_submitted && !ui.button(tr!("search-search")).clicked() {
                     return;
                 }
 
@@ -278,7 +285,7 @@ impl UpdatesApp {
                     .iter()
                     .any(|e| e.title_id == parse_title_id(&self.v.serial_query));
                 if already_searched {
-                    self.show_notifications("Provided title id results already shown", MessageLevel::Info);
+                    self.show_notifications(tr!("search-already-shown"), MessageLevel::Info);
                     return;
                 }
 
@@ -316,7 +323,11 @@ impl UpdatesApp {
                 let fraction = done as f32 / total.max(1) as f32;
                 ui.add(
                     egui::ProgressBar::new(fraction)
-                        .text(format!("Searching {done}/{total}..."))
+                        .text(tr!(
+                            "search-batch-progress",
+                            done = done.to_string(),
+                            total = total.to_string()
+                        ))
                         .desired_width(120.0)
                         .animate(true),
                 );
@@ -325,14 +336,14 @@ impl UpdatesApp {
 
         // Row 2: Action buttons — always visible, wrapping onto a second line at a large text size.
         ui.horizontal_wrapped(|ui| {
-            if ui.button("Import Batch...").clicked() {
+            if ui.button(tr!("search-import-batch")).clicked() {
                 self.trigger_batch_import();
             }
 
             ui.separator();
 
             ui.add_enabled_ui(!self.v.update_results.is_empty(), |ui| {
-                if ui.button("Download All").clicked() {
+                if ui.button(tr!("search-download-all")).clicked() {
                     info!("Downloading all updates for all results");
                     for update in self.v.update_results.clone().iter() {
                         let title = update.title();
@@ -345,14 +356,14 @@ impl UpdatesApp {
                 }
 
                 if ui
-                    .button("Download Missing")
-                    .on_hover_text("Download only the updates not already in the download folder")
+                    .button(tr!("search-download-missing"))
+                    .on_hover_text(tr!("search-download-missing-hint"))
                     .clicked()
                 {
                     self.download_missing();
                 }
 
-                if ui.button("Download All Latest").clicked() {
+                if ui.button(tr!("search-download-all-latest")).clicked() {
                     info!("Downloading latest updates for all results");
                     for update in self.v.update_results.clone().iter() {
                         if let Some(latest_pkg) = update.packages.last() {
@@ -363,17 +374,17 @@ impl UpdatesApp {
                     }
                 }
 
-                if ui.button("Export results...").clicked() {
+                if ui.button(tr!("search-export")).clicked() {
                     self.export_results();
                 }
 
-                if ui.button("Clear results").clicked() {
+                if ui.button(tr!("search-clear-results")).clicked() {
                     self.v.update_results = Vec::new();
                     self.v.no_update_serials.clear();
                 }
             });
 
-            if ui.button("Open Downloads").clicked() {
+            if ui.button(tr!("search-open-downloads")).clicked() {
                 let folder = self.settings.pkg_download_path.clone();
                 self.open_folder(&folder);
             }

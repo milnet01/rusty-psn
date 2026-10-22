@@ -9,21 +9,21 @@ impl UpdatesApp {
             // after them say which it is (RPSN-0157 step 4).
             ui.horizontal(|ui| {
                 let dirty = self.v.settings_dirty;
-                if ui.add_enabled(dirty, egui::Button::new("Save changes")).clicked() {
+                if ui.add_enabled(dirty, egui::Button::new(tr!("settings-save"))).clicked() {
                     self.save_settings();
                 }
-                if ui.add_enabled(dirty, egui::Button::new("Undo changes")).clicked() {
+                if ui.add_enabled(dirty, egui::Button::new(tr!("settings-undo"))).clicked() {
                     self.cancel_settings(ui.ctx());
                     self.v.modified_settings = self.settings.clone();
                 }
-                if ui.button("Restore defaults").clicked() {
+                if ui.button(tr!("settings-restore-defaults")).clicked() {
                     self.restore_default_settings(ui.ctx());
                 }
                 ui.separator();
                 if dirty {
-                    status_pill(ui, "You have unsaved changes", StatusKind::Attention);
+                    status_pill(ui, &tr!("settings-unsaved"), StatusKind::Attention);
                 } else {
-                    status_pill(ui, "All changes saved", StatusKind::Done);
+                    status_pill(ui, &tr!("settings-all-saved"), StatusKind::Done);
                 }
             });
 
@@ -33,8 +33,8 @@ impl UpdatesApp {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     self.draw_settings_fields(ui);
                     ui.add_space(10.0);
-                    egui::CollapsingHeader::new("Migrate downloads").show(ui, |ui| self.draw_migration_section(ui));
-                    egui::CollapsingHeader::new("About rusty-psn").show(ui, |ui| self.draw_about_section(ui));
+                    egui::CollapsingHeader::new(tr!("settings-migrate-heading")).show(ui, |ui| self.draw_migration_section(ui));
+                    egui::CollapsingHeader::new(tr!("settings-about-heading")).show(ui, |ui| self.draw_about_section(ui));
                 });
             });
         });
@@ -63,23 +63,23 @@ impl UpdatesApp {
     fn draw_settings_fields(&mut self, ui: &mut egui::Ui) {
         let mut current_download_path = self.v.modified_settings.pkg_download_path.to_string_lossy().to_string();
 
-        ui.heading("Downloads");
+        ui.heading(tr!("settings-downloads-heading"));
         ui.add_space(3.0);
 
-        ui.label("Download path:");
+        ui.label(tr!("settings-download-path"));
         ui.horizontal(|ui| {
             ui.add_enabled_ui(false, |ui| {
                 ui.text_edit_singleline(&mut current_download_path);
             });
 
-            if ui.button("Pick folder").clicked() {
+            if ui.button(tr!("settings-pick-folder")).clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     self.v.settings_dirty = true;
                     self.v.modified_settings.pkg_download_path = path;
                 }
             }
 
-            if ui.button("Reset").clicked() {
+            if ui.button(tr!("settings-reset")).clicked() {
                 self.v.settings_dirty = true;
                 self.v.modified_settings.pkg_download_path = default_download_path();
             }
@@ -87,7 +87,7 @@ impl UpdatesApp {
 
         ui.add_space(5.0);
 
-        ui.label("Folder structure:");
+        ui.label(tr!("settings-folder-structure"));
         let current_format = self.v.modified_settings.directory_format;
         egui::ComboBox::from_id_salt("dir_format")
             .selected_text(current_format.example())
@@ -110,7 +110,7 @@ impl UpdatesApp {
 
         ui.add_space(5.0);
 
-        ui.label("Maximum concurrent downloads:");
+        ui.label(tr!("settings-max-downloads"));
         if ui
             .add(
                 egui::Slider::new(&mut self.v.modified_settings.max_concurrent_downloads, 1..=10)
@@ -124,10 +124,10 @@ impl UpdatesApp {
         ui.add_space(8.0);
         ui.separator();
         ui.add_space(3.0);
-        ui.heading("Appearance");
+        ui.heading(tr!("settings-appearance-heading"));
         ui.add_space(3.0);
 
-        ui.label("Theme:");
+        ui.label(tr!("settings-theme"));
         let current_theme = self.v.modified_settings.theme;
         egui::ComboBox::from_id_salt("theme_selector")
             .selected_text(current_theme.label())
@@ -147,7 +147,7 @@ impl UpdatesApp {
 
         ui.add_space(5.0);
 
-        ui.label("Text size:");
+        ui.label(tr!("settings-text-size"));
         let current_size = self.v.modified_settings.text_size_percent;
         egui::ComboBox::from_id_salt("text_size_selector")
             .selected_text(text_size_label(current_size))
@@ -168,11 +168,14 @@ impl UpdatesApp {
         ui.add_space(8.0);
         ui.separator();
         ui.add_space(3.0);
-        ui.heading("Notifications");
+        ui.heading(tr!("settings-notifications-heading"));
         ui.add_space(3.0);
 
         if ui
-            .checkbox(&mut self.v.modified_settings.show_notifications, "Show system notifications")
+            .checkbox(
+                &mut self.v.modified_settings.show_notifications,
+                tr!("settings-show-notifications"),
+            )
             .changed()
         {
             self.v.settings_dirty = true;
@@ -181,10 +184,10 @@ impl UpdatesApp {
         ui.add_space(8.0);
         ui.separator();
         ui.add_space(3.0);
-        ui.heading("RPCS3 Integration");
+        ui.heading(tr!("settings-rpcs3-heading"));
         ui.add_space(3.0);
 
-        ui.label("RPCS3 config directory:");
+        ui.label(tr!("settings-rpcs3-config-dir"));
         ui.horizontal(|ui| {
             let rpcs3_display = self
                 .v
@@ -192,20 +195,20 @@ impl UpdatesApp {
                 .rpcs3_config_dir
                 .as_ref()
                 .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|| "Not configured".to_string());
+                .unwrap_or_else(|| tr!("settings-not-configured"));
             let mut display_text = rpcs3_display;
             ui.add_enabled_ui(false, |ui| {
                 ui.text_edit_singleline(&mut display_text);
             });
 
-            if ui.button("Browse").clicked() {
+            if ui.button(tr!("settings-browse")).clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     self.v.settings_dirty = true;
                     self.v.modified_settings.rpcs3_config_dir = Some(path);
                 }
             }
 
-            if ui.button("Auto-detect").clicked() {
+            if ui.button(tr!("settings-auto-detect")).clicked() {
                 self.start_rpcs3_detect(ui.ctx(), DetectFor::Settings);
             }
         });
@@ -213,16 +216,16 @@ impl UpdatesApp {
         // Show status.
         if let Some(dir) = &self.v.modified_settings.rpcs3_config_dir {
             if dir.join("games.yml").exists() {
-                status_pill(ui, "RPCS3 config detected", StatusKind::Done);
+                status_pill(ui, &tr!("settings-rpcs3-config-found"), StatusKind::Done);
             } else {
-                status_pill(ui, "games.yml not found in this directory", StatusKind::Attention);
+                status_pill(ui, &tr!("settings-games-yml-missing"), StatusKind::Attention);
             }
         } else {
-            ui.label("Status: Not configured");
+            ui.label(tr!("settings-status-not-configured"));
         }
 
         ui.add_space(5.0);
-        ui.label("RPCS3 executable:");
+        ui.label(tr!("settings-rpcs3-executable"));
         ui.horizontal(|ui| {
             let exe_display = self
                 .v
@@ -230,20 +233,20 @@ impl UpdatesApp {
                 .rpcs3_executable
                 .as_ref()
                 .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|| "Not configured (auto-detected on scan)".to_string());
+                .unwrap_or_else(|| tr!("settings-rpcs3-executable-unset"));
             let mut display_text = exe_display;
             ui.add_enabled_ui(false, |ui| {
                 ui.text_edit_singleline(&mut display_text);
             });
 
-            if ui.button("Browse").clicked() {
+            if ui.button(tr!("settings-browse")).clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_file() {
                     self.v.settings_dirty = true;
                     self.v.modified_settings.rpcs3_executable = Some(path);
                 }
             }
 
-            if ui.button("Clear").clicked() {
+            if ui.button(tr!("common-clear")).clicked() {
                 self.v.settings_dirty = true;
                 self.v.modified_settings.rpcs3_executable = None;
             }
@@ -252,10 +255,10 @@ impl UpdatesApp {
         ui.add_space(8.0);
         ui.separator();
         ui.add_space(3.0);
-        ui.heading("Content Library");
+        ui.heading(tr!("settings-content-heading"));
         ui.add_space(3.0);
 
-        ui.label("PS3 content directory (patches + DLC):");
+        ui.label(tr!("settings-content-dir"));
         ui.horizontal(|ui| {
             let content_display = self
                 .v
@@ -263,20 +266,20 @@ impl UpdatesApp {
                 .content_directory
                 .as_ref()
                 .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|| "Not configured".to_string());
+                .unwrap_or_else(|| tr!("settings-not-configured"));
             let mut display_text = content_display;
             ui.add_enabled_ui(false, |ui| {
                 ui.text_edit_singleline(&mut display_text);
             });
 
-            if ui.button("Browse").clicked() {
+            if ui.button(tr!("settings-browse")).clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     self.v.settings_dirty = true;
                     self.v.modified_settings.content_directory = Some(path);
                 }
             }
 
-            if ui.button("Clear").clicked() {
+            if ui.button(tr!("common-clear")).clicked() {
                 self.v.settings_dirty = true;
                 self.v.modified_settings.content_directory = None;
             }

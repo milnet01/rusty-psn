@@ -143,7 +143,7 @@ mod tests {
     ];
 
     /// Literals that are names rather than words, so they stay as they are.
-    const PROPER_NAMES: &[&str] = &["RPCS3", "PSN", "rusty-psn"];
+    const PROPER_NAMES: &[&str] = &["RPCS3", "PSN", "rusty-psn", "JSON"];
 
     /// The arguments of the call whose `(` is at `open`, split at top-level commas.
     fn call_arguments(code: &str, open: usize) -> Vec<&str> {
@@ -181,6 +181,17 @@ mod tests {
         args
     }
 
+    /// Whether a literal's source holds a letter, not counting `\u{...}` escapes, which draw symbols.
+    fn holds_a_letter(literal: &str) -> bool {
+        let (mut kept, mut rest) = (String::new(), literal);
+        while let Some(at) = rest.find("\\u{") {
+            kept.push_str(&rest[..at]);
+            rest = rest[at..].split_once('}').map_or("", |(_, after)| after);
+        }
+        kept.push_str(rest);
+        kept.chars().any(|c| c.is_ascii_alphabetic())
+    }
+
     /// Text calls in `code` whose text argument is a string literal holding a letter.
     fn inline_text(code: &str) -> Vec<String> {
         let mut found = Vec::new();
@@ -199,7 +210,7 @@ mod tests {
                     continue;
                 };
                 let literal = text.starts_with('"') && text.ends_with('"') && text.len() >= 2;
-                if literal && text.chars().any(|c| c.is_ascii_alphabetic()) && !PROPER_NAMES.contains(&&text[1..text.len() - 1]) {
+                if literal && holds_a_letter(text) && !PROPER_NAMES.contains(&&text[1..text.len() - 1]) {
                     found.push(format!("{name}({text}"));
                 }
             }
@@ -208,7 +219,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "RPSN-0072: on once every text has moved; red on 2026-10-22 with 149 inline texts"]
     fn the_window_app_has_no_inline_text() {
         let mut found = Vec::new();
         for path in rust_files(Path::new("src/egui")) {
@@ -232,7 +242,8 @@ mod tests {
     fn the_inline_text_scan_sees_each_argument_position() {
         let code = r#"ui.label("Hello"); ui.checkbox(&mut on, "Show"); ui.selectable_value(&mut v, Kind::A, "All");
             ui.hyperlink_to(tr!("x"), "https://example.com"); fn label(text: &str) {} ui.label("RPCS3");
-            ui.selectable_label(true, "Pick"); ui.label(tr!("x")); show_notifications("Done", level);"#;
+            ui.selectable_label(true, "Pick"); ui.label(tr!("x")); show_notifications("Done", level);
+            ui.small_button("\u{2715}");"#;
         assert_eq!(
             inline_text(code),
             [

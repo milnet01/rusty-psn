@@ -81,7 +81,7 @@ impl UpdatesApp {
     pub(super) fn export_results(&mut self) {
         let Some(path) = rfd::FileDialog::new()
             .set_file_name("rusty-psn-results.csv")
-            .add_filter("CSV (spreadsheet)", &["csv"])
+            .add_filter(tr!("export-filter-csv"), &["csv"])
             .add_filter("JSON", &["json"])
             .save_file()
         else {
@@ -91,10 +91,10 @@ impl UpdatesApp {
             .map_err(|e| e.to_string())
             .and_then(|text| std::fs::write(&path, text).map_err(|e| e.to_string()));
         match written {
-            Ok(()) => self.show_notifications(format!("Results saved to {}", path.display()), MessageLevel::Success),
+            Ok(()) => self.show_notifications(tr!("export-saved", path = path.display().to_string()), MessageLevel::Success),
             Err(e) => {
                 error!("Could not save results to {}: {e}", path.display());
-                self.show_notifications(format!("Could not save the results: {e}"), MessageLevel::Error);
+                self.show_notifications(tr!("export-failed", reason = e), MessageLevel::Error);
             }
         }
     }

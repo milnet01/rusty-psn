@@ -17,14 +17,15 @@ pub struct Rpcs3VfsConfig {
 /// Returns a mapping of serial → game path.
 pub fn parse_games_yml(path: &Path) -> Result<HashMap<String, PathBuf>, String> {
     let content = read_yaml(path, "games.yml")?;
-    let value: serde_yaml_ng::Value = serde_yaml_ng::from_str(&content).map_err(|e| format!("failed to parse games.yml: {e}"))?;
+    let value: serde_yaml_ng::Value =
+        serde_yaml_ng::from_str(&content).map_err(|e| tr!("error-rpcs3-games-yml-parse", reason = e.to_string()))?;
 
     // RPCS3 creates games.yml empty, and skips an entry whose serial or path is empty or
     // not a plain value (games_config::load in Emu/games_config.cpp, RPCS3 commit 6fe3c87).
     let map = match value {
         serde_yaml_ng::Value::Null => return Ok(HashMap::new()),
         serde_yaml_ng::Value::Mapping(map) => map,
-        _ => return Err("games.yml is not a list of games".to_string()),
+        _ => return Err(tr!("error-rpcs3-games-yml-not-a-list")),
     };
     Ok(map
         .into_iter()
@@ -44,8 +45,9 @@ pub fn parse_games_yml(path: &Path) -> Result<HashMap<String, PathBuf>, String> 
 
 /// A YAML file's text, refusing one over `MAX_YAML_SIZE`.
 fn read_yaml(path: &Path, name: &str) -> Result<String, String> {
-    let data = super::read_capped(path, MAX_YAML_SIZE).map_err(|e| format!("cannot read {name}: {e}"))?;
-    String::from_utf8(data).map_err(|e| format!("cannot read {name}: {e}"))
+    let cannot_read = |reason: String| tr!("error-rpcs3-cannot-read", name = name, reason = reason);
+    let data = super::read_capped(path, MAX_YAML_SIZE).map_err(|e| cannot_read(e.to_string()))?;
+    String::from_utf8(data).map_err(|e| cannot_read(e.to_string()))
 }
 
 /// The dev_hdd0 folder for an RPCS3 config folder: the one its vfs.yml sets, or

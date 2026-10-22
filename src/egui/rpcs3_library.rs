@@ -55,12 +55,9 @@ impl UpdatesApp {
             (DetectFor::Scan, Some(installation)) => {
                 self.adopt_detected_rpcs3(installation);
                 self.trigger_rpcs3_scan();
-                messages.push(("RPCS3 auto-detected and scan started.".to_string(), MessageLevel::Info));
+                messages.push((tr!("rpcs3-library-detected"), MessageLevel::Info));
             }
-            (DetectFor::Scan, None) => messages.push((
-                "RPCS3 not found. Go to Settings to configure the RPCS3 path.".to_string(),
-                MessageLevel::Warning,
-            )),
+            (DetectFor::Scan, None) => messages.push((tr!("rpcs3-library-not-found-scan"), MessageLevel::Warning)),
             // The Settings page was left while the search ran: nothing is waiting for it.
             (DetectFor::Settings, _) if self.v.page != chrome::Page::Settings => {}
             (DetectFor::Settings, Some(installation)) => {
@@ -70,10 +67,7 @@ impl UpdatesApp {
                     self.v.modified_settings.rpcs3_executable = installation.executable;
                 }
             }
-            (DetectFor::Settings, None) => messages.push((
-                "RPCS3 not found. Please configure the path manually.".to_string(),
-                MessageLevel::Warning,
-            )),
+            (DetectFor::Settings, None) => messages.push((tr!("rpcs3-library-not-found-settings"), MessageLevel::Warning)),
         }
     }
 
@@ -81,7 +75,7 @@ impl UpdatesApp {
         let config_dir = match &self.settings.rpcs3_config_dir {
             Some(dir) => dir.clone(),
             None => {
-                self.show_notifications("RPCS3 not configured. Set the path in Settings.", MessageLevel::Error);
+                self.show_notifications(tr!("rpcs3-library-not-configured"), MessageLevel::Error);
                 return;
             }
         };
@@ -134,12 +128,16 @@ impl UpdatesApp {
                 self.v.rpcs3_installed_games = games;
 
                 messages.push((
-                    format!("RPCS3 scan: {count} game(s) found, checking {search_count} for updates..."),
+                    tr!(
+                        "rpcs3-library-scan-done",
+                        count = count.to_string(),
+                        searching = search_count.to_string()
+                    ),
                     MessageLevel::Info,
                 ));
             }
             Err(e) => {
-                messages.push((format!("RPCS3 scan failed: {e}"), MessageLevel::Error));
+                messages.push((tr!("rpcs3-library-scan-failed", reason = e.to_string()), MessageLevel::Error));
             }
         }
     }
@@ -175,18 +173,20 @@ impl UpdatesApp {
 
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
-                scan = ui.button("Scan RPCS3 library").clicked();
-                ui.label(format!(
-                    "{game_count} game(s) in library, {outdated_count} with updates available"
+                scan = ui.button(tr!("rpcs3-library-scan")).clicked();
+                ui.label(tr!(
+                    "rpcs3-library-summary",
+                    games = game_count.to_string(),
+                    outdated = outdated_count.to_string()
                 ));
 
-                if outdated_count > 0 && ui.button("Update All Outdated").clicked() {
+                if outdated_count > 0 && ui.button(tr!("rpcs3-library-update-all")).clicked() {
                     update_all = Some(games_to_update);
                 }
             });
 
             ui.horizontal(|ui| {
-                ui.label("Show:");
+                ui.label(tr!("rpcs3-library-show"));
                 for filter in LibraryFilter::ALL {
                     ui.selectable_value(&mut self.v.library_filter, filter, filter.label());
                 }
@@ -200,11 +200,11 @@ impl UpdatesApp {
                     .min_col_width(60.0)
                     .show(ui, |ui| {
                         // Header row.
-                        ui.strong("Serial");
-                        ui.strong("Title");
-                        ui.strong("Installed");
-                        ui.strong("Available");
-                        ui.strong("Status");
+                        ui.strong(tr!("common-serial"));
+                        ui.strong(tr!("common-title"));
+                        ui.strong(tr!("rpcs3-library-installed"));
+                        ui.strong(tr!("rpcs3-library-available"));
+                        ui.strong(tr!("rpcs3-library-status"));
                         ui.end_row();
 
                         for i in 0..self.v.rpcs3_installed_games.len() {
@@ -227,14 +227,16 @@ impl UpdatesApp {
                             ui.label(available_ver);
 
                             match self.library_status(game) {
-                                LibraryStatus::NeedsUpdate => status_pill(ui, "Update available", StatusKind::Attention),
-                                LibraryStatus::UpToDate => status_pill(ui, "Up to date", StatusKind::Done),
-                                LibraryStatus::NoUpdates => {
-                                    ui.label("No updates");
+                                LibraryStatus::NeedsUpdate => {
+                                    status_pill(ui, &tr!("rpcs3-library-update-available"), StatusKind::Attention)
                                 }
-                                LibraryStatus::Checking => status_pill(ui, "Checking…", StatusKind::Working),
+                                LibraryStatus::UpToDate => status_pill(ui, &tr!("rpcs3-library-up-to-date"), StatusKind::Done),
+                                LibraryStatus::NoUpdates => {
+                                    ui.label(tr!("rpcs3-library-no-updates"));
+                                }
+                                LibraryStatus::Checking => status_pill(ui, &tr!("rpcs3-library-checking"), StatusKind::Working),
                                 LibraryStatus::VersionUnknown => {
-                                    ui.label("version unknown");
+                                    ui.label(tr!("rpcs3-library-version-unknown"));
                                 }
                                 LibraryStatus::Unknown => {
                                     ui.label("--");
@@ -300,18 +302,21 @@ impl UpdatesApp {
                 let (tid, pid, promise) = self.v.rpcs3_install_promises.remove(i);
                 match promise.block_and_take() {
                     Ok(crate::rpcs3::InstallOutcome::Confirmed) => {
-                        messages.push((format!("Installed {tid} to RPCS3"), MessageLevel::Success));
+                        messages.push((
+                            tr!("rpcs3-library-install-done", serial = tid.as_str()),
+                            MessageLevel::Success,
+                        ));
                         self.v.rpcs3_installed_pkgs.insert((tid, pid));
                     }
                     // No pill, so the Install button stays for a retry once the folder is set.
-                    Ok(crate::rpcs3::InstallOutcome::Unconfirmed) => messages.push((
-                        format!(
-                            "RPCS3 finished installing {tid}, but rusty-psn could not check the result. Set the RPCS3 folder in Settings to check it."
-                        ),
-                        MessageLevel::Warning,
-                    )),
+                    Ok(crate::rpcs3::InstallOutcome::Unconfirmed) => {
+                        messages.push((tr!("common-install-unchecked", name = tid), MessageLevel::Warning))
+                    }
                     Err(e) => {
-                        messages.push((format!("RPCS3 install failed: {e}"), MessageLevel::Error));
+                        messages.push((
+                            tr!("rpcs3-library-install-failed", reason = e.to_string()),
+                            MessageLevel::Error,
+                        ));
                     }
                 }
             } else {
@@ -354,12 +359,12 @@ impl LibraryFilter {
         LibraryFilter::NoUpdates,
     ];
 
-    fn label(self) -> &'static str {
+    fn label(self) -> String {
         match self {
-            LibraryFilter::All => "All",
-            LibraryFilter::NeedsUpdate => "Needs update",
-            LibraryFilter::UpToDate => "Up to date",
-            LibraryFilter::NoUpdates => "No updates exist",
+            LibraryFilter::All => tr!("rpcs3-library-filter-all"),
+            LibraryFilter::NeedsUpdate => tr!("rpcs3-library-filter-needs-update"),
+            LibraryFilter::UpToDate => tr!("rpcs3-library-up-to-date"),
+            LibraryFilter::NoUpdates => tr!("rpcs3-library-filter-no-updates"),
         }
     }
 

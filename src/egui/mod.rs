@@ -154,13 +154,13 @@ enum ResultSortBy {
 }
 
 impl ResultSortBy {
-    fn label(self) -> &'static str {
+    fn label(self) -> String {
         match self {
-            ResultSortBy::SearchOrder => "Search Order",
-            ResultSortBy::Serial => "Serial",
-            ResultSortBy::Title => "Title",
-            ResultSortBy::UpdateCount => "Update Count",
-            ResultSortBy::TotalSize => "Total Size",
+            ResultSortBy::SearchOrder => tr!("results-sort-search-order"),
+            ResultSortBy::Serial => tr!("results-sort-serial"),
+            ResultSortBy::Title => tr!("results-sort-title"),
+            ResultSortBy::UpdateCount => tr!("results-sort-update-count"),
+            ResultSortBy::TotalSize => tr!("results-sort-total-size"),
         }
     }
 }
@@ -232,13 +232,13 @@ const APP_THEMES: [AppTheme; 5] = [
 ];
 
 impl AppTheme {
-    fn label(self) -> &'static str {
+    fn label(self) -> String {
         match self {
-            AppTheme::Dark => "Dark",
-            AppTheme::Light => "Light",
-            AppTheme::PlayStation => "PlayStation",
-            AppTheme::HighContrast => "High contrast",
-            AppTheme::Rpcs3Blue => "RPCS3 Blue",
+            AppTheme::Dark => tr!("settings-theme-dark"),
+            AppTheme::Light => tr!("settings-theme-light"),
+            AppTheme::PlayStation => "PlayStation".to_string(),
+            AppTheme::HighContrast => tr!("settings-theme-high-contrast"),
+            AppTheme::Rpcs3Blue => tr!("settings-theme-rpcs3-blue"),
         }
     }
 
@@ -403,7 +403,7 @@ fn text_size<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u32, D
 /// The label the settings window shows for a text size.
 fn text_size_label(percent: u32) -> String {
     if percent == 100 {
-        "100% (normal)".to_string()
+        tr!("settings-text-size-normal", percent = percent.to_string())
     } else {
         format!("{percent}%")
     }
@@ -952,19 +952,22 @@ impl UpdatesApp {
 
         if let Err(e) = std::process::Command::new(opener).arg(path).spawn() {
             warn!("Could not open {} with {opener}: {e}", path.display());
-            self.show_notifications(format!("Could not open the folder: {e}"), MessageLevel::Warning);
+            self.show_notifications(
+                tr!("common-open-folder-failed", reason = e.to_string()),
+                MessageLevel::Warning,
+            );
         }
     }
 
     /// Copy text to the clipboard, saying so when that fails.
     fn copy_to_clipboard(&mut self, text: String) {
         let Some(clip) = self.v.clipboard.as_mut() else {
-            self.show_notifications("No clipboard is available.", MessageLevel::Warning);
+            self.show_notifications(tr!("common-no-clipboard"), MessageLevel::Warning);
             return;
         };
         if let Err(e) = clip.set_contents(text) {
             warn!("Could not copy to the clipboard: {e}");
-            self.show_notifications(format!("Could not copy: {e}"), MessageLevel::Warning);
+            self.show_notifications(tr!("common-copy-failed", reason = e.to_string()), MessageLevel::Warning);
         }
     }
 }

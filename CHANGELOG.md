@@ -12,6 +12,9 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Changed
 
+- **The app's on-screen text is ready for translation** (RPSN-0072)
+  Every word the window app shows now comes from one English text file, so other languages can be added later. The app reads exactly as before.
+
 - **The window starts at 1240 x 860 and can shrink to 960 x 600; a narrow window wraps the status bar onto a second row instead of cutting it off** (RPSN-0164)
 
 ### Fixed

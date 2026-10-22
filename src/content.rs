@@ -57,12 +57,12 @@ pub enum ContentError {
 impl std::fmt::Display for ContentError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ContentError::Io(e) => write!(f, "I/O error: {e}"),
-            ContentError::Zip(e) => write!(f, "ZIP error: {e}"),
-            ContentError::NoPkgFound => write!(f, "No .pkg file found in ZIP"),
-            ContentError::TooLarge => write!(f, "ZIP unpacks to far more than its own size"),
-            ContentError::DuplicateFile(name) => write!(f, "ZIP holds two files named {name}"),
-            ContentError::InstallFailed(reason) => write!(f, "Install failed: {reason}"),
+            ContentError::Io(e) => f.write_str(&tr!("error-content-io", reason = e.to_string())),
+            ContentError::Zip(e) => f.write_str(&tr!("error-content-zip", reason = e.to_string())),
+            ContentError::NoPkgFound => f.write_str(&tr!("error-content-no-pkg")),
+            ContentError::TooLarge => f.write_str(&tr!("error-content-too-large")),
+            ContentError::DuplicateFile(name) => f.write_str(&tr!("error-content-duplicate", name = name.as_str())),
+            ContentError::InstallFailed(reason) => f.write_str(&tr!("error-content-install", reason = reason.as_str())),
         }
     }
 }
@@ -277,7 +277,7 @@ pub async fn install_dlc_zip(rpcs3_exe: &Path, zip_path: &Path) -> Result<(), Co
     let owned_zip = zip_path.to_path_buf();
     let dlc = tokio::task::spawn_blocking(move || extract_dlc_zip(&owned_zip))
         .await
-        .map_err(|e| ContentError::InstallFailed(format!("unpacking stopped: {e}")))??;
+        .map_err(|e| ContentError::InstallFailed(tr!("error-content-unpacking-stopped", reason = e.to_string())))??;
     info!(
         "Handing RPCS3 {} package(s), {} RAP and {} EDAT licence(s)",
         dlc.pkgs.len(),

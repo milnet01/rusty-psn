@@ -44,7 +44,7 @@ pub enum PsnClientError {
 impl std::fmt::Display for PsnClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PsnClientError::Tls(e) => write!(f, "TLS setup failed: {e}"),
+            PsnClientError::Tls(e) => f.write_str(&tr!("error-psn-tls", reason = e.to_string())),
             PsnClientError::Reqwest(e) => write!(f, "{e}"),
         }
     }
@@ -82,7 +82,7 @@ impl std::fmt::Display for MergeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MergeError::FilepathMismatch(reason) | MergeError::PackagesUnmergeable(reason) => f.write_str(reason),
-            MergeError::FileMergeFailure => f.write_str("the parts could not be joined; the log says why"),
+            MergeError::FileMergeFailure => f.write_str(&tr!("error-merge-failed")),
             MergeError::Security(e) => write!(f, "{e}"),
         }
     }
@@ -308,9 +308,7 @@ impl UpdateInfo {
         format: DirectoryFormat,
     ) -> Result<(), MergeError> {
         if !self.packages.iter().all(|pkg| pkg.part_number.is_some()) {
-            return Err(MergeError::PackagesUnmergeable(String::from(
-                "some packages for the update are not a partial package",
-            )));
+            return Err(MergeError::PackagesUnmergeable(tr!("error-merge-not-partial")));
         }
 
         let mut packages_sorted_by_part_number = self.packages.clone();
@@ -332,20 +330,14 @@ impl UpdateInfo {
         for package in self.packages.iter() {
             let file_name = match package.file_name() {
                 Some(name) => name,
-                None => {
-                    return Err(MergeError::FilepathMismatch(String::from(
-                        "could not deduce filename from a package url",
-                    )))
-                }
+                None => return Err(MergeError::FilepathMismatch(tr!("error-merge-no-file-name"))),
             };
 
             // Safe: the all() check at the top of merge_parts() guarantees part_number is Some.
             let part_number = package.part_number.unwrap();
             let expected_end_of_file_name = format!("_{}.pkg", part_number - 1);
             if !file_name.ends_with(&expected_end_of_file_name) {
-                return Err(MergeError::FilepathMismatch(String::from(
-                    "package name does not end with expected index and extension",
-                )));
+                return Err(MergeError::FilepathMismatch(tr!("error-merge-bad-part-name")));
             }
 
             let merged_file_name = file_name.replace(&expected_end_of_file_name, ".pkg");
