@@ -3,7 +3,7 @@
 ## Where this project is
 
 **State:** 4 — Queue checked (2026-10-12): every discovery sign is named by a roadmap item.
-**In flight:** nothing.
+**In flight:** RPSN-0162, the fork's 1.0.0 release (prep listed in its roadmap notes; publishing waits for the owner's S10 check, RPSN-0095).
 
 ## How work is done here
 

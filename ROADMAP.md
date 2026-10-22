@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=171 -->
+<!-- ants-roadmap-id-high-water: RPSN=172 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1088,6 +1088,27 @@ Lower priority items that would improve the overall experience.
   2026-10-19: after the first release, message ants-projects-hub-website
   with its version and the disclaimer wording change (RPSN-0166: "game
   updates and system software", name "rusty-psn").
+  Owner 2026-10-22: the fork's first release is 1.0.0 (upstream is at
+  0.7.1; the fork's Cargo.toml read 0.5.10). Release prepared now;
+  publishing waits for the owner's S10 check (RPSN-0095), per the
+  2026-10-15 rule that the download waits for every end-to-end check.
+  Release prep found 2026-10-22, not yet done: README.md "latest
+  release" link and the About dialog's GitHub link (src/egui/dialogs.rs,
+  hyperlink_to dialogs-github) still point at RainbowCookie32/rusty-psn;
+  both should point at milnet01/rusty-psn. Issues are disabled on the
+  fork (gh repo view: hasIssuesEnabled false), so the README notice must
+  not tell people to report problems there unless the owner enables
+  them. Still to do: README "unofficial fork, not made or supported by
+  the original author" notice (keep the Disclaimer section
+  byte-identical:
+  dialogs::tests::the_readme_carries_the_about_disclaimer compares it);
+  LICENSE unchanged; docs/standards/versioning-overrides.md (written
+  2026-10-22, review-contract --genre standard run that day); then
+  cut-release 1.0.0 once the owner reports the S10 in-game check
+  (RPSN-0095).
+  Owner 2026-10-22: issues enabled on milnet01/rusty-psn (gh repo view:
+  hasIssuesEnabled true), so people can report problems there. The
+  README notice should send reports to the fork's issues, not upstream.
   **Layman:** Publish your version of rusty-psn for others to download, clearly marked as an unofficial fork.
   Kind: release.
   Source: user-request-2026-10-15.
@@ -1096,6 +1117,9 @@ Lower priority items that would improve the overall experience.
   Owner decision 2026-10-15: do this last, after all other work.
   Needs RPSN-0072's translation layer first. Which languages: ask the
   owner when this starts.
+  Owner 2026-10-22: languages Afrikaans, Spanish, Portuguese (Brazil),
+  and German and/or French (which of the two not yet said; ask when this
+  starts).
   **Layman:** Add other languages to the app, once everything else is done.
   Kind: feature.
   Source: user-request-2026-10-15.
@@ -1270,6 +1294,13 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   `local-dev` was pushed and tracks it, and `origin` stays upstream. The
   owner agreed to publish with their usual commit email. Still open: the
   versioning-overrides note, to wait for a planned release.
+  2026-10-23: docs/standards/versioning-overrides.md passed
+  review-contract --genre standard, capped at 3 loops (calm cap); 4
+  findings fixed, 1 dismissed. One left for the owner: say whether the
+  command line's printed output (STANDARDS.md § 7.2) is a breaking
+  surface, or that it is not and scripts rely on the options and exit
+  code. Record: docs/reviews/versioning-overrides-loop-log.md, commits
+  3b82ba9..fa8cdfa.
   **Layman:** Decide whether to back up your work in your own GitHub copy, and when to note what counts as a breaking change.
   Kind: chore.
   Source: in-session-2026-10-12.
@@ -1706,6 +1737,9 @@ shipped items that built it.
   copied and the PKG installed; the unpack folder was removed. Not run:
   whether the game lists the DLC, because the test copy has no AC3 disc
   game.
+  Owner 2026-10-22: the owner checks the last half (does AC3 list
+  Episode 2 in-game) in their own RPCS3, installing the zip through the
+  app. No game can be booted on the test copy here.
   **Layman:** Check that installing a DLC zip you own makes the DLC appear in the game.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -2512,6 +2546,15 @@ reviewer proposed; check both against the code before fixing.
   Kind: enhancement.
   Source: verify-delivery-s6-2026-10-22.
   Lanes: RPCS3.
+
+- 📋 [RPSN-0172] **security::tests::path_containment_relative_existing_base fails when CARGO_TARGET_DIR moves the build folder.**
+  Found 2026-10-22 building in a worktree with CARGO_TARGET_DIR set
+  elsewhere: tempfile::tempdir_in("target") panics NotFound because
+  ./target does not exist. Fix: create the folder first
+  (std::fs::create_dir_all("target")) or use a folder the test makes.
+  **Layman:** One test only passes when the project's build folder is in its usual place.
+  Kind: test.
+  Source: in-session-2026-10-22.
 
 ## 15. RPCS3 source review (2026-10-13)
 
