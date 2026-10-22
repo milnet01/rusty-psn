@@ -118,7 +118,7 @@ impl UpdatesApp {
                                                 .expect("rt_handle set in UpdatesApp::new before any UI code runs");
                                             let _guard = rt.enter();
                                             let promise = spawn_redrawing(Some(ui.ctx().clone()), async move {
-                                                // A DLC cannot be checked; a clean exit marks it installed, as before
+                                                // A DLC cannot be checked; it is marked installed once RPCS3 has run
                                                 // (docs/specs/RPSN-0137-headless-confirmed-install.md § 3).
                                                 crate::content::install_dlc_zip(&exe, &zip)
                                                     .await

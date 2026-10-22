@@ -416,8 +416,9 @@ fn rpcs3_is_running(lock_file: &Path) -> bool {
 
 /// Install a PKG file, or a folder of PKG, RAP and EDAT files, via RPCS3's headless mode.
 ///
-/// Headless RPCS3 installs with no window and exits 0 whatever happened (`main` in
-/// rpcs3/rpcs3.cpp, RPCS3 commit 6fe3c87), so success is decided by `check`, not the exit.
+/// Headless RPCS3 installs with no window. Its exit status says nothing about the install:
+/// `main` in rpcs3/rpcs3.cpp returns 0 whatever happened (RPCS3 commit 6fe3c87), and RPCS3
+/// 0.0.43 exits 143 at teardown after a good install (RPSN-0168). So `check` decides.
 /// `pkg_path` may also be a folder: RPCS3 then places the RAP and EDAT licences at its top
 /// level and installs every PKG there.
 /// If `rpcs3_executable` is the Flatpak sentinel `flatpak:net.rpcs3.RPCS3`, runs via `flatpak run`.
@@ -531,13 +532,13 @@ async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Resul
         .await
         .map_err(|e| Rpcs3Error::InstallFailed(format!("failed to launch RPCS3: {e}")))?;
 
-    if !output.status.success() {
+    // Logged only: RPCS3 exits 143 after a good install and 0 after a failed one, so what it
+    // left behind decides (RPSN-0137 INV-8, RPSN-0168).
+    if output.status.success() {
+        info!("RPCS3 exited with {}", output.status);
+    } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(Rpcs3Error::InstallFailed(format!(
-            "RPCS3 exited with {}: {}",
-            output.status,
-            stderr.trim()
-        )));
+        warn!("RPCS3 exited with {}: {}", output.status, stderr.trim());
     }
     Ok(())
 }
@@ -551,10 +552,9 @@ pub struct FirmwareCheck {
 
 /// Install a PS3 firmware file (PS3UPDAT.PUP) via RPCS3's headless mode (RPSN-0141).
 ///
-/// Like `install_pkg`, headless RPCS3 exits 0 whatever happened (`run_rpcs3` in rpcs3/rpcs3.cpp,
-/// RPCS3 commit 6fe3c87), so `check`, when given, decides: the firmware version.txt names
-/// afterwards must be the expected one. Runs one at a time with package installs, and not
-/// while RPCS3 is open.
+/// As with `install_pkg`, RPCS3's exit status says nothing about the install, so `check`, when
+/// given, decides: the firmware version.txt names afterwards must be the expected one. Runs one
+/// at a time with package installs, and not while RPCS3 is open.
 pub async fn install_firmware(
     rpcs3_executable: &Path,
     pup_path: &Path,
@@ -1000,7 +1000,8 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn install_confirms_the_expected_version() {
-        // Headless RPCS3 exits 0 whatever happened, so the version read back decides (RPSN-0137).
+        // RPCS3's exit status says nothing about the install, so the version read back decides
+        // (RPSN-0137).
         let root = tempfile::tempdir().unwrap();
         let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 0);
         assert_eq!(
@@ -1040,13 +1041,44 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn install_failure_beats_a_matching_version() {
+    async fn install_ignores_rpcs3s_exit_status() {
+        // RPCS3 exits 143 after a good install and 0 after a failed one (RPSN-0168), so only
+        // what it left behind decides (RPSN-0137 INV-8).
         let root = tempfile::tempdir().unwrap();
-        let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 1);
+        let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), WRITES_01_05, 143);
+        assert_eq!(
+            install(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await.unwrap(),
+            InstallOutcome::Confirmed
+        );
+        assert_eq!(
+            install(&exe, &pkg, InstallCheck::Unconfirmed).await.unwrap(),
+            InstallOutcome::Unconfirmed
+        );
+
+        let root = tempfile::tempdir().unwrap();
+        let (exe, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), "", 0);
         assert!(matches!(
             install(&exe, &pkg, expect(&dev_hdd0, Some("01.05"))).await,
-            Err(Rpcs3Error::InstallFailed(_))
+            Err(Rpcs3Error::NotInstalled { found: None, .. })
         ));
+
+        let root = tempfile::tempdir().unwrap();
+        let dev_flash = root.path().join("dev_flash");
+        let writes_4_93 = format!(
+            "mkdir -p '{0}/vsh/etc' && printf 'release:04.9300:' > '{0}/vsh/etc/version.txt'",
+            dev_flash.display()
+        );
+        let (exe, _, _, _) = stand_in_rpcs3(root.path(), &writes_4_93, 143);
+        let pup = root.path().join("PS3UPDAT.PUP");
+        std::fs::write(&pup, b"pup").unwrap();
+        let check = FirmwareCheck {
+            dev_flash,
+            version: "4.9300".to_string(),
+        };
+        assert_eq!(
+            install_firmware_guarded(&exe, &pup, Some(check), None).await.unwrap(),
+            InstallOutcome::Confirmed
+        );
     }
 
     #[cfg(unix)]

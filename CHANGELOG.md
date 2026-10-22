@@ -16,6 +16,9 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Fixed
 
+- **An RPCS3 install that worked is no longer reported as failed** (RPSN-0168)
+  RPCS3 can crash as it closes after a good install. The app now judges an update or firmware install by the version RPCS3 shows afterwards, not by how RPCS3 exited.
+
 - **On a first start the window opens in the middle of the screen, so on Windows it no longer runs off a 1280 x 1024 screen** (RPSN-0164)
 
 - **STANDARDS.md names the right default download folders for the window app and the command line** (RPSN-0165)

@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=170 -->
+<!-- ants-roadmap-id-high-water: RPSN=171 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1616,13 +1616,18 @@ shipped items that built it.
   Source: check-queue-2026-10-12.
   Lanes: PSN.
 
-- 📋 [RPSN-0092] **Confirm S6: a downloaded update installs into RPCS3 and shows the new version.**
+- ✅ [RPSN-0092] **Confirm S6: a downloaded update installs into RPCS3 and shows the new version.**
   Download a PS3 update, install it through the app, then open RPCS3 and
   check the game reports the new version. Built by RPSN-0053.
   Progress 2026-10-12: not run (no RPCS3 on the test machine). Read: the
   window app's Install to RPCS3 panicked outside the tokio runtime and
   installed the first .pkg in the folder; CLI --install did the same,
   even after a failed download. Both fixed in 981f8ff.
+  Confirmed 2026-10-22 on a private RPCS3 0.0.43-20352 copy, with the
+  RPSN-0168 fix: the CLI (-t BCUS98148 -s --install) installed 01.02 up
+  to 01.30 with no error; PARAM.SFO APP_VER reads 01.30 and RPCS3.log
+  says "Successfully installed ... version=01.30". A rerun logged exit
+  143 and still confirmed 01.30.
   **Layman:** Check that an update installed through the app shows up in RPCS3.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -1681,6 +1686,14 @@ shipped items that built it.
   Install buttons panicked outside the tokio runtime (fixed in 981f8ff);
   multi-file zips and the licence folder remain (RPSN-0111, RPSN-0112,
   RPSN-0098).
+  Progress 2026-10-22, private RPCS3 0.0.43-20352 copy, window app under
+  demoreel: Patches and DLC > Install on the AC3 Tyranny Ep 2 zip
+  (BLUS30991) showed "Installed". dev_hdd0/game/BLUS30991 holds 1.4 GB
+  (PARAM.SFO, USRDIR); exdata holds
+  UP0001-BLUS30991_00-SPAC3DLCSP000002.rap; RPCS3.log says the RAP
+  copied and the PKG installed; the unpack folder was removed. Not run:
+  whether the game lists the DLC, because the test copy has no AC3 disc
+  game.
   **Layman:** Check that installing a DLC zip you own makes the DLC appear in the game.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -2398,7 +2411,7 @@ reviewer proposed; check both against the code before fixing.
   Source: in-session-2026-10-15 (found adding PSP, RPSN-0075).
   Lanes: Window app.
 
-- 📋 [RPSN-0168] **An RPCS3 install that worked is reported as failed, because RPCS3 crashes on exit.**
+- ✅ [RPSN-0168] **An RPCS3 install that worked is reported as failed, because RPCS3 crashes on exit.**
   Found 2026-10-22 running RPSN-0092 (S6) against private copies of RPCS3
   0.0.43-20352-3284e84a and 0.0.43-20291-ffba2bf0 (AppImage, empty home).
   `rpcs3 --headless --installpkg <NPUB30826 01.07>` installs the package
@@ -2417,6 +2430,12 @@ reviewer proposed; check both against the code before fixing.
   and closed (RPSN-0169). The spec now also covers firmware installs
   (they exit 143 too) and a missing RPCS3 behind flatpak. The fix may be
   built.
+  Shipped 2026-10-22: run_headless logs RPCS3's exit status and returns
+  Ok; the version check decides (INV-8). Test
+  install_ignores_rpcs3s_exit_status replaces
+  install_failure_beats_a_matching_version, red first on the old code.
+  Rerun S6 on the private 0.0.43-20352 copy: RPCS3 exited 143 and the
+  app confirmed BCUS98148 at 01.30.
   **Layman:** Installing an update into RPCS3 works, but the app says it failed; the app should judge by the game's new version instead.
   Kind: fix.
   Source: verify-delivery-s6-2026-10-22.
@@ -2452,6 +2471,17 @@ reviewer proposed; check both against the code before fixing.
   **Layman:** If RPCS3 is set up as a Flatpak but is missing, the app should say so instead of reporting an install it could not check.
   Kind: review-fix.
   Source: review-contract-rpsn0137-loop3-2026-10-22.
+  Lanes: RPCS3.
+
+- 📋 [RPSN-0171] **Skip installing updates older than the version RPCS3 already has.**
+  Found 2026-10-22 rerunning S6: with BCUS98148 already at 01.30, `-t
+  BCUS98148 -s --install` ran RPCS3 on each of the 11 older updates, and
+  each gave NotInstalled ("still reports version 01.30"), exit 1. RPCS3
+  left 01.30 in place. Skip, or report as already newer, an update whose
+  version is at or below the installed APP_VER, before launching RPCS3.
+  **Layman:** Installing a game's updates again reports every older update as failed; the app should skip the ones already covered.
+  Kind: enhancement.
+  Source: verify-delivery-s6-2026-10-22.
   Lanes: RPCS3.
 
 ## 15. RPCS3 source review (2026-10-13)
