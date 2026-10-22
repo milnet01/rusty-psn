@@ -2468,6 +2468,8 @@ reviewer proposed; check both against the code before fixing.
   unchecked for a DLC, which is then marked installed (spec § 6, "RPCS3
   missing behind `flatpak`"). Check before launch, for example with
   `flatpak info <app id>`. Build after RPSN-0168.
+  Spec: docs/specs/RPSN-0137-headless-confirmed-install.md INV-9
+  (amended 2026-10-22; review-contract owed before the build).
   **Layman:** If RPCS3 is set up as a Flatpak but is missing, the app should say so instead of reporting an install it could not check.
   Kind: review-fix.
   Source: review-contract-rpsn0137-loop3-2026-10-22.

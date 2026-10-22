@@ -124,7 +124,9 @@ Order inside `install_pkg`:
 4. The exit status is logged and decides nothing (INV-8). The change is in
    `run_headless`, so `install_firmware` follows it (§ 3). A failure to
    launch the process is still `InstallFailed`: `run_headless` finding no
-   executable, or the spawn itself returning an error.
+   executable, or the spawn itself returning an error. **Amended 2026-10-22
+   (RPSN-0170):** finding no executable includes the checks behind
+   `flatpak`, made before launch (INV-9).
 5. Read APP_VER through `sfo::parse_sfo` and compare.
 
 **Versions compare as trimmed text, not with `compare_versions`.** That
@@ -233,6 +235,31 @@ exists.
   *Breaks when:* a non-success exit is turned into an error before the
   version is read, as before this amendment.
 
+- **INV-9** — *Added 2026-10-22 (RPSN-0170).* `run_headless` checks RPCS3
+  is there before launching it, and a missing one is `InstallFailed` under
+  every `InstallCheck` and for `install_firmware`. Three routes:
+  - the Flatpak sentinel `flatpak:<app id>`: `flatpak info <app id>`, run on
+    the host through `sandbox::host_command`, must exit 0;
+  - a path, inside this app's own Flatpak: `test -x <path>`, run on the
+    host the same way, must exit 0;
+  - a path, outside any Flatpak: the path must exist, as before.
+
+  A check that cannot be started is `InstallFailed` too. Measured
+  2026-10-22, Flatpak 1.18.4: `flatpak info` exits 1 for an app id that is
+  not installed and 0 for one that is; from this app's own Flatpak,
+  `flatpak-spawn --host -- test -x` exits 1 for a missing path and 0 for
+  `/usr/bin/ls`.
+  *Test:* `rpcs3::tests::install_refuses_a_missing_flatpak_rpcs3`:
+  `flatpak:net.rpcs3.NotThere` gives `InstallFailed` under `AppVersion` and
+  under `Unconfirmed`. Without the check, `flatpak run` exits 1 and INV-8
+  gives `NotInstalled` and `Ok(Unconfirmed)`. On a machine with no
+  `flatpak`, the launch itself fails, so the test passes with or without
+  the check there. The in-Flatpak route is a manual recipe: from the local
+  Flatpak build, install with an RPCS3 path that does not exist on the
+  host; the result is `InstallFailed` naming the path.
+  *Breaks when:* a missing RPCS3 behind `flatpak` reaches INV-8, so a DLC
+  is marked installed.
+
 ## 6. Failure modes
 
 - **RPCS3 already running.** RPCS3 checks its instance lock
@@ -253,11 +280,12 @@ exists.
   that outcome.
 - **RPCS3 missing behind `flatpak`.** Through `flatpak run`, or through
   `flatpak-spawn --host` from this app's own Flatpak, a missing RPCS3 shows
-  only as a non-zero exit, which INV-8 does not read. `flatpak run` exits 1
-  for an app id that is not installed (measured 2026-10-22);
-  `flatpak-spawn` was not measured. `AppVersion` then reports `NotInstalled`.
-  `Unconfirmed` reports an unchecked install, so the content browser marks a
-  DLC installed.
+  only as a non-zero exit, which INV-8 does not read. So INV-9 checks before
+  launch and reports `InstallFailed`.
+- **RPCS3 removed between INV-9's check and the launch.** The launcher's
+  exit is not read (INV-8): `AppVersion` reports `NotInstalled`;
+  `Unconfirmed` reports an unchecked install, so the content browser marks
+  a DLC installed.
 - **dev_hdd0 moved after detection.** The check reads the wrong folder: a
   false `NotInstalled`, or, with `version: Some`, a false `Confirmed` where
   that folder already holds the version.
@@ -272,11 +300,12 @@ exists.
 | `install_without_a_check_is_unconfirmed` | INV-5 |
 | `install_refuses_an_unsafe_serial` | INV-6 |
 | `install_ignores_rpcs3s_exit_status` | INV-8 |
+| `install_refuses_a_missing_flatpak_rpcs3` | INV-9 (the Flatpak sentinel route) |
 
 Each is `#[cfg(unix)]`, using `sfo::tests::make_test_sfo` for the PARAM.SFO.
 INV-2's test must be seen failing with § 4.2 step 5 replaced by
 `Ok(Confirmed)`, which is today's behaviour under the new signature. INV-7 is the manual
-recipe in its clause.
+recipe in its clause, and so is INV-9's in-Flatpak route.
 
 ## 8. Alternatives considered (and rejected)
 
@@ -319,6 +348,7 @@ recipe in its clause.
 | INV-6 | `rpcs3::tests::install_refuses_an_unsafe_serial` |
 | INV-7 | **nothing** — a manual recipe; no test reaches the window app's messages or the command line's install output |
 | INV-8 | `rpcs3::tests::install_ignores_rpcs3s_exit_status` |
+| INV-9 | `rpcs3::tests::install_refuses_a_missing_flatpak_rpcs3` for the sentinel route; the manual recipe in its clause for the in-Flatpak route |
 
 ## 11. Cross-doc impact
 
