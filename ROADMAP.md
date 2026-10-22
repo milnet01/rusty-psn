@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=168 -->
+<!-- ants-roadmap-id-high-water: RPSN=169 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -2403,6 +2403,22 @@ reviewer proposed; check both against the code before fixing.
   Kind: fix.
   Source: verify-delivery-s6-2026-10-22.
   Lanes: RPCS3.
+
+- 📋 [RPSN-0169] **Name the update chain as an install caller in the RPSN-0137 spec.**
+  Found by a cold review lane on docs/specs/RPSN-0137-headless-confirmed-install.md
+  (2026-10-22). src/egui/update_chain.rs install_in_order calls
+  rpcs3::install_pkg (AppVersion with each package's version, or
+  Unconfirmed with no dev_hdd0), but § 4.3's caller table and § 2 item 3
+  do not name it, so INV-7's manual recipe ("each caller passes the check
+  § 4.3 gives it") does not cover it. Under INV-8 the chain also carries
+  on after an Unconfirmed install where it used to stop on a non-zero
+  exit. Remedy: add the chain's row to § 4.3 and § 4.4 (and the INV-7
+  recipe), recording the code as built. Outside the RPSN-0168 amendment's
+  span, so filed rather than fixed in that review.
+  **Layman:** The install spec lists every place that installs into RPCS3 except the "update all" chain, so its hand test skips it.
+  Kind: doc-fix.
+  Source: review-contract-rpsn0137-loop3-2026-10-22.
+  Lanes: RPCS3, Window app.
 
 ## 15. RPCS3 source review (2026-10-13)
 

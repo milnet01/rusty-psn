@@ -68,6 +68,11 @@ What headless mode does, read at RPCS3 commit 6fe3c87:
   licences and reports success when `rpcs3::install_pkg` does. This spec keeps
   that sentence true: a DLC install succeeds once RPCS3 has run, whatever its
   exit status (INV-8).
+- **A firmware install follows INV-8 too.** Made by this session under the
+  owner's standing go-ahead of 2026-10-12. `install_firmware` (RPSN-0141)
+  shares `run_headless`, and headless `--installfw` also exits 143 after a
+  successful install: measured 2026-10-22 on a private RPCS3 0.0.43-20291
+  copy, which installed firmware 4.92. The owner may reverse this.
 
 ## 4. Design
 
@@ -116,8 +121,10 @@ Order inside `install_pkg`:
    before launching anything.
 2. For `version: None`, read APP_VER before launching.
 3. Launch (§ 4.1) and wait.
-4. The exit status is logged and decides nothing (INV-8). A failure to start
-   RPCS3 at all is still `InstallFailed`.
+4. The exit status is logged and decides nothing (INV-8). The change is in
+   `run_headless`, so `install_firmware` follows it (§ 3). A failure to
+   launch the process is still `InstallFailed`: `run_headless` finding no
+   executable, or the spawn itself returning an error.
 5. Read APP_VER through `sfo::parse_sfo` and compare.
 
 **Versions compare as trimmed text, not with `compare_versions`.** That
@@ -213,12 +220,14 @@ exists.
 
 - **INV-8** — RPCS3's exit status decides nothing. With `AppVersion`, the
   version read decides as INV-2 and INV-3 say; with `Unconfirmed`, the
-  result is `Ok(Unconfirmed)`. Only a failure to start RPCS3 is
-  `InstallFailed`.
+  result is `Ok(Unconfirmed)`. `install_firmware` is the same: its
+  `FirmwareCheck` decides, and with none the result is `Ok(Unconfirmed)`.
+  Only a failure to launch the process (§ 4.2 step 4) is `InstallFailed`.
   *Test:* `rpcs3::tests::install_ignores_rpcs3s_exit_status`: a stand-in that
   writes the expected APP_VER and exits 143 gives `Confirmed`; one that
   writes nothing and exits 0 gives `NotInstalled`; under `Unconfirmed`, one
-  that exits 143 gives `Ok(Unconfirmed)`.
+  that exits 143 gives `Ok(Unconfirmed)`; for `install_firmware`, one that
+  writes the expected `version.txt` and exits 143 gives `Confirmed`.
   *Breaks when:* a non-success exit is turned into an error before the
   version is read, as before this amendment.
 
@@ -240,6 +249,13 @@ exists.
   reports `NotInstalled`.
   Under `Unconfirmed` this is reported as unchecked, which is the point of
   that outcome.
+- **RPCS3 missing behind `flatpak`.** Through `flatpak run`, or through
+  `flatpak-spawn --host` from this app's own Flatpak, a missing RPCS3 shows
+  only as a non-zero exit, which INV-8 does not read. `flatpak run` exits 1
+  for an app id that is not installed (measured 2026-10-22);
+  `flatpak-spawn` was not measured. `AppVersion` then reports `NotInstalled`.
+  `Unconfirmed` reports an unchecked install, so the content browser marks a
+  DLC installed.
 - **dev_hdd0 moved after detection.** The check reads the wrong folder: a
   false `NotInstalled`, or, with `version: Some`, a false `Confirmed` where
   that folder already holds the version.
