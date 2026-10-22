@@ -35,7 +35,8 @@ on.
   dashes.
 - **Results export** — the CSV columns and the JSON fields
   (`src/egui/export.rs`).
-- **Keyboard shortcuts** — Ctrl+F, Ctrl+S and Escape (`src/egui/chrome.rs`).
+- **Keyboard shortcuts** — Ctrl+F and Ctrl+S (Cmd on macOS), and Escape
+  (`src/egui/chrome.rs`).
 - **The Flatpak app id** — `io.github.milnet01.RustyPsn`
   (`packaging/flatpak/`). A new id starts with no settings and no history.
 
