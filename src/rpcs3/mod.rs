@@ -680,10 +680,17 @@ fn installed_app_ver(dev_hdd0: &Path, serial: &str) -> Option<String> {
     }
 }
 
+/// The version of `serial` in `dev_hdd0` where it is `version` or newer, as the window app's
+/// update chain judges it; `None` where `version` would be an update (RPSN-0171). RPCS3 leaves
+/// a newer version in place, so installing an older update reads as a failed install.
+#[cfg_attr(not(feature = "cli"), allow(dead_code))]
+pub fn already_at_or_past(dev_hdd0: &Path, serial: &str, version: &str) -> Option<String> {
+    installed_app_ver(dev_hdd0, serial).filter(|installed| compare_versions(installed, version) != Ordering::Less)
+}
+
 /// Compare two Sony version strings (format "XX.YY", e.g., "01.03", "01.10").
 ///
 /// Returns `Ordering::Less` if `installed` is older than `available`.
-#[cfg_attr(not(feature = "egui"), allow(dead_code))]
 pub fn compare_versions(installed: &str, available: &str) -> Ordering {
     let parse = |v: &str| -> (u32, u32) {
         let parts: Vec<&str> = v.split('.').collect();
@@ -1132,6 +1139,25 @@ mod tests {
         assert!(names_the_app(install(exe, &pkg, expect(&dev_hdd0, None)).await));
         assert!(names_the_app(install(exe, &pkg, InstallCheck::Unconfirmed).await));
         assert!(names_the_app(install_firmware_guarded(exe, &pup, None, None).await));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_update_older_than_the_installed_version_is_already_covered() {
+        let root = tempfile::tempdir().unwrap();
+        let (_, _, dev_hdd0, _) = stand_in_rpcs3(root.path(), "", 0);
+        assert_eq!(
+            already_at_or_past(&dev_hdd0, "BCUS99999", "01.04"),
+            None,
+            "nothing installed yet"
+        );
+
+        let game = dev_hdd0.join("game/BCUS99999");
+        std::fs::create_dir_all(&game).unwrap();
+        std::fs::write(game.join("PARAM.SFO"), sfo::tests::make_test_sfo()).unwrap();
+        assert_eq!(already_at_or_past(&dev_hdd0, "BCUS99999", "01.04").as_deref(), Some("01.05"));
+        assert_eq!(already_at_or_past(&dev_hdd0, "BCUS99999", "01.05").as_deref(), Some("01.05"));
+        assert_eq!(already_at_or_past(&dev_hdd0, "BCUS99999", "01.06"), None);
     }
 
     #[cfg(unix)]

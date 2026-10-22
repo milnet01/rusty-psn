@@ -19,6 +19,9 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Fixed
 
+- **The command line no longer reports older updates as failed installs** (RPSN-0171)
+  With --install, an update RPCS3 already has, or one older than the installed version, is skipped with a note instead of being sent to RPCS3 and counted as a failure.
+
 - **A missing Flatpak RPCS3 is reported, not treated as an install** (RPSN-0170)
   If RPCS3 is set up as a Flatpak that is not installed, the app now says so before it starts, instead of marking a DLC installed.
 

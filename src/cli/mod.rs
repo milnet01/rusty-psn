@@ -528,7 +528,15 @@ pub fn start_app(args: Args) -> bool {
                         parts_downloaded += 1;
                     }
                     // If the download succeeded and --install is set, install exactly the file it wrote.
-                    if install_mode {
+                    let already_at = match (install_mode, &rpcs3_dev_hdd0) {
+                        (true, Some(dev_hdd0)) => crate::rpcs3::already_at_or_past(dev_hdd0, &update.title_id, &pkg.version),
+                        _ => None,
+                    };
+                    if let Some(installed) = &already_at {
+                        if !silent_mode {
+                            println!("  Not installed: {} is already at version {installed}.", update.title_id);
+                        }
+                    } else if install_mode {
                         if let (Some(exe), Some(path)) = (rpcs3_exe.as_ref(), downloaded_file.as_ref()) {
                             if !silent_mode {
                                 println!("  Installing {} to RPCS3...", path.display());

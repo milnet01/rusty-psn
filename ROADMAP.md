@@ -2494,12 +2494,20 @@ reviewer proposed; check both against the code before fixing.
   Source: review-contract-rpsn0137-loop3-2026-10-22.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0171] **Skip installing updates older than the version RPCS3 already has.**
+- ✅ [RPSN-0171] **Skip installing updates older than the version RPCS3 already has.**
   Found 2026-10-22 rerunning S6: with BCUS98148 already at 01.30, `-t
   BCUS98148 -s --install` ran RPCS3 on each of the 11 older updates, and
   each gave NotInstalled ("still reports version 01.30"), exit 1. RPCS3
   left 01.30 in place. Skip, or report as already newer, an update whose
   version is at or below the installed APP_VER, before launching RPCS3.
+  Shipped 2026-10-22: the command line's --install skips an update whose
+  version is at or below RPCS3's installed APP_VER
+  (rpcs3::already_at_or_past, the same compare_versions rule the window
+  app's update chain uses) and prints "Not installed: <serial> is
+  already at version <v>." Not counted as a failure. Red: the 2026-10-22
+  rerun log (11 NotInstalled, exit 1). Green: the same command on the
+  private 0.0.43-20352 copy exits 0 and launches RPCS3 zero times. Test
+  an_update_older_than_the_installed_version_is_already_covered.
   **Layman:** Installing a game's updates again reports every older update as failed; the app should skip the ones already covered.
   Kind: enhancement.
   Source: verify-delivery-s6-2026-10-22.
