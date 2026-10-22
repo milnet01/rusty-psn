@@ -244,17 +244,19 @@ exists.
     host the same way, must exit 0;
   - a path, outside any Flatpak: the path must exist, as before.
 
-  A check that cannot be started is `InstallFailed` too. Measured
+  A check that cannot be started is `InstallFailed` too. Each of these
+  refusals names the app id or the path. Measured
   2026-10-22, Flatpak 1.18.4: `flatpak info` exits 1 for an app id that is
   not installed and 0 for one that is; from this app's own Flatpak,
   `flatpak-spawn --host -- test -x` exits 1 for a missing path and 0 for
   `/usr/bin/ls`.
   *Test:* `rpcs3::tests::install_refuses_a_missing_flatpak_rpcs3`:
-  `flatpak:net.rpcs3.NotThere` gives `InstallFailed` under `AppVersion` and
-  under `Unconfirmed`. Without the check, `flatpak run` exits 1 and INV-8
-  gives `NotInstalled` and `Ok(Unconfirmed)`. On a machine with no
-  `flatpak`, the launch itself fails, so the test passes with or without
-  the check there. The in-Flatpak route is a manual recipe: from the local
+  `flatpak:net.rpcs3.NotThere` gives `InstallFailed` naming
+  `net.rpcs3.NotThere` under `AppVersion` and under `Unconfirmed`. Without
+  the check, `flatpak run` exits 1 and INV-8 gives `NotInstalled` and
+  `Ok(Unconfirmed)`; on a machine with no `flatpak`, the failed launch
+  gives an `InstallFailed` that names no app id. So the test fails without
+  the check on either machine. The in-Flatpak route is a manual recipe: from the local
   Flatpak build, install with an RPCS3 path that does not exist on the
   host; the result is `InstallFailed` naming the path.
   *Breaks when:* a missing RPCS3 behind `flatpak` reaches INV-8, so a DLC
