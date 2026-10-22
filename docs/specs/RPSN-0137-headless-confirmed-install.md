@@ -30,7 +30,12 @@ as success.
 2. **Exit status 0 says nothing about the install.** In headless mode the same
    branch calls `main_window::InstallPackages(nullptr, …)` and then returns 0
    whatever happened. In window mode the exit code reports how RPCS3 was
-   closed.
+   closed. **Amended 2026-10-22 (RPSN-0168):** headless RPCS3 0.0.43-20291
+   and 0.0.43-20352 then crash at teardown ("Verification failed" in
+   `stx::manual_typemap`'s destructor) and exit 143 after a successful
+   install. Measured on private AppImage copies with NPUB30826 01.07: the
+   log says "Successfully installed", APP_VER reads 01.07, the exit is 143.
+   So the exit status carries nothing about the install, either way.
 3. **Every caller trusts it.** The window app's Install button
    (`src/egui/results.rs`, handled by `handle_rpcs3_install_promises` in
    `src/egui/rpcs3_library.rs`), the content browser's patch Install
@@ -61,7 +66,8 @@ What headless mode does, read at RPCS3 commit 6fe3c87:
 - **A DLC install stays unconfirmed.** `docs/design.md` § Writes outside the
   download folder records that Content cannot see whether RPCS3 placed the
   licences and reports success when `rpcs3::install_pkg` does. This spec keeps
-  that sentence true: a DLC install succeeds on a clean RPCS3 exit, as today.
+  that sentence true: a DLC install succeeds once RPCS3 has run, whatever its
+  exit status (INV-8).
 
 ## 4. Design
 
@@ -89,7 +95,7 @@ pub enum InstallCheck {
 
 pub enum InstallOutcome {
     Confirmed,
-    /// RPCS3 exited cleanly; nothing was checked.
+    /// RPCS3 ran; nothing was checked.
     Unconfirmed,
 }
 
@@ -101,7 +107,7 @@ pub async fn install_pkg(
 ```
 
 A new `Rpcs3Error::NotInstalled { serial: String, found: Option<String> }`
-reports a clean exit whose check failed; `found` is the APP_VER read after, or
+reports an install whose check failed; `found` is the APP_VER read after, or
 `None` where there was no readable PARAM.SFO.
 
 Order inside `install_pkg`:
@@ -110,7 +116,8 @@ Order inside `install_pkg`:
    before launching anything.
 2. For `version: None`, read APP_VER before launching.
 3. Launch (§ 4.1) and wait.
-4. A non-success exit status is `InstallFailed`, as today, whatever the check.
+4. The exit status is logged and decides nothing (INV-8). A failure to start
+   RPCS3 at all is still `InstallFailed`.
 5. Read APP_VER through `sfo::parse_sfo` and compare.
 
 **Versions compare as trimmed text, not with `compare_versions`.** That
@@ -156,7 +163,7 @@ exists.
   *Breaks when:* `--headless` is dropped; RPCS3 then opens its window and the
   call waits for the user to close it.
 
-- **INV-2** — With `AppVersion { version: Some(v) }`, a clean exit gives
+- **INV-2** — With `AppVersion { version: Some(v) }`, an install gives
   `Ok(Confirmed)` only when APP_VER read afterwards equals `v`; otherwise
   `Err(NotInstalled { found })`.
   *Test:* `rpcs3::tests::install_confirms_the_expected_version`: a stand-in
@@ -166,7 +173,7 @@ exists.
   *Breaks when:* the exit status alone decides, as today; the stand-in that
   writes nothing then reads as `Confirmed`.
 
-- **INV-3** — With `AppVersion { version: None }`, a clean exit gives
+- **INV-3** — With `AppVersion { version: None }`, an install gives
   `Ok(Confirmed)` only when APP_VER afterwards is present and differs from
   APP_VER before.
   *Test:* `rpcs3::tests::install_confirms_a_changed_version`: no PARAM.SFO
@@ -175,14 +182,14 @@ exists.
   *Breaks when:* APP_VER is read only after the run, so an untouched existing
   PARAM.SFO reads as an install.
 
-- **INV-4** — A non-success exit is `Err(InstallFailed)` whatever the check
-  and whatever PARAM.SFO holds.
-  *Test:* `rpcs3::tests::install_failure_beats_a_matching_version`: a stand-in
-  that writes the expected APP_VER and exits 1 gives `InstallFailed`.
-  *Breaks when:* the version read is allowed to override the exit status.
+- **INV-4** — *Withdrawn 2026-10-22 (RPSN-0168); replaced by INV-8.* It
+  made a non-success exit `InstallFailed` whatever PARAM.SFO held, on the
+  premise that the exit status could report a failure. § 2 item 2 records
+  why it cannot.
+  *Test:* none; its test is removed with it.
 
-- **INV-5** — `InstallCheck::Unconfirmed` gives `Ok(Unconfirmed)` on a clean
-  exit and never `Confirmed`.
+- **INV-5** — `InstallCheck::Unconfirmed` gives `Ok(Unconfirmed)` once RPCS3
+  has run, and never `Confirmed`.
   *Test:* `rpcs3::tests::install_without_a_check_is_unconfirmed`.
   *Breaks when:* a clean exit with nothing checked is reported as
   `Confirmed`, the false claim this spec removes.
@@ -204,6 +211,17 @@ exists.
   *Breaks when:* a caller keeps passing `Unconfirmed` where it knows
   `dev_hdd0`, or reports `Unconfirmed` as success without the warning.
 
+- **INV-8** — RPCS3's exit status decides nothing. With `AppVersion`, the
+  version read decides as INV-2 and INV-3 say; with `Unconfirmed`, the
+  result is `Ok(Unconfirmed)`. Only a failure to start RPCS3 is
+  `InstallFailed`.
+  *Test:* `rpcs3::tests::install_ignores_rpcs3s_exit_status`: a stand-in that
+  writes the expected APP_VER and exits 143 gives `Confirmed`; one that
+  writes nothing and exits 0 gives `NotInstalled`; under `Unconfirmed`, one
+  that exits 143 gives `Ok(Unconfirmed)`.
+  *Breaks when:* a non-success exit is turned into an error before the
+  version is read, as before this amendment.
+
 ## 6. Failure modes
 
 - **RPCS3 already running.** RPCS3 checks its instance lock
@@ -218,7 +236,8 @@ exists.
 - **RPCS3 hangs.** The call never returns, as today. No timeout is added: a
   large package can take minutes and no figure would be right.
 - **RPCS3 refuses the package** (wrong TARGET_APP_VER, a damaged file).
-  Headless RPCS3 still exits 0; the version check reports `NotInstalled`.
+  Headless RPCS3's exit status is the same as on success; the version check
+  reports `NotInstalled`.
   Under `Unconfirmed` this is reported as unchecked, which is the point of
   that outcome.
 - **dev_hdd0 moved after detection.** The check reads the wrong folder: a
@@ -232,9 +251,9 @@ exists.
 | `install_runs_rpcs3_headless` | INV-1 |
 | `install_confirms_the_expected_version` | INV-2 |
 | `install_confirms_a_changed_version` | INV-3 |
-| `install_failure_beats_a_matching_version` | INV-4 |
 | `install_without_a_check_is_unconfirmed` | INV-5 |
 | `install_refuses_an_unsafe_serial` | INV-6 |
+| `install_ignores_rpcs3s_exit_status` | INV-8 |
 
 Each is `#[cfg(unix)]`, using `sfo::tests::make_test_sfo` for the PARAM.SFO.
 INV-2's test must be seen failing with § 4.2 step 5 replaced by
@@ -248,6 +267,10 @@ recipe in its clause.
   reads as running until the user closes RPCS3, which is problem 1, and
   RPSN-0058's batch install would need the user to close RPCS3 once per
   package.
+- **Trust a non-success exit as a failure (the original INV-4).** Rejected
+  2026-10-22 (RPSN-0168): its premise, that a non-zero exit means the
+  install failed, was false; RPCS3 exits 143 after a successful headless
+  install.
 - **Read RPCS3's log for a success line.** No confirmation data needed from
   the caller. Rejected: the log's wording is not a contract and changes
   between RPCS3 versions.
@@ -273,10 +296,11 @@ recipe in its clause.
 | INV-1 | `rpcs3::tests::install_runs_rpcs3_headless` |
 | INV-2 | `rpcs3::tests::install_confirms_the_expected_version` |
 | INV-3 | `rpcs3::tests::install_confirms_a_changed_version` |
-| INV-4 | `rpcs3::tests::install_failure_beats_a_matching_version` |
+| INV-4 | withdrawn; see INV-8 |
 | INV-5 | `rpcs3::tests::install_without_a_check_is_unconfirmed` |
 | INV-6 | `rpcs3::tests::install_refuses_an_unsafe_serial` |
 | INV-7 | **nothing** — a manual recipe; no test reaches the window app's messages or the command line's install output |
+| INV-8 | `rpcs3::tests::install_ignores_rpcs3s_exit_status` |
 
 ## 11. Cross-doc impact
 

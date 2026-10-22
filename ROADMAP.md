@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=167 -->
+<!-- ants-roadmap-id-high-water: RPSN=168 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1019,6 +1019,21 @@ Lower priority items that would improve the overall experience.
   whether PS5 has a public equivalent or needs signed requests), the PS5
   serial prefixes (PPSA and others), the package format and how a
   download is verified, and what PS5 emulators expect on disk.
+  Research 2026-10-22. A PS5 update URL cannot be built from the title
+  id. knutwurst/ps5-patchdl (GPL-3.0, commit 6275a78, 2026-10-21):
+  patchdl_resolve_url computes the PS4 URL with the HMAC key, but for
+  PPSA/PPSE/PPSH/PPSJ/PPSC it only looks the id up in a TSV
+  (/data/patchdl/db/ps5_xml.tsv) or the console's app database field
+  VERSION_FILE_URI (src/patchdl_resolve.c, src/patchdl_appdb.c); read by
+  hand. Hosts it allows: sgst.prod.dl.playstation.net,
+  gst.prod.dl.playstation.net, gs2.ww.prod.dl.playstation.net. Updates
+  are pieces listed in a JSON manifest (url, fileOffset, fileSize,
+  hashValue SHA-256), often tens of GB. PS5 emulators (KytyPS5,
+  SharpEmu) run dumped eboot.bin folders, not pkgs (their READMEs).
+  prosperopatches.com lists versions but gives no Sony URLs. Not
+  verified: psdevwiki blocked the fetch. Verdict: no "type a PPSA id"
+  feature is possible the PS4 way; needs the owner's call (drop, or a
+  narrower "paste a manifest URL" download).
   **Layman:** Let the app find and download PS5 game updates, as it does for PS3, PS4, Vita and PSP.
   Kind: feature.
   Source: user-request-2026-10-15.
@@ -1520,7 +1535,7 @@ One item per discovery sign that no other item claimed on 2026-10-12. Each runs
 the sign by hand against real Sony servers and a real RPCS3, and names the
 shipped items that built it.
 
-- 📋 [RPSN-0089] **Confirm S1: every listed update downloads in full and matches Sony's checksum.**
+- ✅ [RPSN-0089] **Confirm S1: every listed update downloads in full and matches Sony's checksum.**
   Pick game IDs with several updates and download them all. Check every
   file completes and passes the SHA1 check, and that a corrupted file is
   not kept. Built by the upstream download code; RPSN-0025 re-hashes after
@@ -1531,30 +1546,47 @@ shipped items that built it.
   (fixed in 981f8ff; regression test
   hash_file_accepts_upper_case_checksum). Still open: a failed file is
   kept (RPSN-0116).
+  Confirmed 2026-10-22 (CLI release build of ac59bc7, -s): PS3 BCUS98148
+  LittleBigPlanet, all 13 updates (01.02 to 01.30) downloaded, exit 0.
+  Each file's own PKG footer SHA-1 recomputed independently (python
+  hashlib over the file minus its last 32 bytes): 13 of 13 match. A
+  corrupted file is not kept: RPSN-0116, test
+  a_whole_file_that_fails_its_checksum_is_deleted; not forced live,
+  since the network cannot be made to corrupt a file on demand.
   **Layman:** Check that every update for a game downloads completely and undamaged.
   Kind: test.
   Source: check-queue-2026-10-12.
   Lanes: PSN.
 
-- 📋 [RPSN-0090] **Confirm S2: a dropped connection resumes and still ends verified.**
+- ✅ [RPSN-0090] **Confirm S2: a dropped connection resumes and still ends verified.**
   Interrupt a large download mid-way and restart it. Check it resumes from
   where it stopped and finishes with a matching checksum. Built by
   RPSN-0024, RPSN-0025 and RPSN-0030.
   Progress 2026-10-12: not run. Read: any non-206 reply during resume
   truncated the partial file; fixed in 981f8ff (error statuses now leave
   it intact). Content-Range is still unchecked (RPSN-0118).
+  Confirmed 2026-10-22 (CLI release build of ac59bc7): BCUS98148 01.18
+  (188.7 MiB) stopped by SIGINT after 4 s at 10.9 MiB; the rerun printed
+  "Resuming from 10.9 MiB...", then "Verifying checksum...", exit 0. The
+  result is byte-identical (cmp) to the same update downloaded without
+  interruption, and its PKG footer SHA-1 matches.
   **Layman:** Check that an interrupted download picks up where it left off.
   Kind: test.
   Source: check-queue-2026-10-12.
   Lanes: PSN.
 
-- 📋 [RPSN-0091] **Confirm S5: PS3, PS4 and PSVita game IDs each return their updates.**
+- ✅ [RPSN-0091] **Confirm S5: PS3, PS4 and PSVita game IDs each return their updates.**
   Look up one known game ID for each console and download an update from
   each list, with S1 holding for each. PSVita support was built by
   RPSN-0041, RPSN-0043 and RPSN-0047.
   Progress 2026-10-12 (verify-delivery, CLI run): PS3 NPUB30826, PS4
   CUSA01021 and PSVita PCSA00007 each listed their updates. The psn
   network tests also pass in ./scripts/local-ci.sh.
+  Confirmed 2026-10-22 (CLI release build of ac59bc7): PS3 NPUB30826
+  (01.07), PSVita PCSA00007 (01.01), PS4 CUSA01021 (01.54) and PSP
+  NPUG80318 (02.00) each listed their updates. Downloads of each
+  console's lists: PS3 in RPSN-0089's run; PS4, Vita were downloaded and
+  verified 2026-10-12.
   **Layman:** Check that updates are found for PS3, PS4 and Vita games.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -2326,6 +2358,25 @@ reviewer proposed; check both against the code before fixing.
   Kind: fix.
   Source: in-session-2026-10-15 (found adding PSP, RPSN-0075).
   Lanes: Window app.
+
+- 📋 [RPSN-0168] **An RPCS3 install that worked is reported as failed, because RPCS3 crashes on exit.**
+  Found 2026-10-22 running RPSN-0092 (S6) against private copies of RPCS3
+  0.0.43-20352-3284e84a and 0.0.43-20291-ffba2bf0 (AppImage, empty home).
+  `rpcs3 --headless --installpkg <NPUB30826 01.07>` installs the package
+  (RPCS3.log: "Successfully installed ... version=01.07"; PARAM.SFO
+  APP_VER 01.07), then exits 143 after "Verification failed" in
+  stx::manual_typemap's destructor at teardown. RPCS3's main
+  (rpcs3/rpcs3.cpp, master 76d4c45) returns 0 after
+  main_window::InstallPackages(nullptr, ...) whatever the install did,
+  so the exit status never reports the install. run_headless turns 143
+  into InstallFailed before the version check runs (RPSN-0137 § 4.2 step
+  4, INV-4). Fix: the version check decides; the exit status is logged.
+  Needs an amendment to docs/specs/RPSN-0137-headless-confirmed-install.md
+  (INV-4) and its gate first.
+  **Layman:** Installing an update into RPCS3 works, but the app says it failed; the app should judge by the game's new version instead.
+  Kind: fix.
+  Source: verify-delivery-s6-2026-10-22.
+  Lanes: RPCS3.
 
 ## 15. RPCS3 source review (2026-10-13)
 
