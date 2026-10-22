@@ -119,7 +119,8 @@ Order inside `install_pkg`:
 
 1. Validate `serial` with `looks_like_serial`; refuse with `InstallFailed`
    before launching anything.
-2. For `version: None`, read APP_VER before launching.
+2. For `version: None`, read APP_VER before launching, after taking the
+   install queue (§ 6).
 3. Launch (§ 4.1) and wait.
 4. The exit status is logged and decides nothing (INV-8). The change is in
    `run_headless`, so `install_firmware` follows it (§ 3). A failure to
@@ -252,8 +253,9 @@ exists.
   `/usr/bin/ls`.
   *Test:* `rpcs3::tests::install_refuses_a_missing_flatpak_rpcs3`:
   `flatpak:net.rpcs3.NotThere` gives `InstallFailed` naming
-  `net.rpcs3.NotThere` under `AppVersion` and under `Unconfirmed`. Without
-  the check, `flatpak run` exits 1 and INV-8 gives `NotInstalled` and
+  `net.rpcs3.NotThere` under `AppVersion`, under `Unconfirmed`, and from
+  `install_firmware` with no `FirmwareCheck`. Without the check,
+  `flatpak run` exits 1 and INV-8 gives `NotInstalled` and
   `Ok(Unconfirmed)`; on a machine with no `flatpak`, the failed launch
   gives an `InstallFailed` that names no app id. So the test fails without
   the check on either machine. The in-Flatpak route is a manual recipe: from the local
