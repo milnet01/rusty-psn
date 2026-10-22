@@ -24,8 +24,10 @@ on.
 - **Saved window-app state** — the settings and their keys and the download
   history (`UpdatesApp::save` in `src/egui/mod.rs`), and the window's size
   and position (eframe's, and `src/egui/placement.rs` on KDE Wayland). eframe
-  keeps them in a folder named from the app name `src/main.rs` passes to
-  `eframe::run_native`. Older saved state must still load from there.
+  keeps them in a folder named from the viewport's `app_id`, or, with none
+  set, from the app name `src/main.rs` passes to `eframe::run_native`; a
+  `persistence_path` overrides both. Older saved state must still load from
+  there.
 - **Download folders** — the three folder layouts (`DirectoryFormat` in
   `src/utils.rs`), where a download lands under each, and the layout and
   folder each build uses when the user chose none. A changed layout strands
