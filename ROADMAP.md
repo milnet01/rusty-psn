@@ -2461,7 +2461,7 @@ reviewer proposed; check both against the code before fixing.
   Source: review-contract-rpsn0137-loop3-2026-10-22.
   Lanes: RPCS3, Window app.
 
-- 📋 [RPSN-0170] **Check a Flatpak RPCS3 exists before installing through it.**
+- ✅ [RPSN-0170] **Check a Flatpak RPCS3 exists before installing through it.**
   After RPSN-0168, an exit status decides nothing (RPSN-0137 INV-8), so a
   missing RPCS3 behind `flatpak run` or flatpak-spawn (exit 1, measured
   2026-10-22 with net.rpcs3.NotThere) reads as NotInstalled, or as
@@ -2471,6 +2471,12 @@ reviewer proposed; check both against the code before fixing.
   Spec: docs/specs/RPSN-0137-headless-confirmed-install.md INV-9
   (amended 2026-10-22; review-contract gated 2026-10-22, loops 5-6,
   cap reached, accepted; ready to build).
+  Shipped 2026-10-22: run_headless checks before launch (INV-9):
+  `flatpak info <app id>` for the sentinel, host `test -x` for a path
+  inside this app's Flatpak, the path's existence elsewhere; each
+  refusal is InstallFailed naming the app id or path. Test
+  install_refuses_a_missing_flatpak_rpcs3, red first. Not run: INV-9's
+  in-Flatpak manual recipe (needs a fresh Flatpak build).
   **Layman:** If RPCS3 is set up as a Flatpak but is missing, the app should say so instead of reporting an install it could not check.
   Kind: review-fix.
   Source: review-contract-rpsn0137-loop3-2026-10-22.

@@ -16,6 +16,9 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Fixed
 
+- **A missing Flatpak RPCS3 is reported, not treated as an install** (RPSN-0170)
+  If RPCS3 is set up as a Flatpak that is not installed, the app now says so before it starts, instead of marking a DLC installed.
+
 - **An RPCS3 install that worked is no longer reported as failed** (RPSN-0168)
   RPCS3 can crash as it closes after a good install. The app now judges an update or firmware install by the version RPCS3 shows afterwards, not by how RPCS3 exited.
 

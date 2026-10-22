@@ -37,13 +37,13 @@ pub enum Rpcs3Error {
     SfoParseFailed(PathBuf, String),
     YamlParseFailed(String),
     InstallFailed(String),
-    /// RPCS3 exited cleanly but the installed version is not the expected one.
+    /// RPCS3 ran but the installed version is not the expected one.
     /// `found` is the APP_VER read afterwards, `None` where no PARAM.SFO could be read.
     NotInstalled {
         serial: String,
         found: Option<String>,
     },
-    /// RPCS3 exited cleanly but its firmware is not the version installed. `found` is the version
+    /// RPCS3 ran but its firmware is not the version installed. `found` is the version
     /// `dev_flash/vsh/etc/version.txt` names afterwards, `None` where it cannot be read.
     FirmwareNotInstalled {
         expected: String,
@@ -342,7 +342,7 @@ pub enum InstallCheck {
 #[derive(Debug, PartialEq)]
 pub enum InstallOutcome {
     Confirmed,
-    /// RPCS3 exited cleanly; nothing was checked.
+    /// RPCS3 ran; nothing was checked.
     Unconfirmed,
 }
 
@@ -501,15 +501,27 @@ async fn install_pkg_guarded(
 /// From inside this app's own Flatpak, RPCS3 runs on the host (RPSN-0074).
 async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Result<(), Rpcs3Error> {
     let exe_str = rpcs3_executable.to_string_lossy();
-    let is_flatpak = exe_str.starts_with("flatpak:");
+    let flatpak_app_id = exe_str.strip_prefix("flatpak:");
 
-    // A sandbox cannot see the host's /usr, where `which rpcs3` may have found it; there a
-    // missing RPCS3 shows as flatpak-spawn's failed exit instead.
-    if !is_flatpak && !crate::sandbox::in_flatpak() && !rpcs3_executable.exists() {
-        return Err(Rpcs3Error::InstallFailed(format!(
-            "RPCS3 executable not found: {}",
-            rpcs3_executable.display()
-        )));
+    // Behind `flatpak run` or flatpak-spawn a missing RPCS3 shows only as a failed exit, which
+    // decides nothing, so look for it first (RPSN-0137 INV-9). A sandbox cannot see the host's
+    // /usr, where `which rpcs3` may have found it, so there the host looks.
+    if let Some(app_id) = flatpak_app_id {
+        if !host_succeeds("flatpak", &["info".as_ref(), app_id.as_ref()]).await {
+            return Err(Rpcs3Error::InstallFailed(format!("RPCS3 Flatpak {app_id} is not installed")));
+        }
+    } else {
+        let found = if crate::sandbox::in_flatpak() {
+            host_succeeds("test", &["-x".as_ref(), rpcs3_executable.as_os_str()]).await
+        } else {
+            rpcs3_executable.exists()
+        };
+        if !found {
+            return Err(Rpcs3Error::InstallFailed(format!(
+                "RPCS3 executable not found: {}",
+                rpcs3_executable.display()
+            )));
+        }
     }
 
     info!(
@@ -518,8 +530,7 @@ async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Resul
         path.display()
     );
 
-    let mut command = if is_flatpak {
-        let app_id = exe_str.strip_prefix("flatpak:").unwrap_or("net.rpcs3.RPCS3");
+    let mut command = if let Some(app_id) = flatpak_app_id {
         let mut command = crate::sandbox::host_command("flatpak");
         command.args(["run", app_id]);
         command
@@ -532,8 +543,8 @@ async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Resul
         .await
         .map_err(|e| Rpcs3Error::InstallFailed(format!("failed to launch RPCS3: {e}")))?;
 
-    // Logged only: RPCS3 exits 143 after a good install and 0 after a failed one, so what it
-    // left behind decides (RPSN-0137 INV-8, RPSN-0168).
+    // Logged only: RPCS3 0.0.43 exits 143 after a good install and after a refused one, so what
+    // it left behind decides (RPSN-0137 INV-8, RPSN-0168).
     if output.status.success() {
         info!("RPCS3 exited with {}", output.status);
     } else {
@@ -541,6 +552,20 @@ async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Resul
         warn!("RPCS3 exited with {}: {}", output.status, stderr.trim());
     }
     Ok(())
+}
+
+/// Whether `program` with `args`, run on the host, exits 0. A program that cannot be started
+/// counts as a failure.
+async fn host_succeeds(program: &str, args: &[&std::ffi::OsStr]) -> bool {
+    let mut command = crate::sandbox::host_command(program);
+    command
+        .args(args)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    tokio::process::Command::from(command)
+        .status()
+        .await
+        .is_ok_and(|status| status.success())
 }
 
 /// What a firmware install should leave behind: `dev_flash` holding firmware `version`, as Sony
@@ -1079,6 +1104,23 @@ mod tests {
             install_firmware_guarded(&exe, &pup, Some(check), None).await.unwrap(),
             InstallOutcome::Confirmed
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn install_refuses_a_missing_flatpak_rpcs3() {
+        // Behind `flatpak run` a missing RPCS3 shows only as a failed exit, which decides nothing,
+        // so it is looked for first (RPSN-0137 INV-9, RPSN-0170).
+        let root = tempfile::tempdir().unwrap();
+        let (_, _, dev_hdd0, pkg) = stand_in_rpcs3(root.path(), "", 0);
+        let pup = root.path().join("PS3UPDAT.PUP");
+        std::fs::write(&pup, b"pup").unwrap();
+        let exe = Path::new("flatpak:net.rpcs3.NotThere");
+        let names_the_app = |result: Result<InstallOutcome, Rpcs3Error>| matches!(result, Err(Rpcs3Error::InstallFailed(ref m)) if m.contains("net.rpcs3.NotThere"));
+
+        assert!(names_the_app(install(exe, &pkg, expect(&dev_hdd0, None)).await));
+        assert!(names_the_app(install(exe, &pkg, InstallCheck::Unconfirmed).await));
+        assert!(names_the_app(install_firmware_guarded(exe, &pup, None, None).await));
     }
 
     #[cfg(unix)]
