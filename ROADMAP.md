@@ -845,6 +845,9 @@ Lower priority items that would improve the overall experience.
   2026-10-22 after the contract review (2 loops, capped at the spec cap,
   calm; 17 verified findings, all fixed; nothing deferred). Loop log:
   docs/reviews/RPSN-0072-translation-layer-loop-log.md.
+  Owner 2026-10-22: keep i18n-embed despite RUSTSEC-2026-0374
+  (basic-toml unmaintained, reached through i18n-config at build time
+  only; a warning, cargo audit exits 0).
   **Layman:** Prepare the app for translation into other languages.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -1013,7 +1016,7 @@ Lower priority items that would improve the overall experience.
   Kind: fix.
   Source: in-session-2026-10-15.
 
-- 📋 [RPSN-0161] **PS5 game updates.**
+- 🚫 [RPSN-0161] **PS5 game updates.**
   Owner request 2026-10-15: Sony has announced the end of physical
   media for PlayStation games, and PS5 emulation is moving fast as a
   result, so PS5 updates are now worth having. The app already fetches
@@ -1038,6 +1041,10 @@ Lower priority items that would improve the overall experience.
   verified: psdevwiki blocked the fetch. Verdict: no "type a PPSA id"
   feature is possible the PS4 way; needs the owner's call (drop, or a
   narrower "paste a manifest URL" download).
+  Owner decision 2026-10-22: dropped, after the research above. Nothing
+  useful can be built for PS5 emulator users: the update URL cannot be
+  derived from the title id, and PS5 emulators run console dumps, not
+  update packages.
   **Layman:** Let the app find and download PS5 game updates, as it does for PS3, PS4, Vita and PSP.
   Kind: feature.
   Source: user-request-2026-10-15.
