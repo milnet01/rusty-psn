@@ -317,7 +317,7 @@ UpdatesApp (eframe::App)
 ### 6.2 State Management
 
 - **Persisted state** (`#[derive(Serialize, Deserialize)]`): `AppSettings` saved via `eframe::set_value` / `eframe::get_value` between sessions. The History page's entries are stored beside them under `download_history`, newest 500 kept (`src/egui/history.rs`)
-- **Window size and position**: the window starts at 1240 x 860, so it fits a 1280 x 1024 screen, and cannot be made smaller than 960 x 600 (`src/main.rs`, RPSN-0164). eframe saves the size, and the position where the system reports one. Wayland reports none, so on KDE Plasma `src/egui/placement.rs` asks KWin for it at close and stores it under its own key, `kwin_frame_position` (RPSN-0156)
+- **Window size and position**: the window starts at 1240 x 860, so it fits a 1280 x 1024 screen, and cannot be made smaller than 960 x 600 (`src/main.rs`, RPSN-0164). On a first start, with no saved settings, `src/egui/placement.rs` moves it to the middle of the screen; Wayland ignores that move. eframe saves the size, and the position where the system reports one. Wayland reports none, so on KDE Plasma `src/egui/placement.rs` asks KWin for it at close and stores it under its own key, `kwin_frame_position` (RPSN-0156)
 - **Volatile state**: `VolatileData` marked `#[serde(skip)]`, reset each launch
 - Settings modification uses a dirty-flag pattern: `settings_dirty` tracks unsaved changes, `modified_settings` holds the working copy
 

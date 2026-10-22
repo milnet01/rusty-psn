@@ -1049,7 +1049,7 @@ Lower priority items that would improve the overall experience.
   Kind: feature.
   Source: user-request-2026-10-15.
 
-- 📋 [RPSN-0164] **Let the window fit a 1280-pixel-wide screen.**
+- ✅ [RPSN-0164] **Let the window fit a 1280-pixel-wide screen.**
   Seen 2026-10-15 on the Windows test PC (1280x1024): src/main.rs
   sets with_min_inner_size([1320.0, 700.0]), so the window cannot fit
   and the right edge of the results list was cut off. Matters once the
@@ -1068,6 +1068,14 @@ Lower priority items that would improve the overall experience.
   placement in src/egui/placement.rs, working. Re-test with the
   ui.ps1-style check: the window's BoundingRectangle must sit inside
   Screen.WorkingArea.
+  2026-10-22, part 2: a first start (no saved settings) centres the
+  window off Wayland (src/egui/placement.rs, tests
+  a_first_start_centres_the_window_once,
+  a_later_start_leaves_the_saved_position_alone). eframe's `centered:
+  true` was not used: it re-centres on every start, overriding a saved
+  position. Windows test PC, local mingw build: window 12,63 size
+  1256x899, inside work area 1280x984; with a planted saved position of
+  5,10 it opened at 5,10.
   **Layman:** On a small screen the app's window is wider than the screen, so its right edge is cut off.
   Kind: ux.
   Source: in-session-2026-10-15.

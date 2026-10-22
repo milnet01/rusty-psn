@@ -577,6 +577,8 @@ struct VolatileData {
     frame_position: Option<(i32, i32)>,
     /// Whether the saved position has been handed to KWin this run.
     placement_restored: bool,
+    /// Whether this is a first start whose window has not yet been centred; see `placement`.
+    centre_pending: bool,
 }
 
 impl Default for VolatileData {
@@ -669,6 +671,7 @@ impl Default for VolatileData {
 
             frame_position: None,
             placement_restored: false,
+            centre_pending: false,
         }
     }
 }
@@ -797,6 +800,8 @@ impl UpdatesApp {
         app.v.rt_handle = Some(rt_handle);
         app.v.psn_client = Some(psn_client);
         app.v.egui_ctx = Some(cc.egui_ctx.clone());
+        // No saved settings means no saved window either: eframe writes both on every save.
+        app.v.centre_pending = cc.storage.is_none_or(|storage| storage.get_string(eframe::APP_KEY).is_none());
         app.v.frame_position = cc
             .storage
             .and_then(|storage| eframe::get_value(storage, placement::STORAGE_KEY));

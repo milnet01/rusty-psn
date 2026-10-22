@@ -6,6 +6,9 @@
 //! way to reach it: the script's `print()` lands in the user journal, and a script may move a
 //! window. The owner's OneUp app does the same (`oneup/gui/placement.py`). Other Wayland desktops
 //! keep the size only.
+//!
+//! Off Wayland, a first start moves the window to the middle of its screen. Left to itself, Windows
+//! places a new window down and to the right, which can push it off a small screen (RPSN-0164).
 
 use super::*;
 
@@ -25,10 +28,11 @@ const ANSWER_TIMEOUT: Duration = Duration::from_millis(1500);
 const RESTORE_DELAY: Duration = Duration::from_millis(300);
 
 impl UpdatesApp {
-    /// Restores the saved position once, after the first frame, and saves the position when the
-    /// window is asked to close. Does nothing unless winit chose Wayland.
+    /// On Wayland, restores the saved position once, after the first frame, and saves the position
+    /// when the window is asked to close. Elsewhere, centres the window on a first start.
     pub(super) fn handle_window_placement(&mut self, ctx: &egui::Context) {
         if !on_wayland() {
+            self.centre_on_first_start(ctx);
             return;
         }
         if !self.v.placement_restored {
@@ -50,6 +54,25 @@ impl UpdatesApp {
             }
         }
     }
+
+    /// On a first start, moves the window to the middle of its screen as soon as egui knows both
+    /// sizes. A later start keeps the position eframe saved.
+    fn centre_on_first_start(&mut self, ctx: &egui::Context) {
+        if !self.v.centre_pending {
+            return;
+        }
+        let (outer, monitor) = ctx.input(|i| (i.viewport().outer_rect, i.viewport().monitor_size));
+        if let (Some(outer), Some(monitor)) = (outer, monitor) {
+            self.v.centre_pending = false;
+            ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(centred(outer.size(), monitor)));
+        }
+    }
+}
+
+/// The top-left corner that centres a window of `window` size on a screen of `monitor` size,
+/// kept on screen when the window is the larger.
+fn centred(window: egui::Vec2, monitor: egui::Vec2) -> egui::Pos2 {
+    ((monitor - window) / 2.0).max(egui::Vec2::ZERO).to_pos2()
 }
 
 /// Whether winit chose Wayland, by winit's own rule: a non-empty `WAYLAND_DISPLAY` or `WAYLAND_SOCKET`
@@ -182,6 +205,57 @@ fn run_kwin_script(js: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Runs one frame in which egui reports the window's outer rectangle and the screen size, and
+    /// returns the window moves the app asked for.
+    fn moves_after_frame(app: &mut UpdatesApp, ctx: &egui::Context) -> Vec<egui::ViewportCommand> {
+        let info = egui::ViewportInfo {
+            // The Windows test PC's first start, before RPSN-0164: off the right and bottom.
+            outer_rect: Some(egui::Rect::from_min_size(egui::pos2(104.0, 104.0), egui::vec2(1256.0, 899.0))),
+            monitor_size: Some(egui::vec2(1280.0, 1024.0)),
+            ..Default::default()
+        };
+        let mut input = egui::RawInput::default();
+        input.viewports.insert(egui::ViewportId::ROOT, info);
+        let mut output = ctx.run_ui(input, |ui| app.centre_on_first_start(&ui.ctx().clone()));
+        // Nothing draws these textures; epaint panics if they are dropped unapplied.
+        output.textures_delta.clear();
+        output
+            .viewport_output
+            .remove(&egui::ViewportId::ROOT)
+            .map(|viewport| viewport.commands)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|command| matches!(command, egui::ViewportCommand::OuterPosition(_)))
+            .collect()
+    }
+
+    #[test]
+    fn a_first_start_centres_the_window_once() {
+        let ctx = egui::Context::default();
+        let mut app = UpdatesApp::default();
+        app.v.centre_pending = true;
+        assert_eq!(
+            moves_after_frame(&mut app, &ctx),
+            vec![egui::ViewportCommand::OuterPosition(egui::pos2(12.0, 62.5))]
+        );
+        assert!(moves_after_frame(&mut app, &ctx).is_empty());
+    }
+
+    #[test]
+    fn a_later_start_leaves_the_saved_position_alone() {
+        let ctx = egui::Context::default();
+        let mut app = UpdatesApp::default();
+        assert!(moves_after_frame(&mut app, &ctx).is_empty());
+    }
+
+    #[test]
+    fn a_window_larger_than_the_screen_starts_at_its_corner() {
+        assert_eq!(
+            centred(egui::vec2(1400.0, 900.0), egui::vec2(1280.0, 1024.0)),
+            egui::pos2(0.0, 62.0)
+        );
+    }
 
     #[test]
     fn frame_from_journal_reads_the_marked_line() {
