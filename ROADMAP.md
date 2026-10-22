@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=169 -->
+<!-- ants-roadmap-id-high-water: RPSN=170 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -2441,6 +2441,18 @@ reviewer proposed; check both against the code before fixing.
   Kind: doc-fix.
   Source: review-contract-rpsn0137-loop3-2026-10-22.
   Lanes: RPCS3, Window app.
+
+- 📋 [RPSN-0170] **Check a Flatpak RPCS3 exists before installing through it.**
+  After RPSN-0168, an exit status decides nothing (RPSN-0137 INV-8), so a
+  missing RPCS3 behind `flatpak run` or flatpak-spawn (exit 1, measured
+  2026-10-22 with net.rpcs3.NotThere) reads as NotInstalled, or as
+  unchecked for a DLC, which is then marked installed (spec § 6, "RPCS3
+  missing behind `flatpak`"). Check before launch, for example with
+  `flatpak info <app id>`. Build after RPSN-0168.
+  **Layman:** If RPCS3 is set up as a Flatpak but is missing, the app should say so instead of reporting an install it could not check.
+  Kind: fix.
+  Source: review-contract-rpsn0137-loop3-2026-10-22.
+  Lanes: RPCS3.
 
 ## 15. RPCS3 source review (2026-10-13)
 
