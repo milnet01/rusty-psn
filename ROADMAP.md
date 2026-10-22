@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=166 -->
+<!-- ants-roadmap-id-high-water: RPSN=167 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1114,6 +1114,16 @@ Lower priority items that would improve the overall experience.
   **Layman:** The app and its README say plainly that it fetches only Sony's official updates, holds no games, and is not made by Sony.
   Kind: doc.
   Source: user-request-2026-10-16 (via ants-projects-hub-website).
+
+- ✅ [RPSN-0167] **Update rustls-webpki and webpki-root-certs past two certificate advisories.**
+  The pre-push cargo audit refused a7f45f3 on 2026-10-22:
+  RUSTSEC-2026-0382 (rustls-webpki 0.103.15 may accept distrusted
+  intermediates) and RUSTSEC-2026-0383 (webpki-root-certs 1.0.9 trusts
+  distrusted emSign intermediates). cargo update moved them to 0.103.16
+  and 1.0.10; cargo audit then reports no vulnerabilities.
+  **Layman:** Two parts of the secure-connection code had a known flaw; they are updated to the fixed versions.
+  Kind: security.
+  Source: pre-push-audit-2026-10-22.
 
 ## 10. Custom Application Icon [P2]
 

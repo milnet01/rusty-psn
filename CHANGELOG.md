@@ -19,3 +19,7 @@ What changed in this fork of rusty-psn, newest first. The format follows
 - **On a first start the window opens in the middle of the screen, so on Windows it no longer runs off a 1280 x 1024 screen** (RPSN-0164)
 
 - **STANDARDS.md names the right default download folders for the window app and the command line** (RPSN-0165)
+
+### Security
+
+- **Secure connections use the fixed rustls-webpki 0.103.16 and webpki-root-certs 1.0.10 (RUSTSEC-2026-0382, RUSTSEC-2026-0383)** (RPSN-0167)
