@@ -841,6 +841,10 @@ Lower priority items that would improve the overall experience.
   audience after all. This item is the preparation only: every
   on-screen string goes through a translation layer, English only. The
   translations themselves are a separate item, done last.
+  Spec: docs/specs/RPSN-0072-translation-layer.md, accepted
+  2026-10-22 after the contract review (2 loops, capped at the spec cap,
+  calm; 17 verified findings, all fixed; nothing deferred). Loop log:
+  docs/reviews/RPSN-0072-translation-layer-loop-log.md.
   **Layman:** Prepare the app for translation into other languages.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
