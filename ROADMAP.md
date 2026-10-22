@@ -2412,6 +2412,11 @@ reviewer proposed; check both against the code before fixing.
   4, INV-4). Fix: the version check decides; the exit status is logged.
   Needs an amendment to docs/specs/RPSN-0137-headless-confirmed-install.md
   (INV-4) and its gate first.
+  Gate run 2026-10-22: review-contract on the RPSN-0137 amendment, loops
+  3 and 4, cap reached (calm), 5 verified, 4 fixed in the spec, 1 filed
+  and closed (RPSN-0169). The spec now also covers firmware installs
+  (they exit 143 too) and a missing RPCS3 behind flatpak. The fix may be
+  built.
   **Layman:** Installing an update into RPCS3 works, but the app says it failed; the app should judge by the game's new version instead.
   Kind: fix.
   Source: verify-delivery-s6-2026-10-22.
