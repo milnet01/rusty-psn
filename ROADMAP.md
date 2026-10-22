@@ -1604,7 +1604,7 @@ shipped items that built it.
   Source: check-queue-2026-10-12.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0093] **Confirm S7: a library scan marks every installed game correctly.**
+- ✅ [RPSN-0093] **Confirm S7: a library scan marks every installed game correctly.**
   Scan an RPCS3 library holding both up-to-date and outdated games, and
   check each is marked correctly. Built by RPSN-0050, RPSN-0051,
   RPSN-0052 and RPSN-0057.
@@ -1617,18 +1617,33 @@ shipped items that built it.
   list digital games; RPCS3 finds them in dev_hdd0/game, and since
   79a9b33 (RPSN-0136) so does scan_library. The hand check on a real
   library is still owed.
+  Confirmed 2026-10-22, window app (debug build of ac59bc7) under
+  demoreel, against a private RPCS3 0.0.43-20352 AppImage copy with an
+  empty home: BCUS98148 installed at 01.02 and NPUB30826 at 01.07. Fresh
+  settings, Scan RPCS3 library: "2 game(s) in library, 1 with updates
+  available"; LittleBigPlanet 01.02 / 01.30 "Update available",
+  Assassin's Creed III 01.07 / 01.07 "Up to date". RPCS3's TEST12345 was
+  not listed. Shots in /mnt/Games/flatpak-build/e2e/shots (scratch).
   **Layman:** Check that the library scan correctly shows which games need updates.
   Kind: test.
   Source: check-queue-2026-10-12.
   Lanes: RPCS3, Window app.
 
-- 📋 [RPSN-0094] **Confirm S8: RPCS3 is found without typing a path, and can be overridden.**
+- ✅ [RPSN-0094] **Confirm S8: RPCS3 is found without typing a path, and can be overridden.**
   On a fresh settings file, check the app finds the RPCS3 folder by itself,
   and that a path typed in settings replaces it. Built by RPSN-0049,
   RPSN-0054 and RPSN-0056.
   Progress 2026-10-12: not run (no RPCS3 on the test machine). Read:
   macOS and Windows detection rarely succeed (RPSN-0112, RPSN-0113); the
   AppImage fallback can pick any program (RPSN-0110).
+  Confirmed 2026-10-22, same private RPCS3: with fresh settings (RPCS3
+  config directory "Not configured") the window app's scan and the CLI's
+  --scan-rpcs3 both found the library by themselves (2 games). Override:
+  CLI --rpcs3-config-dir pointing at a second private copy found 1 game;
+  the window app with rpcs3_config_dir set to that copy found 1 game.
+  The window app's field is read-only by design (set through Browse, a
+  native folder picker), so the setting Browse writes was put in the
+  saved settings directly; the picker itself was not driven.
   **Layman:** Check that the app finds RPCS3 by itself and lets you change the folder.
   Kind: test.
   Source: check-queue-2026-10-12.
