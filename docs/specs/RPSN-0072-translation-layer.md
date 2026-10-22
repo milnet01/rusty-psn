@@ -1,7 +1,7 @@
 <!-- ants-spec-format: 1 -->
 # RPSN-0072 — Route every on-screen text through a translation layer
 
-**Status:** spec draft (2026-10-22).
+**Status:** accepted (2026-10-22).
 **Kind:** enhancement.
 **Source:** ROADMAP RPSN-0072 (owner, 2026-10-15: the fork will be offered as a download).
 
@@ -55,8 +55,11 @@ match.
 Source: <https://crates.io/api/v1/crates/i18n-embed-fl>,
 <https://github.com/kellpossible/cargo-i18n/blob/master/i18n-embed-fl/README.md>.
 
-No new advisory: `rust-embed`'s RUSTSEC-2021-0126 is patched from 6.3.0
-(`~/.cargo/advisory-db/crates/rust-embed/RUSTSEC-2021-0126.md`).
+`cargo audit` against the local advisory database (2026-10-22) reports
+one new warning: RUSTSEC-2026-0374, `basic-toml` unmaintained, reached
+only through `i18n-config`, which the proc macros use at build time. It is
+a warning, so `cargo audit` still passes. `rust-embed`'s RUSTSEC-2021-0126
+is patched from 6.3.0.
 
 ```toml
 # Cargo.toml [dependencies], not optional: shared parts use them too
@@ -118,10 +121,19 @@ including the start-up error dialog in `src/main.rs`, and the `Display` text of 
 proper names below.
 
 **Not through it:** proper names (PlayStation 3, RPCS3, PSN, Sony,
-Windows); data — game titles, serials, versions, sizes, paths, and text
-Sony or RPCS3 sends; log lines (`log::` macros); the command line's own
+Windows); data — game titles, serials, versions, sizes, paths, text
+Sony or RPCS3 sends, and other libraries' error text (`{e}` of a
+`reqwest`, `quick_xml` or `serde_json` error); log lines (`log::` macros); the command line's own
 messages in `src/cli/` (kept for AI use, English only); numbers and units
 formatted by code.
+
+**Text an error carries goes through it where it is built.** A sentence
+made where a shared-part error is created and held in its payload, such as
+`Rpcs3Error::InstallFailed(format!(...))` in `src/rpcs3/mod.rs`, comes from
+`tr!` at that line.
+
+**A `status_slot` width sample** (`src/egui/chrome.rs`) comes from the same
+message as the text it sizes, with the widest values.
 
 **The About dialog's disclaimer goes through it too.**
 `dialogs::tests::the_readme_carries_the_about_disclaimer` then compares the
@@ -244,7 +256,7 @@ Added to `STANDARDS.md`, beside the naming conventions:
 | INV-3 | `i18n::tests::placeholders_carry_no_isolation_marks` |
 | INV-4 | Partial: `i18n::tests::the_window_app_has_no_inline_text` sees literal text arguments of the listed calls only. Text reaching the screen any other way — a `format!` string, a variable, a constant, a helper's return value, an unlisted call, `src/main.rs` — is caught by review |
 | INV-5 | **nothing** automatic — review of `tr!` results used outside text calls; existing path and URL tests catch a changed path only where one covers it |
-| INV-6 | Partial: existing text assertions cover the texts they name; the rest rests on the manual demoreel comparison |
+| INV-6 | Partial: existing text assertions cover the texts they name; the manual demoreel comparison covers what the sidebar pages show; tooltips, notifications, dialogs and error text rest on review |
 | INV-7 | `cargo test --no-default-features --features cli` and the cli clippy run in the pre-push gate |
 | §4.5 rule | INV-1 to INV-4's checks for window-app text; the `Display` half is caught by review only |
 
