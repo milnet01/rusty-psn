@@ -62,8 +62,11 @@ No new advisory: `rust-embed`'s RUSTSEC-2021-0126 is patched from 6.3.0
 # Cargo.toml [dependencies], not optional: shared parts use them too
 i18n-embed = { version = "0.16.0", features = ["fluent-system"] }
 i18n-embed-fl = "0.10.1"
-rust-embed = "8.13.0"
+rust-embed = { version = "8.13.0", features = ["debug-embed"] }
 ```
+
+`debug-embed` builds the file into debug builds too; without it a debug
+build reads `i18n/` from disk at run time.
 
 ```toml
 # i18n.toml, beside Cargo.toml; read by fl! at compile time
@@ -71,11 +74,13 @@ fallback_language = "en"
 
 [fluent]
 assets_dir = "i18n"
+domain = "rusty-psn"
 ```
 
-`fl!` takes the domain from `CARGO_PKG_NAME`, so the file is
-`i18n/en/rusty-psn.ftl` (`i18n_embed::fluent::FluentLanguageLoader`
-builds the name as `<domain>.ftl`).
+The domain names the file: `i18n/en/rusty-psn.ftl`
+(`i18n_embed::fluent::FluentLanguageLoader` builds the name as
+`<domain>.ftl`). Without `domain`, `fl!` looks for `en/rusty_psn.ftl`
+and the build fails (tried 2026-10-22 with the versions above).
 
 ### 4.2 The Text part
 
@@ -109,7 +114,7 @@ where it means the same thing in both places.
 
 **Through the layer:** every label, button, tooltip, heading, menu entry,
 table header, dialog text and Messages-panel message the window app shows,
-and the `Display` text of the shared-part types named in §2.2 except the
+including the start-up error dialog in `src/main.rs`, and the `Display` text of the shared-part types named in §2.2 except the
 proper names below.
 
 **Not through it:** proper names (PlayStation 3, RPCS3, PSN, Sony,
@@ -130,7 +135,7 @@ URL, a settings value or anything sent to Sony or RPCS3 (INV-5).
 Added to `STANDARDS.md`, beside the naming conventions:
 
 > **On-screen text.** Every text the window app shows, and the `Display`
-> text of an error a front end shows, comes from `i18n/en/rusty-psn.ftl`
+> text of a shared-part type a front end shows, comes from `i18n/en/rusty-psn.ftl`
 > through `tr!` (`src/i18n.rs`, RPSN-0072). Proper names, data, log lines and
 > the command line's own messages stay literal. Text that becomes a path,
 > URL, file name or setting is never translated.
@@ -145,7 +150,8 @@ Added to `STANDARDS.md`, beside the naming conventions:
 
 - **INV-2** — Every message in the English file is used by the code.
   *Test:* `i18n::tests::every_english_message_is_used` — reads each id from
-  the file and searches `src/` for it in a `tr!` call.
+  the file and searches the code under `src/`, comments excluded, for a
+  `tr!` call naming it.
   *Breaks when:* a message stays in the file after its last use is removed.
 
 - **INV-3** — Translated text carries no U+2068 or U+2069.
@@ -158,10 +164,12 @@ Added to `STANDARDS.md`, beside the naming conventions:
   under `src/egui/` for `label(`, `button(`, `small_button(`, `heading(`,
   `RichText::new(`, `Button::new(`, `Label::new(`, `CollapsingHeader::new(`,
   `on_hover_text(`, `on_disabled_hover_text(`, `hint_text(`, `hyperlink_to(`,
-  `checkbox(`, `selectable_label(`, `selectable_value(`, `radio_value(` and
-  `show_notifications(` whose string-literal argument contains an ASCII
-  letter, and fails naming each. Proper names listed in the test are
-  allowed.
+  `checkbox(`, `selectable_label(`, `selectable_value(`, `radio_value(`,
+  `strong(`, `weak(`, `add_filter(`, `status_pill(` and
+  `show_notifications(` whose text argument is a string literal containing
+  an ASCII letter, and fails naming each. The text argument is the one the
+  call draws; a URL, an id or a file extension is not one. Proper names
+  listed in the test are allowed.
   *Breaks when:* someone writes `ui.button("Save")`.
 
 - **INV-5** — No translated text becomes a path, file name, URL, settings
@@ -174,13 +182,14 @@ Added to `STANDARDS.md`, beside the naming conventions:
 
 - **INV-6** — In English, every screen reads as before.
   *Test:* every existing test asserting on-screen or `Display` text passes
-  unchanged; and a manual comparison of each sidebar page before and after,
-  captured with demoreel at the same window size.
+  unchanged, except the disclaimer test §4.4 changes; and a manual
+  comparison of each sidebar page before and after, captured with
+  demoreel at the same window size.
   *Breaks when:* a moved text loses or changes a word, or a placeholder
   renders as `{ $name }`.
 
 - **INV-7** — The command line still builds and prints English.
-  *Test:* `cargo test --features cli` passes; `cargo clippy --no-default-features --features cli -- -D warnings` is clean.
+  *Test:* `cargo test --no-default-features --features cli` passes; `cargo clippy --no-default-features --features cli -- -D warnings` is clean.
   *Breaks when:* a shared part's text needs the window app's build to
   compile.
 
@@ -205,7 +214,7 @@ Added to `STANDARDS.md`, beside the naming conventions:
 - INV-5 — `utils::tests`, `psn::tests`, `security::tests`, plus review.
 - INV-6 — the existing text assertions, plus the manual demoreel
   comparison.
-- INV-7 — `cargo test --features cli` and the cli clippy run.
+- INV-7 — `cargo test --no-default-features --features cli` and the cli clippy run.
 
 ## 8. Alternatives considered (and rejected)
 
@@ -233,19 +242,21 @@ Added to `STANDARDS.md`, beside the naming conventions:
 | INV-1 | the compile step (`fl!`) |
 | INV-2 | `i18n::tests::every_english_message_is_used` |
 | INV-3 | `i18n::tests::placeholders_carry_no_isolation_marks` |
-| INV-4 | Partial: `i18n::tests::the_window_app_has_no_inline_text` sees literal arguments only; a `format!` string passed to a text call is caught by review |
+| INV-4 | Partial: `i18n::tests::the_window_app_has_no_inline_text` sees literal text arguments of the listed calls only. Text reaching the screen any other way — a `format!` string, a variable, a constant, a helper's return value, an unlisted call, `src/main.rs` — is caught by review |
 | INV-5 | **nothing** automatic — review of `tr!` results used outside text calls; existing path and URL tests catch a changed path only where one covers it |
 | INV-6 | Partial: existing text assertions cover the texts they name; the rest rests on the manual demoreel comparison |
-| INV-7 | `cargo test --features cli` and the cli clippy run in the pre-push gate |
-| §4.5 rule | INV-1 to INV-4's checks; nothing else |
+| INV-7 | `cargo test --no-default-features --features cli` and the cli clippy run in the pre-push gate |
+| §4.5 rule | INV-1 to INV-4's checks for window-app text; the `Display` half is caught by review only |
 
 ## 11. Cross-doc impact
 
 - `STANDARDS.md` — gains §4.5's rule.
 - `docs/design.md` — § The parts gains a row: **Text** — the English
   on-screen text and the `tr!` macro — `src/i18n.rs`, `i18n/en/rusty-psn.ftl`.
-  § What may depend on what gains: **Text uses no other part**; the front
-  ends, PSN, RPCS3, Content, Batch, Security and Files may use it.
+  § What may depend on what gains: **Text uses no other part**; Entry, the
+  front ends, PSN, RPCS3, Content, Batch, Security and Files may use it.
+  Its line "**Security uses no other part.**" becomes "**Security uses only
+  Text.**"
 - `CHANGELOG.md` — one entry when it ships.
 - `ROADMAP.md` — RPSN-0072's body gains this spec's path.
 
