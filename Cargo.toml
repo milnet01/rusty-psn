@@ -19,6 +19,12 @@ serde_yaml_ng = "0.10.0"
 zip = { version = "9.0.2", default-features = false, features = ["deflate"] }
 tempfile = "3.27.0"
 
+# On-screen text, from i18n/en/rusty-psn.ftl (src/i18n.rs, RPSN-0072). Not optional: shared parts use it.
+i18n-embed = { version = "0.16.0", features = ["fluent-system"] }
+i18n-embed-fl = "0.10.1"
+# debug-embed builds the text file into debug builds too, so they never read i18n/ at run time.
+rust-embed = { version = "8.13.0", features = ["debug-embed"] }
+
 log = "0.4.34"
 flexi_logger = "0.31.10"
 

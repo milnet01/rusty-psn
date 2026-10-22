@@ -1,0 +1,7 @@
+# Read by the fl! macro at compile time (src/i18n.rs, RPSN-0072).
+fallback_language = "en"
+
+[fluent]
+assets_dir = "i18n"
+# Without it fl! looks for en/rusty_psn.ftl, the package name with "_".
+domain = "rusty-psn"

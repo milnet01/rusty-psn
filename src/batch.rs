@@ -24,9 +24,14 @@ pub enum BatchFileError {
 impl fmt::Display for BatchFileError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BatchFileError::Io(e) => write!(f, "Failed to read batch file: {e}"),
-            BatchFileError::TooLarge(size) => write!(f, "Batch file too large ({size} bytes, max {MAX_BATCH_FILE_SIZE})"),
-            BatchFileError::NoValidSerials => write!(f, "Batch file contains no valid serials"),
+            BatchFileError::Io(e) => f.write_str(&tr!("error-batch-read", reason = e.to_string())),
+            // Numbers go in as text, so Fluent cannot regroup their digits.
+            BatchFileError::TooLarge(size) => f.write_str(&tr!(
+                "error-batch-too-large",
+                size = size.to_string(),
+                max = MAX_BATCH_FILE_SIZE.to_string()
+            )),
+            BatchFileError::NoValidSerials => f.write_str(&tr!("error-batch-no-serials")),
         }
     }
 }
@@ -102,6 +107,20 @@ pub fn parse_batch_file(path: &Path) -> Result<BatchParseResult, BatchFileError>
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn errors_read_as_before_the_translation_layer() {
+        let io = BatchFileError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "gone"));
+        assert_eq!(io.to_string(), "Failed to read batch file: gone");
+        assert_eq!(
+            BatchFileError::TooLarge(2_000_000).to_string(),
+            "Batch file too large (2000000 bytes, max 1048576)"
+        );
+        assert_eq!(
+            BatchFileError::NoValidSerials.to_string(),
+            "Batch file contains no valid serials"
+        );
+    }
 
     fn write_temp_file(content: &str) -> tempfile::NamedTempFile {
         let mut f = tempfile::NamedTempFile::new().unwrap();

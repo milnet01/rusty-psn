@@ -19,6 +19,10 @@ compile_error!(
      `--no-default-features --features cli` is the command line."
 );
 
+// First, so every module after it can use `tr!`.
+#[macro_use]
+mod i18n;
+
 mod batch;
 #[cfg(feature = "cli")]
 mod cli;
