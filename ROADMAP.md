@@ -823,7 +823,7 @@ Lower priority items that would improve the overall experience.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0072] **Localization.**
+- 🚧 [RPSN-0072] **Localization.**
   The GUI embeds Japanese fonts already; add basic i18n framework for
   UI strings
   Checked against the code 2026-10-12: Not done — no translation
@@ -848,6 +848,19 @@ Lower priority items that would improve the overall experience.
   Owner 2026-10-22: keep i18n-embed despite RUSTSEC-2026-0374
   (basic-toml unmaintained, reached through i18n-config at build time
   only; a warning, cargo audit exits 0).
+  Progress 2026-10-22 (5de2144): groundwork in; BatchFileError moved.
+  Left: the 149 inline texts the_window_app_has_no_inline_text found
+  (results.rs 43, settings.rs 32, search.rs 15, rpcs3_library.rs 14,
+  firmware.rs 11, content_browser.rs 11, history.rs 7, dialogs.rs 7,
+  downloads_page.rs 3, messages.rs 2, export.rs 2, update_chain.rs 1,
+  mod.rs 1), plus what that test cannot see (format! strings,
+  status_slot samples, src/main.rs's dialog, the other shared Display
+  impls in spec §2.2), then remove its #[ignore], add the STANDARDS rule
+  (spec §4.5) and design.md rows (§11; commit body names this spec's
+  gate, loop 2, and a grep of "Security", "Text", "uses no other part"),
+  take the before/after demoreel shots (INV-6), and a changelog entry.
+  Numbers go into tr! as text (to_string) so Fluent cannot regroup
+  digits.
   **Layman:** Prepare the app for translation into other languages.
   Kind: enhancement.
   Source: todo-md-import-2026-10-12.
@@ -2404,7 +2417,7 @@ reviewer proposed; check both against the code before fixing.
   Source: verify-delivery-s6-2026-10-22.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0169] **Name the update chain as an install caller in the RPSN-0137 spec.**
+- ✅ [RPSN-0169] **Name the update chain as an install caller in the RPSN-0137 spec.**
   Found by a cold review lane on docs/specs/RPSN-0137-headless-confirmed-install.md
   (2026-10-22). src/egui/update_chain.rs install_in_order calls
   rpcs3::install_pkg (AppVersion with each package's version, or
@@ -2415,6 +2428,10 @@ reviewer proposed; check both against the code before fixing.
   exit. Remedy: add the chain's row to § 4.3 and § 4.4 (and the INV-7
   recipe), recording the code as built. Outside the RPSN-0168 amendment's
   span, so filed rather than fixed in that review.
+  Resolved 2026-10-22 in the same review (loop 4): § 4.3 now has the
+  "Update All Outdated" chain's row, recording update_chain.rs as built
+  (it stops at the first Err; an Unconfirmed step does not stop it), and
+  INV-7's recipe names it.
   **Layman:** The install spec lists every place that installs into RPCS3 except the "update all" chain, so its hand test skips it.
   Kind: doc-fix.
   Source: review-contract-rpsn0137-loop3-2026-10-22.

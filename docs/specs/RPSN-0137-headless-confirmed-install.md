@@ -140,6 +140,7 @@ package `version` and PARAM.SFO's APP_VER share the `XX.YY` form.
 | Command line `--install` | `AppVersion` with the package's `version`, `dev_hdd0` from `--rpcs3-config-dir`, else `auto_detect::detect_rpcs3` when `--rpcs3-executable` is not given; `Unconfirmed` otherwise |
 | Content browser patch Install | `AppVersion` with `version: None` (`ContentPatch` carries no version), `dev_hdd0` as for the window app; `Unconfirmed` when `settings.rpcs3_config_dir` is empty |
 | `content::install_dlc_zip` | `Unconfirmed` |
+| "Update All Outdated" chain (`src/egui/update_chain.rs`) | `AppVersion` with each package's `version`, `dev_hdd0` as for the window app; `Unconfirmed` when `settings.rpcs3_config_dir` is empty. The chain stops at the first `Err`; an `Unconfirmed` step does not stop it |
 
 ### 4.4 What the user sees
 
@@ -212,7 +213,7 @@ exists.
 - **INV-7** — Each caller passes the check § 4.3 gives it and reports as
   § 4.4 says.
   *Test:* manual, under Xvfb with a stand-in RPCS3 set as the executable:
-  Install, and the content browser's patch Install, each with and without
+  Install, the content browser's patch Install and "Update All Outdated", each with and without
   the RPCS3 folder set, show the success message and the warning message in turn; `--install` with and without `--rpcs3-config-dir`
   prints the two § 4.4 lines.
   *Breaks when:* a caller keeps passing `Unconfirmed` where it knows
@@ -222,7 +223,8 @@ exists.
   version read decides as INV-2 and INV-3 say; with `Unconfirmed`, the
   result is `Ok(Unconfirmed)`. `install_firmware` is the same: its
   `FirmwareCheck` decides, and with none the result is `Ok(Unconfirmed)`.
-  Only a failure to launch the process (§ 4.2 step 4) is `InstallFailed`.
+  The exit status never gives `InstallFailed`; a failure to launch the
+  process still does (§ 4.2 step 4).
   *Test:* `rpcs3::tests::install_ignores_rpcs3s_exit_status`: a stand-in that
   writes the expected APP_VER and exits 143 gives `Confirmed`; one that
   writes nothing and exits 0 gives `NotInstalled`; under `Unconfirmed`, one
