@@ -21,14 +21,18 @@ on.
 - **Command-line options and exit code** — the options `--help` lists
   (`Args` in `src/main.rs`) and the exit code `STANDARDS.md` § 7.3 states.
   Scripts and AI sessions call the command line.
-- **Saved window-app state** — what `UpdatesApp::save` in `src/egui/mod.rs`
-  writes: the settings and their keys, the download history, the window
-  position. Older saved state must still load.
+- **Saved window-app state** — the settings and their keys and the download
+  history (`UpdatesApp::save` in `src/egui/mod.rs`), and the window's size
+  and position (eframe's, and `src/egui/placement.rs` on KDE Wayland). eframe
+  keeps them in a folder named from the app name `src/main.rs` passes to
+  `eframe::run_native`. Older saved state must still load from there.
 - **Download folders** — the three folder layouts (`DirectoryFormat` in
-  `src/utils.rs`) and where a download lands under each. A changed layout
-  strands earlier downloads and breaks resuming them.
-- **Batch files** — one serial per line, `#` starting a comment
-  (`src/batch.rs`).
+  `src/utils.rs`), where a download lands under each, and the layout and
+  folder each build uses when the user chose none. A changed layout strands
+  earlier downloads and breaks resuming them.
+- **Batch files** — what `parse_batch_file` in `src/batch.rs` accepts: one
+  serial per line, `#` starting a comment, any letter case, with or without
+  dashes.
 - **Results export** — the CSV columns and the JSON fields
   (`src/egui/export.rs`).
 - **Keyboard shortcuts** — Ctrl+F, Ctrl+S and Escape (`src/egui/chrome.rs`).
