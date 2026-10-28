@@ -14,7 +14,8 @@ pub fn start_app(args: Args) {
 
     let _guard = runtime.enter();
 
-    let titles = args.titles[0].split(' ');
+    // Serials may be passed as several -t flags and/or as one space-separated string.
+    let titles = args.titles.iter().flat_map(|t| t.split_whitespace());
     let silent_mode = args.silent;
     let destination_path = args.destination_path.unwrap_or_else(|| PathBuf::from("pkgs/"));
 
@@ -26,7 +27,6 @@ pub fn start_app(args: Args) {
         let mut info = Vec::new();
 
         let promises = titles
-            .into_iter()
             .map(|t| (t.to_string(), Promise::spawn_async(UpdateInfo::get_info(t.to_string()))))
             .collect::<Vec<(String, Promise<Result<UpdateInfo, UpdateError>>)>>();
 
@@ -79,32 +79,15 @@ pub fn start_app(args: Args) {
     };
 
     for update in update_info {
-        let title = {
-            if let Some(title) = update.titles.first() {
-                title.clone()
-            } else {
-                warn!("Failed to get update's title: Last pkg's info didn't contain a title");
-                String::from("Untitled")
-            }
-        };
+        let title = update.titles.first().cloned().unwrap_or_else(|| {
+            warn!("Failed to get update's title: Last pkg's info didn't contain a title");
+            String::from("Untitled")
+        });
 
         if !silent_mode {
-            crossterm::execute!(
-                std::io::stdout(),
-                terminal::Clear(terminal::ClearType::All),
-                cursor::MoveTo(0, 0)
-            )
-            .unwrap();
+            clear_screen();
 
-            let total_size = {
-                let mut total = 0;
-
-                for pkg in update.packages.iter() {
-                    total += pkg.size;
-                }
-
-                ByteSize::b(total)
-            };
+            let total_size = ByteSize::b(update.packages.iter().map(|pkg| pkg.size).sum());
 
             println!(
                 "[{}] {} - {} - {} update(s) ({})",
@@ -134,7 +117,7 @@ pub fn start_app(args: Args) {
 
             if !response.is_empty() {
                 updates_to_fetch = response
-                    .split(' ')
+                    .split_whitespace()
                     .filter_map(|s| s.parse::<usize>().ok())
                     .filter(|idx| *idx < update.packages.len())
                     .collect();
@@ -143,38 +126,16 @@ pub fn start_app(args: Args) {
                 updates_to_fetch.dedup();
             }
 
-            let updates = {
-                let mut updates = String::new();
-
-                if updates_to_fetch.is_empty() {
-                    for (i, pkg) in update.packages.iter().enumerate() {
-                        updates.push_str(&pkg.id());
-
-                        if i < update.packages.len() - 1 {
-                            updates.push_str(", ");
-                        }
-                    }
-                } else {
-                    for (i, update_idx) in updates_to_fetch.iter().enumerate() {
-                        updates.push_str(&update.packages[*update_idx].id().to_string());
-
-                        if i < updates_to_fetch.len() - 1 {
-                            updates.push_str(", ");
-                        }
-                    }
-                }
-
-                updates
-            };
+            let updates = if updates_to_fetch.is_empty() {
+                update.packages.iter().map(|pkg| pkg.id()).collect::<Vec<_>>()
+            } else {
+                updates_to_fetch.iter().map(|&idx| update.packages[idx].id()).collect()
+            }
+            .join(", ");
 
             info!("Downloading updates {updates}");
 
-            crossterm::execute!(
-                std::io::stdout(),
-                terminal::Clear(terminal::ClearType::All),
-                cursor::MoveTo(0, 0)
-            )
-            .unwrap();
+            clear_screen();
             println!("{} {} - Downloading update(s): {}", update.title_id, title, updates);
         }
 
@@ -197,101 +158,65 @@ pub fn start_app(args: Args) {
 
             crossterm::execute!(stdout, cursor::SavePosition).unwrap();
 
-            loop {
-                match promise.ready() {
-                    Some(result) => {
-                        if let Err(e) = result {
-                            match e {
-                                DownloadError::HashMismatch(short_on_data) => {
-                                    error!(
-                                        "Download of {} {} failed: hash mismatch. (short on data: {})",
-                                        update.title_id,
-                                        pkg.id(),
-                                        short_on_data
-                                    );
-                                    println!("Error downloading update: hash mismatch on downloaded file.");
+            // Replaces the current download's status line.
+            let mut print_status = |status: &str, finished: bool| {
+                if silent_mode {
+                    return;
+                }
 
-                                    if *short_on_data {
-                                        println!("The downloaded file is smaller than expected. Please try again later, as Sony's servers can sometimes be unreliable");
-                                    }
-                                }
-                                DownloadError::Tokio(e) => {
-                                    error!("Download of {} {} failed: {e}", update.title_id, pkg.id());
-                                    println!("Error downloading update: {e}.")
-                                }
-                                DownloadError::Reqwest(e) => {
-                                    error!("Download of {} {} failed: {e}", update.title_id, pkg.id());
-                                    println!("Error downloading update: {e}.")
-                                }
-                            }
-                        }
+                crossterm::execute!(
+                    stdout,
+                    cursor::RestorePosition,
+                    terminal::Clear(terminal::ClearType::CurrentLine),
+                    cursor::SavePosition
+                )
+                .unwrap();
 
-                        break;
+                if finished {
+                    println!("        {} - {title} | {status}", pkg.id());
+                } else {
+                    print!("        {} - {title} | {status}", pkg.id());
+                }
+
+                stdout.flush().unwrap();
+            };
+
+            // Blocks until the next status arrives, and ends once the download task
+            // drops its sender, so every status (including the final one) is shown.
+            while let Some(status) = rx.blocking_recv() {
+                match status {
+                    DownloadStatus::Progress(bytes) => {
+                        downloaded += bytes;
+                        print_status(&format!("{} / {}", ByteSize::b(downloaded), ByteSize::b(pkg.size)), false);
                     }
-                    None => {
-                        if let Ok(status) = rx.try_recv() {
-                            match status {
-                                DownloadStatus::Progress(bytes) => {
-                                    downloaded += bytes;
+                    DownloadStatus::Verifying => print_status("Verifying checksum... ", false),
+                    DownloadStatus::DownloadSuccess => print_status("Download completed successfully. ", true),
+                    DownloadStatus::DownloadFailure => print_status("Download failed. ", true),
+                }
+            }
 
-                                    if !silent_mode {
-                                        crossterm::execute!(
-                                            stdout,
-                                            cursor::RestorePosition,
-                                            terminal::Clear(terminal::ClearType::CurrentLine),
-                                            cursor::SavePosition
-                                        )
-                                        .unwrap();
-                                        print!(
-                                            "        {} - {title} | {} / {}",
-                                            pkg.id(),
-                                            ByteSize::b(downloaded),
-                                            ByteSize::b(pkg.size)
-                                        );
-                                        stdout.flush().unwrap();
-                                    }
-                                }
-                                DownloadStatus::Verifying => {
-                                    if !silent_mode {
-                                        crossterm::execute!(
-                                            stdout,
-                                            cursor::RestorePosition,
-                                            terminal::Clear(terminal::ClearType::CurrentLine),
-                                            cursor::SavePosition
-                                        )
-                                        .unwrap();
-                                        print!("        {} - {title} | Verifying checksum... ", pkg.id());
-                                        stdout.flush().unwrap();
-                                    }
-                                }
-                                DownloadStatus::DownloadSuccess => {
-                                    if !silent_mode {
-                                        crossterm::execute!(
-                                            stdout,
-                                            cursor::RestorePosition,
-                                            terminal::Clear(terminal::ClearType::CurrentLine),
-                                            cursor::SavePosition
-                                        )
-                                        .unwrap();
-                                        println!("        {} - {title} | Download completed successfully. ", pkg.id());
-                                        stdout.flush().unwrap();
-                                    }
-                                }
-                                DownloadStatus::DownloadFailure => {
-                                    if !silent_mode {
-                                        crossterm::execute!(
-                                            stdout,
-                                            cursor::RestorePosition,
-                                            terminal::Clear(terminal::ClearType::CurrentLine),
-                                            cursor::SavePosition
-                                        )
-                                        .unwrap();
-                                        println!("        {} - {title} | Download failed. ", pkg.id());
-                                        stdout.flush().unwrap();
-                                    }
-                                }
-                            }
+            if let Err(e) = promise.block_and_take() {
+                match e {
+                    DownloadError::HashMismatch(short_on_data) => {
+                        error!(
+                            "Download of {} {} failed: hash mismatch. (short on data: {})",
+                            update.title_id,
+                            pkg.id(),
+                            short_on_data
+                        );
+                        println!("Error downloading update: hash mismatch on downloaded file.");
+
+                        if short_on_data {
+                            println!("The downloaded file is smaller than expected. Please try again later, as Sony's servers can sometimes be unreliable");
                         }
+                    }
+                    DownloadError::Tokio(e) => {
+                        error!("Download of {} {} failed: {e}", update.title_id, pkg.id());
+                        println!("Error downloading update: {e}.")
+                    }
+                    DownloadError::Reqwest(e) => {
+                        error!("Download of {} {} failed: {e}", update.title_id, pkg.id());
+                        println!("Error downloading update: {e}.")
                     }
                 }
             }
@@ -300,12 +225,16 @@ pub fn start_app(args: Args) {
         std::thread::sleep(std::time::Duration::from_secs(3));
 
         if !silent_mode {
-            crossterm::execute!(
-                std::io::stdout(),
-                terminal::Clear(terminal::ClearType::All),
-                cursor::MoveTo(0, 0)
-            )
-            .unwrap();
+            clear_screen();
         }
     }
+}
+
+fn clear_screen() {
+    crossterm::execute!(
+        std::io::stdout(),
+        terminal::Clear(terminal::ClearType::All),
+        cursor::MoveTo(0, 0)
+    )
+    .unwrap();
 }
