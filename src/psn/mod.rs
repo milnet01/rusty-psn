@@ -116,7 +116,7 @@ impl UpdateInfo {
 
         let mut info = UpdateInfo::empty(platform_variant);
 
-        match parser::parse_response(response_txt, &mut info) {
+        match parser::parse_response(&response_txt, &mut info) {
             Ok(()) => {
                 if info.title_id.is_empty() || info.packages.is_empty() {
                     return Err(UpdateError::NoUpdatesAvailable);
