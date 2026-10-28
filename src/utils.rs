@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 
 use sha1_smol::Sha1;
@@ -9,12 +8,6 @@ use tokio::fs::{File, OpenOptions};
 use tokio::io::{self, AsyncBufReadExt, AsyncSeekExt, BufReader, SeekFrom};
 
 use crate::psn::DownloadError;
-
-#[cfg(target_family = "windows")]
-const INVALID_CHARS: [char; 9] = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
-
-#[cfg(target_family = "unix")]
-const INVALID_CHARS: [char; 1] = ['/'];
 
 fn sanitize_title(title: &str) -> String {
     let options = if cfg!(target_family = "windows") {
@@ -28,8 +21,7 @@ fn sanitize_title(title: &str) -> String {
         }
     };
 
-    let clean_title = sanitise_file_name::sanitise_with_options(title, &options);
-    clean_title
+    sanitise_file_name::sanitise_with_options(title, &options)
 }
 
 fn create_old_pkg_path<P>(download_path: P, serial: &str) -> PathBuf
@@ -64,20 +56,11 @@ pub async fn create_pkg_file(download_path: PathBuf, serial: &str, title: &str, 
     target_path.push(pkg_name);
     info!("Creating file for pkg at path {:?}", target_path);
 
-    if let Some(parent) = target_path.parent() {
-        match fs::create_dir_all(parent).await {
-            Ok(_) => info!("Created directory for updates"),
-            Err(e) => match e.kind() {
-                io::ErrorKind::AlreadyExists => {}
-                _ => return Err(DownloadError::Tokio(e)),
-            },
-        }
-    } else {
-        return Err(DownloadError::Tokio(io::Error::new(
-            io::ErrorKind::Other,
-            "Target path has no parent directory",
-        )));
-    }
+    let parent = target_path
+        .parent()
+        .ok_or_else(|| DownloadError::Tokio(io::Error::other("Target path has no parent directory")))?;
+    // create_dir_all succeeds if the directory already exists.
+    fs::create_dir_all(parent).await.map_err(DownloadError::Tokio)?;
 
     // Using OpenOptions to avoid the file getting truncated if it already exists
     // .create(true) preserves an existing file's contents.
@@ -90,10 +73,11 @@ pub async fn create_pkg_file(download_path: PathBuf, serial: &str, title: &str, 
         .map_err(DownloadError::Tokio)
 }
 
-const CHUNK_SIZE: usize = 1024 * 1024 * 128;
-pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Result<bool, DownloadError> {
-    let mut hasher = Sha1::new();
+// Large enough to keep syscall overhead low, small enough that several concurrent
+// downloads being verified at once don't allocate hundreds of megabytes.
+const HASH_BUFFER_SIZE: usize = 1024 * 1024;
 
+pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Result<bool, DownloadError> {
     // Last 0x20 bytes are the SHA1 hash for PS3 and PS Vita updates. PS4 updates don't include hash suffix.
     let suffix_size = if hash_whole_file { 0 } else { 0x20 };
 
@@ -104,43 +88,65 @@ pub async fn hash_file(file: &mut File, hash: &str, hash_whole_file: bool) -> Re
         return Ok(false);
     }
 
-    let file_length_without_suffix: usize = (file_length - suffix_size)
-        .try_into()
-        .map_err(|_| DownloadError::HashMismatch(true))?;
-
     // Write operations during the download move the internal seek pointer.
     // Resetting it to 0 makes reader actually read the whole thing.
     file.seek(SeekFrom::Start(0)).await.map_err(DownloadError::Tokio)?;
 
-    let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
-    let mut processed_length = 0;
-    loop {
-        let chunk_buffer = reader.fill_buf().await.map_err(DownloadError::Tokio)?;
-        let chunk_length = chunk_buffer.len();
-        if chunk_length == 0 {
-            break;
+    let mut hasher = Sha1::new();
+    let mut reader = BufReader::with_capacity(HASH_BUFFER_SIZE, file);
+    let mut remaining = file_length - suffix_size;
+
+    while remaining > 0 {
+        let chunk = reader.fill_buf().await.map_err(DownloadError::Tokio)?;
+        if chunk.is_empty() {
+            // The file got shorter than its reported length.
+            return Ok(false);
         }
 
-        let previously_processed_length: usize = processed_length;
-        processed_length += chunk_length;
-        // While iterating through the file a chunk being processed may already include some hash suffix bits which should not be hashed.
-        // In such case file chunk is stripped of those extra suffix bits.
-        let suffix_part_in_chunk = processed_length > file_length_without_suffix;
-        let hashable_buffer = if suffix_part_in_chunk {
-            let last_before_suffix = file_length_without_suffix
-                .checked_sub(previously_processed_length)
-                .ok_or_else(|| DownloadError::HashMismatch(true))?;
-            &chunk_buffer[..last_before_suffix]
-        } else {
-            chunk_buffer
-        };
-
-        hasher.update(hashable_buffer);
-        reader.consume(chunk_length);
-        if suffix_part_in_chunk {
-            break; // Since unhashable suffix has already been encountered, either in part or in full, there's no need to read rest of the file anymore.
-        }
+        // Never hash into the suffix, which may start partway through a chunk.
+        let hashable_length = remaining.min(chunk.len() as u64) as usize;
+        hasher.update(&chunk[..hashable_length]);
+        reader.consume(hashable_length);
+        remaining -= hashable_length as u64;
     }
 
-    Ok(hasher.digest().to_string() == hash.to_lowercase())
+    Ok(hasher.digest().to_string().eq_ignore_ascii_case(hash))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::AsyncWriteExt;
+
+    async fn temp_file(name: &str, contents: &[u8]) -> File {
+        let path = std::env::temp_dir().join(format!("rusty-psn-{}-{name}", std::process::id()));
+        let mut file = OpenOptions::default()
+            .create(true)
+            .truncate(true)
+            .read(true)
+            .write(true)
+            .open(path)
+            .await
+            .unwrap();
+        file.write_all(contents).await.unwrap();
+        file.flush().await.unwrap();
+        file
+    }
+
+    #[tokio::test]
+    async fn hash_file_skips_suffix() {
+        let mut contents = b"hello world".to_vec();
+        contents.extend_from_slice(&[0xAA; 0x20]);
+        let expected = Sha1::from(b"hello world").digest().to_string();
+
+        let mut file = temp_file("suffix", &contents).await;
+        assert!(hash_file(&mut file, &expected.to_uppercase(), false).await.unwrap());
+        assert!(!hash_file(&mut file, &expected, true).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn hash_file_rejects_short_files() {
+        let mut file = temp_file("short", &[0; 0x20]).await;
+        assert!(!hash_file(&mut file, "", false).await.unwrap());
+    }
 }

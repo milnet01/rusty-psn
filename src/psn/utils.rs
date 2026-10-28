@@ -1,10 +1,9 @@
 use crate::psn::UpdateError;
 
-use core::str;
 use std::{
     fmt,
     io::{Error, SeekFrom},
-    path::PathBuf,
+    path::Path,
 };
 
 use hmac::{digest::Output, Hmac, Mac};
@@ -35,30 +34,21 @@ pub fn get_platform_variant(title_id: &str) -> Option<PlaformVariant> {
     }
 
     if title_id.starts_with("CUSA") {
-        return Some(PlaformVariant::PS4);
+        Some(PlaformVariant::PS4)
+    } else if title_id.starts_with("PCS") {
+        Some(PlaformVariant::PSVita)
+    } else {
+        None
     }
-
-    if title_id.starts_with("PCS") {
-        return Some(PlaformVariant::PSVita);
-    }
-
-    None
 }
 
 fn get_title_id_hmac(title_id: &str, key: &str) -> Result<Output<Sha256>, UpdateError> {
-    let key = match hex::decode(key) {
-        Ok(key) => key,
-        Err(_) => return Err(UpdateError::InvalidSerial),
-    };
-    let msg = format!("np_{0}", title_id);
-    let mut hasher = match HmacSha256::new_from_slice(&key) {
-        Ok(hasher) => hasher,
-        Err(_) => return Err(UpdateError::InvalidSerial),
-    };
+    let key = hex::decode(key).map_err(|_| UpdateError::InvalidSerial)?;
+    let mut hasher = HmacSha256::new_from_slice(&key).map_err(|_| UpdateError::InvalidSerial)?;
 
-    hasher.update(msg.as_ref());
-    let hash_bytes = hasher.finalize().into_bytes();
-    Ok(hash_bytes)
+    hasher.update(b"np_");
+    hasher.update(title_id.as_bytes());
+    Ok(hasher.finalize().into_bytes())
 }
 
 pub fn get_update_info_url(title_id: &str, platform_variant: PlaformVariant) -> Result<String, UpdateError> {
@@ -84,8 +74,10 @@ pub fn get_update_info_url(title_id: &str, platform_variant: PlaformVariant) -> 
     }
 }
 
-const MERGE_CHUNK_SIZE: usize = 1024 * 1024 * 128;
-pub async fn copy_pkg_file(src_path: &PathBuf, target_path: &PathBuf, offset: u64) -> Result<u64, Error> {
+// Two buffers of this size are allocated per merge (reader and writer).
+const MERGE_BUFFER_SIZE: usize = 8 * 1024 * 1024;
+
+pub async fn copy_pkg_file(src_path: &Path, target_path: &Path, offset: u64) -> Result<u64, Error> {
     let src_file = OpenOptions::default()
         .create(false)
         .read(true)
@@ -104,8 +96,8 @@ pub async fn copy_pkg_file(src_path: &PathBuf, target_path: &PathBuf, offset: u6
         target_file.seek(SeekFrom::Start(offset)).await?;
     }
 
-    let mut writer = BufWriter::with_capacity(MERGE_CHUNK_SIZE, target_file);
-    let mut reader = BufReader::with_capacity(MERGE_CHUNK_SIZE, src_file);
+    let mut writer = BufWriter::with_capacity(MERGE_BUFFER_SIZE, target_file);
+    let mut reader = BufReader::with_capacity(MERGE_BUFFER_SIZE, src_file);
     let read_bytes = copy_buf(&mut reader, &mut writer).await?;
     Ok(read_bytes)
 }
