@@ -31,26 +31,26 @@ pub enum ParseError {
 }
 
 pub fn parse_manifest_response(
-    response: String,
+    response: &str,
     parent_manifest_package: &PackageInfo,
     info: &mut UpdateInfo,
 ) -> Result<(), ParseError> {
-    let manifest: Manifest = serde_json::from_str(response.as_ref()).map_err(ParseError::JsonParsing)?;
+    let manifest: Manifest = serde_json::from_str(response).map_err(ParseError::JsonParsing)?;
 
     if manifest.pieces.is_empty() {
         return Err(ParseError::NoPartsFound);
     }
 
-    for (idx, piece) in manifest.pieces.iter().enumerate() {
+    for (idx, piece) in manifest.pieces.into_iter().enumerate() {
         let part_number = if manifest.number_of_split_files > 1 {
             Some(idx + 1)
         } else {
             None
         };
         let part_package = PackageInfo {
-            version: parent_manifest_package.version.to_owned(),
-            sha1sum: piece.hash_value.to_owned(),
-            url: piece.url.to_owned(),
+            version: parent_manifest_package.version.clone(),
+            sha1sum: piece.hash_value,
+            url: piece.url,
             size: piece.file_size,
             hash_whole_file: true,
             offset: piece.file_offset,
