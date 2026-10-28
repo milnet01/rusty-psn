@@ -8,7 +8,9 @@ use clap::Parser;
 use flexi_logger::{Logger, LoggerHandle};
 #[cfg(feature = "cli")]
 use std::path::PathBuf;
+#[cfg(feature = "egui")]
 use std::sync::Arc;
+#[cfg(feature = "egui")]
 use tokio::{runtime::Runtime, sync::Notify};
 
 #[macro_use]

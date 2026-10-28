@@ -1,4 +1,3 @@
-use std::ops::DerefMut;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -23,6 +22,16 @@ pub struct DownloadProgressStatus {
     last_received_status: DownloadStatus,
 }
 
+impl DownloadProgressStatus {
+    fn apply(&mut self, status: DownloadStatus) {
+        if let DownloadStatus::Progress(progress) = status {
+            self.progress += progress;
+        }
+
+        self.last_received_status = status;
+    }
+}
+
 pub struct ActiveDownload {
     title_id: String,
     pkg_id: String,
@@ -36,6 +45,16 @@ pub struct ActiveDownload {
 pub struct MergeProgressStatus {
     progress: usize,
     last_received_status: MergeStatus,
+}
+
+impl MergeProgressStatus {
+    fn apply(&mut self, status: MergeStatus) {
+        if let MergeStatus::PartProgress(progress) = status {
+            self.progress = progress;
+        }
+
+        self.last_received_status = status;
+    }
 }
 
 pub struct ActiveMerge {
@@ -337,16 +356,7 @@ impl UpdatesApp {
                                     self.v.show_mismatch_warning_window = true;
                                 }
                             }
-                            DownloadError::Tokio(_) => {
-                                toasts.push((
-                                    format!(
-                                        "Failed to download {} v{}. Check the log for details.",
-                                        download.title_id, download.pkg_id
-                                    ),
-                                    ToastLevel::Error,
-                                ));
-                            }
-                            DownloadError::Reqwest(_) => {
+                            DownloadError::Tokio(_) | DownloadError::Reqwest(_) => {
                                 toasts.push((
                                     format!(
                                         "Failed to download {} v{}. Check the log for details.",
@@ -431,20 +441,17 @@ impl UpdatesApp {
             loop {
                 select! {
                     result = &mut download_fut => {
+                        // The download may finish before its last statuses were received.
+                        while let Ok(status) = rx.try_recv() {
+                            async_status.lock().await.apply(status);
+                        }
+
                         ctx.request_repaint();
                         return result
                     }
-                    progress = rx.recv() => {
-                        if let Some(progress_status) = progress {
-                            let mut guard = async_status.lock().await;
-                            let download = guard.deref_mut();
-                            if let DownloadStatus::Progress(progress) = progress_status {
-                                download.progress += progress;
-                            }
-
-                            download.last_received_status = progress_status;
-                            ctx.request_repaint();
-                        }
+                    Some(status) = rx.recv() => {
+                        async_status.lock().await.apply(status);
+                        ctx.request_repaint();
                     }
                 }
             }
@@ -480,20 +487,17 @@ impl UpdatesApp {
             loop {
                 select! {
                     result = &mut merge_fut => {
+                        // The merge may finish before its last statuses were received.
+                        while let Ok(status) = rx.try_recv() {
+                            async_status.lock().await.apply(status);
+                        }
+
                         ctx.request_repaint();
                         return result
                     },
-                    progress = rx.recv() => {
-                        let mut guard = async_status.lock().await;
-                        let merge = guard.deref_mut();
-                        if let Some(status) = progress {
-                            if let MergeStatus::PartProgress(progress) = status {
-                                merge.progress = progress;
-                            }
-
-                            merge.last_received_status = status;
-                            ctx.request_repaint();
-                        }
+                    Some(status) = rx.recv() => {
+                        async_status.lock().await.apply(status);
+                        ctx.request_repaint();
                     }
                 };
             }
