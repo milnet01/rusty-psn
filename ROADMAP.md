@@ -2610,6 +2610,14 @@ reviewer proposed; check both against the code before fixing.
 
 - 📋 [RPSN-0178] **Make the weekly dependency audit run on the fork's real code.**
   GitHub runs scheduled workflows from the default branch. The fork's default branch is dev, and dev has no audit.yml; that file is only on local-dev. RUSTSEC-2026-0385 was found by another session, not by this check. Fix: make local-dev the default branch, or otherwise bring the audit to dev.
+  2026-10-30: not done. `gh repo edit milnet01/rusty-psn
+  --default-branch local-dev` was refused by this session's permission
+  check, as a change to a shared resource, so it needs the owner's
+  go-ahead. That is the chosen fix: dev holds upstream's code, so adding
+  audit.yml there would audit the wrong code. The switch also makes the
+  fork's front page show the README notice. Proof once switched: `gh run
+  list -R milnet01/rusty-psn --workflow audit.yml --event schedule`
+  shows a run after the next Monday 04:17 UTC.
   **Layman:** The weekly security check does not run, so a new alert waits until the next push.
   Kind: security.
   Source: session-message-858-2026-10-29.
