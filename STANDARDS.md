@@ -178,7 +178,7 @@ PackageInfo {
 
 - **Formatter**: `rustfmt` (enforced via CI on pull requests using nightly toolchain)
 - **Max line width**: 130 characters (`.rustfmt.toml`: `max_width = 130`)
-- CI uses `mbrobbel/rustfmt-check` in review mode, which posts formatting suggestions as PR review comments
+- CI runs `cargo +nightly fmt --check` (`rustfmt.yml`), which fails the check on badly formatted code and posts nothing on the PR
 
 ### 4.2 Rust Edition & Idioms
 
