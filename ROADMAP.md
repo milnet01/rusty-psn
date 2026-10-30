@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=172 -->
+<!-- ants-roadmap-id-high-water: RPSN=178 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -2555,6 +2555,46 @@ reviewer proposed; check both against the code before fixing.
   **Layman:** One test only passes when the project's build folder is in its usual place.
   Kind: test.
   Source: in-session-2026-10-22.
+
+- ✅ [RPSN-0173] **Update ctutils past RUSTSEC-2026-0385.**
+  cargo audit reports RUSTSEC-2026-0385 on ctutils 0.4.3 (fixed in 0.4.4 and later). It arrives through digest, used by hmac and sha1.
+  2026-10-30: ctutils 0.4.7. Same update: tokio 1.54.1
+  (RUSTSEC-2026-0386, unsound) and clipboard-win 5.4.3 (5.4.1 was
+  yanked). cargo audit: no vulnerabilities, 6 unmaintained warnings
+  left, all from other libraries' dependencies.
+  **Layman:** Update a small security library so the audit comes back clean.
+  Kind: security.
+  Source: session-message-858-2026-10-29.
+
+- 📋 [RPSN-0174] **Merge a split PS4 update's parts in part order.**
+  merge_parts sorts the parts, then loops over the unsorted list, so the sort does nothing. Each part is written at its own offset, so the merged file is right either way; the part number on screen can run out of order. Found in the fork's PR #1.
+  **Layman:** The merge progress now counts the parts in order.
+  Kind: fix.
+  Source: pr-1-2026-10-30.
+
+- 📋 [RPSN-0175] **Report a refused PS4 manifest request as a network error.**
+  The manifest request does not check the HTTP status, so an error page is parsed as JSON and shows as a manifest parsing failure. Found in the fork's PR #1.
+  **Layman:** When Sony refuses a request, the app now says so instead of reporting a garbled reply.
+  Kind: fix.
+  Source: pr-1-2026-10-30.
+
+- 📋 [RPSN-0176] **Use smaller read and write buffers for checksums and merges.**
+  Each checksum holds a 128 MiB read buffer, and each merged part holds 128 MiB each for reading and writing. Several at once take hundreds of MB. Found in the fork's PR #1, which uses 1 MiB for checksums and 8 MiB each for merges.
+  **Layman:** Checking and merging downloads uses far less memory.
+  Kind: perf.
+  Source: pr-1-2026-10-30.
+
+- 📋 [RPSN-0177] **Stop the format check failing on a correctly formatted pull request.**
+  rustfmt.yml runs mbrobbel/rustfmt-check in review mode. On the fork's PR #1 it found nothing wrong, then failed posting an approval: "GitHub Actions is not permitted to approve pull requests." Running the format check without posting a review would need no repository setting changed.
+  **Layman:** A GitHub check reports a failure on tidy code, because of how it posts its result.
+  Kind: chore.
+  Source: pr-1-2026-10-30.
+
+- 📋 [RPSN-0178] **Make the weekly dependency audit run on the fork's real code.**
+  GitHub runs scheduled workflows from the default branch. The fork's default branch is dev, and dev has no audit.yml; that file is only on local-dev. RUSTSEC-2026-0385 was found by another session, not by this check. Fix: make local-dev the default branch, or otherwise bring the audit to dev.
+  **Layman:** The weekly security check does not run, so a new alert waits until the next push.
+  Kind: security.
+  Source: session-message-858-2026-10-29.
 
 ## 15. RPCS3 source review (2026-10-13)
 

@@ -34,4 +34,7 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Security
 
+- **Update ctutils past RUSTSEC-2026-0385.** (RPSN-0173)
+  Update a small security library so the audit comes back clean.
+
 - **Secure connections use the fixed rustls-webpki 0.103.16 and webpki-root-certs 1.0.10 (RUSTSEC-2026-0382, RUSTSEC-2026-0383)** (RPSN-0167)
