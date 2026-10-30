@@ -12,6 +12,8 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Changed
 
+- **The versioning note now says the command line's printed text is not a breaking surface** (RPSN-0096)
+
 - **README and About dialog now point at this fork, with a notice that it is unofficial and where to report problems** (RPSN-0162)
 
 - **Use smaller read and write buffers for checksums and merges.** (RPSN-0176)

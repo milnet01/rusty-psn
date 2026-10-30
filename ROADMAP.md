@@ -1123,6 +1123,8 @@ Lower priority items that would improve the overall experience.
   Owner 2026-10-22: languages Afrikaans, Spanish, Portuguese (Brazil),
   and German and/or French (which of the two not yet said; ask when this
   starts).
+  Owner 2026-10-30: both German and French, so five languages with
+  Afrikaans, Spanish and Portuguese (Brazil).
   **Layman:** Add other languages to the app, once everything else is done.
   Kind: feature.
   Source: user-request-2026-10-15.
@@ -1285,7 +1287,7 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   Kind: fix.
   Source: in-session-2026-10-12.
 
-- 📋 [RPSN-0096] **Owner to decide: a GitHub fork, and a versioning-overrides note.**
+- ✅ [RPSN-0096] **Owner to decide: a GitHub fork, and a versioning-overrides note.**
   Deferred by the owner on 2026-10-12. `origin` points at the upstream
   author's repository, so the work on branch `local-dev` exists only on
   this disk; a fork of the owner's own would give it a remote. Pushing
@@ -1304,6 +1306,10 @@ Gaps noticed while aligning the project to the global workflow on 2026-10-12.
   surface, or that it is not and scripts rely on the options and exit
   code. Record: docs/reviews/versioning-overrides-loop-log.md, commits
   3b82ba9..fa8cdfa.
+  Owner 2026-10-30: the command line's printed text is not a breaking
+  surface; scripts rely on the options and exit code. Recorded in
+  docs/standards/versioning-overrides.md. Nothing is left open on this
+  item.
   **Layman:** Decide whether to back up your work in your own GitHub copy, and when to note what counts as a breaking change.
   Kind: chore.
   Source: in-session-2026-10-12.
@@ -1743,6 +1749,8 @@ shipped items that built it.
   Owner 2026-10-22: the owner checks the last half (does AC3 list
   Episode 2 in-game) in their own RPCS3, installing the zip through the
   app. No game can be booted on the test copy here.
+  Owner 2026-10-30: not done yet; the 1.0.0 release keeps waiting for
+  it.
   **Layman:** Check that installing a DLC zip you own makes the DLC appear in the game.
   Kind: test.
   Source: check-queue-2026-10-12.
@@ -2618,6 +2626,11 @@ reviewer proposed; check both against the code before fixing.
   fork's front page show the README notice. Proof once switched: `gh run
   list -R milnet01/rusty-psn --workflow audit.yml --event schedule`
   shows a run after the next Monday 04:17 UTC.
+  Owner go-ahead 2026-10-30: done. The fork's default branch is now
+  local-dev (gh repo view: defaultBranchRef local-dev); audit.yml is on
+  it and its state is active. Not yet proven: no scheduled run has
+  happened. Check after Monday 2026-11-02 04:17 UTC with the command
+  above, then flip this item.
   **Layman:** The weekly security check does not run, so a new alert waits until the next push.
   Kind: security.
   Source: session-message-858-2026-10-29.

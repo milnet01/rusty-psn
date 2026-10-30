@@ -45,6 +45,10 @@ on.
 A surface missing from this list is still a surface: if users rely on it and
 it breaks, the release was breaking (`versioning.md` § 3).
 
+**Not a surface:** the text the command line prints (`STANDARDS.md` § 7.2).
+Its wording and layout may change in any release; scripts rely on the options
+and the exit code (owner, 2026-10-30, RPSN-0096).
+
 ## Cold-eyes loop log
 
 Kept in [`docs/reviews/versioning-overrides-loop-log.md`](../reviews/versioning-overrides-loop-log.md).
