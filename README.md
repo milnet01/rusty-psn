@@ -4,6 +4,14 @@ A simple tool to grab updates for PS3 & PS4 games, directly from Sony's servers
 using their updates API. Available for both Linux and Windows, in both GUI and
 CLI alternatives.
 
+## Unofficial fork
+
+This is an unofficial fork of
+[RainbowCookie32's rusty-psn](https://github.com/RainbowCookie32/rusty-psn). It
+is not made or supported by the original author. Please report problems in
+[this fork's Issues](https://github.com/milnet01/rusty-psn/issues), not to the
+original project.
+
 ## Disclaimer
 
 We do not condone piracy. rusty-psn only downloads official game updates and
@@ -15,7 +23,7 @@ Entertainment.
 ## Usage
 
 Go to the
-[latest release](https://github.com/RainbowCookie32/rusty-psn/releases/latest)
+[latest release](https://github.com/milnet01/rusty-psn/releases/latest)
 page and download the file you'll use from the Assets section:
 
 - If you want to use the GUI version of rusty-psn, then download the

@@ -8,7 +8,7 @@
 | **Version** | 0.5.10 |
 | **Language** | Rust (Edition 2021) |
 | **License** | MIT (Copyright 2022 RainbowCookie32) |
-| **Repository** | https://github.com/RainbowCookie32/rusty-psn |
+| **Repository** | https://github.com/milnet01/rusty-psn (unofficial fork of https://github.com/RainbowCookie32/rusty-psn) |
 | **Purpose** | Download PS3, PS4, PSVita & PSP game update packages (.pkg) from Sony's PSN servers for use with emulators (primarily RPCS3) |
 
 ---

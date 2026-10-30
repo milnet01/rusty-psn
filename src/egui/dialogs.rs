@@ -6,7 +6,7 @@ impl UpdatesApp {
     pub(super) fn draw_about_section(&mut self, ui: &mut egui::Ui) {
         ui.label(tr!("dialogs-version", version = env!("CARGO_PKG_VERSION")));
         ui.label(tr!("dialogs-tagline"));
-        ui.hyperlink_to(tr!("dialogs-github"), "https://github.com/RainbowCookie32/rusty-psn");
+        ui.hyperlink_to(tr!("dialogs-github"), "https://github.com/milnet01/rusty-psn");
         ui.add_space(6.0);
         // The README's Disclaimer section says the same (RPSN-0166).
         ui.label(tr!("dialogs-disclaimer"));
