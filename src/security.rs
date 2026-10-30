@@ -402,6 +402,8 @@ mod tests {
         // The command line's default download folder is the relative "pkgs/". Once it
         // exists, a new file inside it must still pass.
         // Cargo runs tests from the crate root, so a folder under target/ has a relative form.
+        // target/ is missing here when CARGO_TARGET_DIR moves the build folder.
+        std::fs::create_dir_all("target").unwrap();
         let dir = tempfile::tempdir_in("target").unwrap();
         let cwd = std::env::current_dir().unwrap();
         let relative_base = dir.path().strip_prefix(&cwd).unwrap_or(dir.path());
