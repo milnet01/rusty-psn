@@ -12,6 +12,8 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Changed
 
+- **README and About dialog now point at this fork, with a notice that it is unofficial and where to report problems** (RPSN-0162)
+
 - **Use smaller read and write buffers for checksums and merges.** (RPSN-0176)
   Checking and merging downloads uses far less memory.
 
@@ -21,6 +23,10 @@ What changed in this fork of rusty-psn, newest first. The format follows
 - **The window starts at 1240 x 860 and can shrink to 960 x 600; a narrow window wraps the status bar onto a second row instead of cutting it off** (RPSN-0164)
 
 ### Fixed
+
+- **Tests no longer depend on where the build folder is** (RPSN-0172)
+
+- **The format check on pull requests no longer fails on correctly formatted code** (RPSN-0177)
 
 - **Merge a split PS4 update's parts in part order.** (RPSN-0174)
 

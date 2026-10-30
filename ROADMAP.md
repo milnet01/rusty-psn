@@ -1109,6 +1109,9 @@ Lower priority items that would improve the overall experience.
   Owner 2026-10-22: issues enabled on milnet01/rusty-psn (gh repo view:
   hasIssuesEnabled true), so people can report problems there. The
   README notice should send reports to the fork's issues, not upstream.
+  2026-10-30: README notice added (reports go to the fork's Issues); README latest-release link, About dialog link, Dockerfile download and STANDARDS.md Repository row now point at milnet01/rusty-psn. LICENSE and the Disclaimer section unchanged.
+  Until the first release: the fork has no releases, so the README link lands on an empty Releases page (checked: /releases/latest redirects to /releases) and `docker build` fails, because the Dockerfile's download has nothing to fetch.
+  For cut-release: main.yml's create_release job runs only on a push to master, and the fork's master has diverged from local-dev (it is upstream's merge 1cb78d3, not an ancestor). Publishing needs that condition or the branch decided first. Publishing still waits for RPSN-0095.
   **Layman:** Publish your version of rusty-psn for others to download, clearly marked as an unofficial fork.
   Kind: release.
   Source: user-request-2026-10-15.
@@ -2547,11 +2550,13 @@ reviewer proposed; check both against the code before fixing.
   Source: verify-delivery-s6-2026-10-22.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0172] **security::tests::path_containment_relative_existing_base fails when CARGO_TARGET_DIR moves the build folder.**
+- ✅ [RPSN-0172] **security::tests::path_containment_relative_existing_base fails when CARGO_TARGET_DIR moves the build folder.**
   Found 2026-10-22 building in a worktree with CARGO_TARGET_DIR set
   elsewhere: tempfile::tempdir_in("target") panics NotFound because
   ./target does not exist. Fix: create the folder first
   (std::fs::create_dir_all("target")) or use a folder the test makes.
+  2026-10-30: the test creates target/ first. Red then green in a
+  worktree with no ./target and CARGO_TARGET_DIR set elsewhere.
   **Layman:** One test only passes when the project's build folder is in its usual place.
   Kind: test.
   Source: in-session-2026-10-22.
@@ -2593,8 +2598,12 @@ reviewer proposed; check both against the code before fixing.
   Kind: perf.
   Source: pr-1-2026-10-30.
 
-- 📋 [RPSN-0177] **Stop the format check failing on a correctly formatted pull request.**
+- ✅ [RPSN-0177] **Stop the format check failing on a correctly formatted pull request.**
   rustfmt.yml runs mbrobbel/rustfmt-check in review mode. On the fork's PR #1 it found nothing wrong, then failed posting an approval: "GitHub Actions is not permitted to approve pull requests." Running the format check without posting a review would need no repository setting changed.
+  2026-10-30: rustfmt.yml now runs `cargo +nightly fmt --check`, the
+  command scripts/local-ci.sh already mirrors, and no longer holds
+  pull-requests: write. It only runs on pull requests, and none is open,
+  so it has not yet run on GitHub.
   **Layman:** A GitHub check reports a failure on tidy code, because of how it posts its result.
   Kind: chore.
   Source: pr-1-2026-10-30.
