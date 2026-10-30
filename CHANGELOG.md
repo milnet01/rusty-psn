@@ -22,6 +22,10 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Fixed
 
+- **Merge a split PS4 update's parts in part order.** (RPSN-0174)
+
+- **Report a refused PS4 manifest request as a network error.** (RPSN-0175)
+
 - **The command line no longer reports older updates as failed installs** (RPSN-0171)
   With --install, an update RPCS3 already has, or one older than the installed version, is skipped with a note instead of being sent to RPCS3 and counted as a failure.
 

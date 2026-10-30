@@ -2566,14 +2566,20 @@ reviewer proposed; check both against the code before fixing.
   Kind: security.
   Source: session-message-858-2026-10-29.
 
-- 📋 [RPSN-0174] **Merge a split PS4 update's parts in part order.**
+- ✅ [RPSN-0174] **Merge a split PS4 update's parts in part order.**
   merge_parts sorts the parts, then loops over the unsorted list, so the sort does nothing. Each part is written at its own offset, so the merged file is right either way; the part number on screen can run out of order. Found in the fork's PR #1.
+  2026-10-30: fixed; merge_parts_merges_in_part_order failed first with
+  [2, 1].
   **Layman:** The merge progress now counts the parts in order.
   Kind: fix.
   Source: pr-1-2026-10-30.
 
-- 📋 [RPSN-0175] **Report a refused PS4 manifest request as a network error.**
+- ✅ [RPSN-0175] **Report a refused PS4 manifest request as a network error.**
   The manifest request does not check the HTTP status, so an error page is parsed as JSON and shows as a manifest parsing failure. Found in the fork's PR #1.
+  2026-10-30: fixed;
+  fetch_manifest_reports_a_refused_request_as_a_network_error failed
+  first. The update query itself keeps no status check, because Sony's
+  error replies there carry an XML error code the parser reads.
   **Layman:** When Sony refuses a request, the app now says so instead of reporting a garbled reply.
   Kind: fix.
   Source: pr-1-2026-10-30.

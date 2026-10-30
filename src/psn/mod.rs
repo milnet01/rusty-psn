@@ -184,6 +184,17 @@ impl From<CappedReadError> for UpdateError {
     }
 }
 
+async fn fetch_manifest(client: &reqwest::Client, url: &str) -> Result<String, UpdateError> {
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(UpdateError::Reqwest)?
+        .error_for_status()
+        .map_err(UpdateError::Reqwest)?;
+    Ok(read_capped_text(response, crate::security::MAX_METADATA_SIZE).await?)
+}
+
 #[derive(Clone)]
 pub struct UpdateInfo {
     pub title_id: String,
@@ -285,8 +296,7 @@ impl UpdateInfo {
             // Validate manifest URL before fetching (it comes from Sony's XML response).
             crate::security::validate_download_url(&package.manifest_url).map_err(UpdateError::Security)?;
 
-            let manifest_response = client.get(&package.manifest_url).send().await.map_err(UpdateError::Reqwest)?;
-            let manifest_response_txt = read_capped_text(manifest_response, crate::security::MAX_METADATA_SIZE).await?;
+            let manifest_response_txt = fetch_manifest(client, &package.manifest_url).await?;
             match manifest_parser::parse_manifest_response(manifest_response_txt, &package, &mut info) {
                 Ok(()) => {}
                 Err(e) => {
@@ -327,7 +337,7 @@ impl UpdateInfo {
 
         info!("Starting merge for {}", self.title());
 
-        for package in self.packages.iter() {
+        for package in packages_sorted_by_part_number.iter() {
             let file_name = match package.file_name() {
                 Some(name) => name,
                 None => return Err(MergeError::FilepathMismatch(tr!("error-merge-no-file-name"))),
@@ -635,6 +645,72 @@ fn content_range_start(headers: &reqwest::header::HeaderMap) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::{checksum_failed, content_range_start, DownloadError};
+
+    #[tokio::test]
+    async fn fetch_manifest_reports_a_refused_request_as_a_network_error() {
+        use std::io::{Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let _ = stream.read(&mut [0u8; 1024]);
+            let _ = stream.write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 6\r\nConnection: close\r\n\r\ndenied");
+        });
+
+        let result = super::fetch_manifest(&reqwest::Client::new(), &url).await;
+
+        tokio::task::spawn_blocking(move || server.join().unwrap()).await.unwrap();
+        assert!(
+            matches!(&result, Err(super::UpdateError::Reqwest(e)) if e.status() == Some(reqwest::StatusCode::FORBIDDEN)),
+            "the error page must not reach the manifest parser"
+        );
+    }
+
+    #[tokio::test]
+    async fn merge_parts_merges_in_part_order() {
+        let root = tempfile::tempdir().unwrap();
+        let folder = root.path().join("CUSA00001 - Title");
+        std::fs::create_dir(&folder).unwrap();
+        std::fs::write(folder.join("UP0000-CUSA00001_00-PART_0.pkg"), b"aaaa").unwrap();
+        std::fs::write(folder.join("UP0000-CUSA00001_00-PART_1.pkg"), b"bbbb").unwrap();
+
+        let part = |number: usize, offset: u64| {
+            let mut package = super::PackageInfo::empty();
+            package.url = format!(
+                "https://gs2.ww.prod.dl.playstation.net/ppkg/UP0000-CUSA00001_00-PART_{}.pkg",
+                number - 1
+            );
+            package.part_number = Some(number);
+            package.offset = offset;
+            package
+        };
+        let info = super::UpdateInfo {
+            title_id: "CUSA00001".to_string(),
+            tag_name: String::new(),
+            titles: vec!["Title".to_string()],
+            packages: vec![part(2, 4), part(1, 0)],
+            platform_variant: super::PlatformVariant::PS4,
+        };
+        let (tx, mut rx) = tokio::sync::mpsc::channel(10);
+
+        let result = info
+            .merge_parts(tx, root.path(), crate::utils::DirectoryFormat::SerialTitle)
+            .await;
+
+        assert!(result.is_ok());
+        let mut parts_reported = Vec::new();
+        while let Some(status) = rx.recv().await {
+            if let super::MergeStatus::PartProgress(number) = status {
+                parts_reported.push(number);
+            }
+        }
+        assert_eq!(parts_reported, vec![1, 2]);
+        assert_eq!(
+            std::fs::read(folder.join("UP0000-CUSA00001_00-PART.pkg")).unwrap(),
+            b"aaaabbbb"
+        );
+    }
 
     #[test]
     fn content_range_start_reads_the_first_byte() {
