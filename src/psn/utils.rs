@@ -127,7 +127,7 @@ pub async fn read_capped_text(mut response: reqwest::Response, cap: u64) -> Resu
     Ok(String::from_utf8_lossy(&body).into_owned())
 }
 
-const MERGE_CHUNK_SIZE: usize = 1024 * 1024 * 128;
+const MERGE_CHUNK_SIZE: usize = 1024 * 1024 * 8;
 pub async fn copy_pkg_file(src_path: &PathBuf, target_path: &PathBuf, offset: u64) -> Result<u64, Error> {
     let src_file = OpenOptions::default()
         .create(false)

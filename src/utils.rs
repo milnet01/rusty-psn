@@ -423,7 +423,7 @@ pub async fn migrate_directories(migrations: &[(PathBuf, PathBuf)], download_pat
     (success_count, migrations.len() - success_count)
 }
 
-const CHUNK_SIZE: usize = 1024 * 1024 * 128;
+const CHUNK_SIZE: usize = 1024 * 1024;
 
 /// Verify a downloaded file's SHA1 hash. Runs the CPU-intensive hashing on the
 /// tokio blocking thread pool so it doesn't starve async I/O tasks.
@@ -545,6 +545,20 @@ mod tests {
         content.extend_from_slice(&[0u8; 0x20]);
         std::fs::write(&path, &content).unwrap();
         let expected = hex::encode(Sha1::digest(body)).to_uppercase();
+
+        let mut file = File::open(&path).await.unwrap();
+        assert!(hash_file(&mut file, &expected, false).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn hash_file_skips_a_suffix_that_crosses_a_read_boundary() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("x.pkg");
+        let body = vec![7u8; super::CHUNK_SIZE - 5];
+        let mut content = body.clone();
+        content.extend_from_slice(&[0u8; 0x20]);
+        std::fs::write(&path, &content).unwrap();
+        let expected = hex::encode(Sha1::digest(&body));
 
         let mut file = File::open(&path).await.unwrap();
         assert!(hash_file(&mut file, &expected, false).await.unwrap());

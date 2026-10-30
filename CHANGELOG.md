@@ -12,6 +12,9 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Changed
 
+- **Use smaller read and write buffers for checksums and merges.** (RPSN-0176)
+  Checking and merging downloads uses far less memory.
+
 - **The app's on-screen text is ready for translation** (RPSN-0072)
   Every word the window app shows now comes from one English text file, so other languages can be added later. The app reads exactly as before.
 

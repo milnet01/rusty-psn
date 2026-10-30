@@ -2578,8 +2578,11 @@ reviewer proposed; check both against the code before fixing.
   Kind: fix.
   Source: pr-1-2026-10-30.
 
-- 📋 [RPSN-0176] **Use smaller read and write buffers for checksums and merges.**
+- ✅ [RPSN-0176] **Use smaller read and write buffers for checksums and merges.**
   Each checksum holds a 128 MiB read buffer, and each merged part holds 128 MiB each for reading and writing. Several at once take hundreds of MB. Found in the fork's PR #1, which uses 1 MiB for checksums and 8 MiB each for merges.
+  2026-10-30: checksums read through 1 MiB, merges through 8 MiB each
+  way. Memory and speed not measured; the size comes straight from the
+  constants.
   **Layman:** Checking and merging downloads uses far less memory.
   Kind: perf.
   Source: pr-1-2026-10-30.
