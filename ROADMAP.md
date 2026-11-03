@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=178 -->
+<!-- ants-roadmap-id-high-water: RPSN=180 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1604,6 +1604,29 @@ Work named by docs/design.md and its review on 2026-10-12.
   Kind: ux.
   Source: user-request-2026-10-14.
   Lanes: Window app.
+
+- 📋 [RPSN-0179] **Say why Install is missing when the RPCS3 program is not set.**
+  src/egui/content_browser.rs shows Install only when
+  settings.rpcs3_executable is set, and shows nothing in its place.
+  The owner found no Install button on 2026-11-03 and could not tell
+  why. Show a line naming the missing setting, with a button to
+  Settings, as the page already does for a missing content folder.
+  **Layman:** The Patches and DLC page hides its Install buttons without saying you need to set the RPCS3 program first.
+  Kind: ux.
+  Source: owner-s10-check-2026-11-03.
+  Lanes: Content, RPCS3.
+
+- 📋 [RPSN-0180] **Read the owner's real DLC folder layout on the Patches and DLC page.**
+  scan_content_directory reads only Game/Patches/SERIAL/*.pkg and
+  Game/DLC/*.zip. The owner's PS3 folder, as seen 2026-11-03, also
+  holds: DLC zips loose at the top level; game folders holding .pkg,
+  .rap and an UPDATE folder; and Game/DLC/<name>/ folders, not zips.
+  Needs design: which of these the page reads, and how a loose zip is
+  matched to its game.
+  **Layman:** The Patches and DLC page only finds DLC stored one particular way, so it misses most of a real collection.
+  Kind: feature.
+  Source: owner-s10-check-2026-11-03.
+  Lanes: Content.
 
 ## 13. Confirm the signs of success
 
