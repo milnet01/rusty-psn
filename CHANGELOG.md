@@ -26,6 +26,8 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Fixed
 
+- **Installs reach a portable RPCS3 AppImage's own setup, not a new empty one under ~/.config/rpcs3** (RPSN-0181)
+
 - **Tests no longer depend on where the build folder is** (RPSN-0172)
 
 - **The format check on pull requests no longer fails on correctly formatted code** (RPSN-0177)

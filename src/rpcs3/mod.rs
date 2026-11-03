@@ -541,15 +541,7 @@ async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Resul
         path.display()
     );
 
-    let mut command = if let Some(app_id) = flatpak_app_id {
-        let mut command = crate::sandbox::host_command("flatpak");
-        command.args(["run", app_id]);
-        command
-    } else {
-        crate::sandbox::host_command(rpcs3_executable)
-    };
-    command.args(["--headless", flag]).arg(path);
-    let output = tokio::process::Command::from(command)
+    let output = tokio::process::Command::from(headless_command(rpcs3_executable, flag, path))
         .output()
         .await
         .map_err(|e| Rpcs3Error::InstallFailed(tr!("error-rpcs3-launch-failed", reason = e.to_string())))?;
@@ -563,6 +555,33 @@ async fn run_headless(rpcs3_executable: &Path, flag: &str, path: &Path) -> Resul
         warn!("RPCS3 exited with {}: {}", output.status, stderr.trim());
     }
     Ok(())
+}
+
+/// The session folder variables a portable AppImage must not see (RPSN-0181).
+const PORTABLE_UNSET: [&str; 4] = ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME"];
+
+/// The command `run_headless` starts: RPCS3 with `--headless`, `flag` and `path`.
+fn headless_command(rpcs3_executable: &Path, flag: &str, path: &Path) -> std::process::Command {
+    let mut command = if let Some(app_id) = rpcs3_executable.to_string_lossy().strip_prefix("flatpak:") {
+        let mut command = crate::sandbox::host_command("flatpak");
+        command.args(["run", app_id]);
+        command
+    } else if has_portable_home(rpcs3_executable) {
+        crate::sandbox::host_command_unsetting(rpcs3_executable, &PORTABLE_UNSET)
+    } else {
+        crate::sandbox::host_command(rpcs3_executable)
+    };
+    command.args(["--headless", flag]).arg(path);
+    command
+}
+
+/// Whether `<executable>.home` is a folder. The AppImage runtime then points HOME at it, but
+/// RPCS3 reads XDG_CONFIG_HOME before HOME, so a session that sets the XDG folders (KDE does)
+/// sends RPCS3 to ~/.config/rpcs3 instead (seen 2026-11-03, RPSN-0181).
+fn has_portable_home(rpcs3_executable: &Path) -> bool {
+    let mut home = rpcs3_executable.as_os_str().to_owned();
+    home.push(".home");
+    Path::new(&home).is_dir()
 }
 
 /// Whether `program` with `args`, run on the host, exits 0. A program that cannot be started
@@ -989,6 +1008,34 @@ mod tests {
 
         let recorded = std::fs::read_to_string(args).unwrap();
         assert_eq!(recorded, format!("--headless\n--installpkg\n{}\n", pkg.display()));
+    }
+
+    #[test]
+    fn a_portable_appimage_runs_without_the_sessions_xdg_folders() {
+        // RPSN-0181: with XDG_CONFIG_HOME set, RPCS3 ignores RPCS3.AppImage.home and installs
+        // into a fresh setup under ~/.config/rpcs3, not the one the user plays from.
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("RPCS3.AppImage");
+        let pkg = Path::new("/p.pkg");
+        let removed = |command: &std::process::Command| {
+            command
+                .get_envs()
+                .filter(|(_, value)| value.is_none())
+                .map(|(name, _)| name.to_owned())
+                .collect::<Vec<_>>()
+        };
+
+        assert!(removed(&headless_command(&exe, "--installpkg", pkg)).is_empty());
+
+        std::fs::create_dir(dir.path().join("RPCS3.AppImage.home")).unwrap();
+        let command = headless_command(&exe, "--installpkg", pkg);
+        let mut expected = PORTABLE_UNSET;
+        expected.sort_unstable(); // get_envs lists names sorted
+        assert_eq!(removed(&command), expected);
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            ["--headless", "--installpkg", "/p.pkg"]
+        );
     }
 
     #[test]

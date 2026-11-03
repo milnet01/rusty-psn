@@ -21,16 +21,29 @@ pub fn in_flatpak() -> bool {
 /// which needs the manifest's `--talk-name=org.freedesktop.Flatpak`, and directly elsewhere.
 /// `--` keeps a program named like an option from being read as one of flatpak-spawn's.
 pub fn host_command(program: impl AsRef<OsStr>) -> Command {
-    host_command_for(in_flatpak(), program.as_ref())
+    host_command_for(in_flatpak(), program.as_ref(), &[])
 }
 
-fn host_command_for(sandboxed: bool, program: &OsStr) -> Command {
+/// As `host_command`, with the variables in `unset` removed from the program's environment.
+/// flatpak-spawn starts the program in the host session's environment, not this one, so there
+/// the removal is its `--unset-env` option.
+pub fn host_command_unsetting(program: impl AsRef<OsStr>, unset: &[&str]) -> Command {
+    host_command_for(in_flatpak(), program.as_ref(), unset)
+}
+
+fn host_command_for(sandboxed: bool, program: &OsStr, unset: &[&str]) -> Command {
     if sandboxed {
         let mut command = Command::new("flatpak-spawn");
-        command.args(["--host", "--"]).arg(program);
+        command.arg("--host");
+        command.args(unset.iter().map(|name| format!("--unset-env={name}")));
+        command.arg("--").arg(program);
         command
     } else {
-        Command::new(program)
+        let mut command = Command::new(program);
+        for name in unset {
+            command.env_remove(name);
+        }
+        command
     }
 }
 
@@ -67,13 +80,34 @@ mod tests {
 
     #[test]
     fn host_command_goes_through_flatpak_spawn_only_in_a_sandbox() {
-        let sandboxed = host_command_for(true, OsStr::new("rpcs3"));
+        let sandboxed = host_command_for(true, OsStr::new("rpcs3"), &[]);
         assert_eq!(sandboxed.get_program(), "flatpak-spawn");
         assert_eq!(sandboxed.get_args().collect::<Vec<_>>(), ["--host", "--", "rpcs3"]);
 
-        let native = host_command_for(false, OsStr::new("rpcs3"));
+        let native = host_command_for(false, OsStr::new("rpcs3"), &[]);
         assert_eq!(native.get_program(), "rpcs3");
         assert_eq!(native.get_args().count(), 0);
+        assert_eq!(native.get_envs().count(), 0);
+    }
+
+    #[test]
+    fn host_command_unsets_variables_on_either_route() {
+        // RPSN-0181: a portable RPCS3 AppImage must not see the session's XDG folders.
+        let sandboxed = host_command_for(true, OsStr::new("rpcs3"), &["XDG_CONFIG_HOME", "XDG_DATA_HOME"]);
+        assert_eq!(
+            sandboxed.get_args().collect::<Vec<_>>(),
+            [
+                "--host",
+                "--unset-env=XDG_CONFIG_HOME",
+                "--unset-env=XDG_DATA_HOME",
+                "--",
+                "rpcs3"
+            ]
+        );
+
+        let native = host_command_for(false, OsStr::new("rpcs3"), &["XDG_CONFIG_HOME"]);
+        assert_eq!(native.get_args().count(), 0);
+        assert_eq!(native.get_envs().collect::<Vec<_>>(), [(OsStr::new("XDG_CONFIG_HOME"), None)]);
     }
 
     #[test]

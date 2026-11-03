@@ -678,7 +678,7 @@ Integrate directly with the RPCS3 emulator to auto-detect games and install upda
   Kind: feature.
   Source: todo-md-import-2026-10-12.
 
-- 📋 [RPSN-0181] **Install into the portable AppImage's own RPCS3 when the desktop sets XDG folders.**
+- ✅ [RPSN-0181] **Install into the portable AppImage's own RPCS3 when the desktop sets XDG folders.**
   Owner's S10 check, 2026-11-03. The executable was RPCS3.AppImage with
   a sibling RPCS3.AppImage.home. The KDE session sets XDG_CONFIG_HOME,
   XDG_DATA_HOME, XDG_CACHE_HOME and XDG_STATE_HOME, so RPCS3 ignored the
@@ -687,6 +687,12 @@ Integrate directly with the RPCS3 emulator to auto-detect games and install upda
   rpcs3-portable.sh unsets those four variables before running the
   AppImage. Fix: do the same in run_headless when the executable is an
   AppImage with a sibling .AppImage.home folder. Log: rusty-psn_2026-11-03_21-07-34.log.
+  Fixed 2026-11-03: headless_command removes the four XDG_*_HOME
+  variables when <exe>.home is a folder (flatpak-spawn --unset-env inside
+  the app's Flatpak). Test a_portable_appimage_runs_without_the_sessions_xdg_folders
+  failed before the fix and passes after. Earlier test runs on the private
+  copies unset these by hand, which is why S10 passed there. The owner's
+  re-run of S10 is the end-to-end proof (RPSN-0095).
   **Layman:** With a portable RPCS3, installs went into a new empty RPCS3 setup instead of the one you play from.
   Kind: fix.
   Source: owner-s10-check-2026-11-03.
