@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=182 -->
+<!-- ants-roadmap-id-high-water: RPSN=183 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1143,6 +1143,12 @@ Lower priority items that would improve the overall experience.
   2026-10-30: README notice added (reports go to the fork's Issues); README latest-release link, About dialog link, Dockerfile download and STANDARDS.md Repository row now point at milnet01/rusty-psn. LICENSE and the Disclaimer section unchanged.
   Until the first release: the fork has no releases, so the README link lands on an empty Releases page (checked: /releases/latest redirects to /releases) and `docker build` fails, because the Dockerfile's download has nothing to fetch.
   For cut-release: main.yml's create_release job runs only on a push to master, and the fork's master has diverged from local-dev (it is upstream's merge 1cb78d3, not an ancestor). Publishing needs that condition or the branch decided first. Publishing still waits for RPSN-0095.
+  2026-11-03: main.yml runs for 669f1cb, 9329c06 and 2df0245 show
+  failure only because both macos-latest jobs were never given a runner
+  (annotation: "The job was not acquired by Runner of type hosted";
+  GitHub macOS arm64 capacity). Linux and Windows jobs passed. Before
+  cut-release, re-run with `gh run rerun <id> -R milnet01/rusty-psn
+  --failed` and get a green macOS build.
   **Layman:** Publish your version of rusty-psn for others to download, clearly marked as an unofficial fork.
   Kind: release.
   Source: user-request-2026-10-15.
@@ -1659,6 +1665,17 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: owner-s10-check-2026-11-03.
   Lanes: Content.
 
+- 📋 [RPSN-0183] **Keep refining the window app's look to match the approved mockups.**
+  Owner 2026-11-03: "continue refining the look to match that mockup".
+  The mockups are the claude.ai artifact named in RPSN-0133; no copy is
+  on this machine and a session cannot open it. Asked the owner for
+  screenshots of its four screens (Search, Downloads, RPCS3 library,
+  Settings) or a saved file. With them: compare each screen to the app
+  (record-demo skill, private display) and file each difference here.
+  **Layman:** Make the app look more like the design pictures you approved.
+  Kind: ux.
+  Source: owner-request-2026-11-03.
+
 ## 13. Confirm the signs of success
 
 One item per discovery sign that no other item claimed on 2026-10-12. Each runs
@@ -1805,6 +1822,19 @@ shipped items that built it.
   app. No game can be booted on the test copy here.
   Owner 2026-10-30: not done yet; the 1.0.0 release keeps waiting for
   it.
+  Owner attempt 2026-11-03: failed for two app faults, not the game.
+  The owner's ~/.local/bin/rusty-psn was a 2026-10-13 build with no
+  Patches and DLC page; replaced with a fresh release build (old kept as
+  rusty-psn.old-2026-10-13). The page reads only <Game>/DLC/*.zip, so a
+  test folder /mnt/Games/PS3_PSN_DLC_Test/Assassins Creed III/DLC/ holds
+  a hard link to the owner's zip; the app's content folder points there.
+  The install then went into a stray ~/.config/rpcs3 (RPSN-0181, fixed
+  in 2df0245, stray folder deleted with the owner's yes) while the page
+  said Installed (RPSN-0182, open). Next: owner restarts the app and
+  clicks Install again; then check, read-only, that
+  /mnt/Emulators/Sony_PlayStation_3/RPCS3/RPCS3.AppImage.home/.config/rpcs3/dev_hdd0/home/00000001/exdata
+  holds UP0001-BLUS30991_00-SPAC3DLCSP000002.rap and that ~/.config/rpcs3
+  was not recreated; then the owner checks in-game.
   **Layman:** Check that installing a DLC zip you own makes the DLC appear in the game.
   Kind: test.
   Source: check-queue-2026-10-12.
