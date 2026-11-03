@@ -49,6 +49,8 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Security
 
+- **The weekly dependency security check now runs on the fork's own code** (RPSN-0178)
+
 - **Update ctutils past RUSTSEC-2026-0385.** (RPSN-0173)
   Update a small security library so the audit comes back clean.
 
