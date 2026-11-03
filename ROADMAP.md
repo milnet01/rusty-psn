@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=180 -->
+<!-- ants-roadmap-id-high-water: RPSN=182 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -677,6 +677,31 @@ Integrate directly with the RPCS3 emulator to auto-detect games and install upda
   **Layman:** Make "Update All Outdated" install the updates into RPCS3 as well as downloading them.
   Kind: feature.
   Source: todo-md-import-2026-10-12.
+
+- 📋 [RPSN-0181] **Install into the portable AppImage's own RPCS3 when the desktop sets XDG folders.**
+  Owner's S10 check, 2026-11-03. The executable was RPCS3.AppImage with
+  a sibling RPCS3.AppImage.home. The KDE session sets XDG_CONFIG_HOME,
+  XDG_DATA_HOME, XDG_CACHE_HOME and XDG_STATE_HOME, so RPCS3 ignored the
+  .home folder and built a fresh setup in ~/.config/rpcs3 (created
+  21:15:16, holding the AC3 DLC and its RAP). The owner's launcher
+  rpcs3-portable.sh unsets those four variables before running the
+  AppImage. Fix: do the same in run_headless when the executable is an
+  AppImage with a sibling .AppImage.home folder. Log: rusty-psn_2026-11-03_21-07-34.log.
+  **Layman:** With a portable RPCS3, installs went into a new empty RPCS3 setup instead of the one you play from.
+  Kind: fix.
+  Source: owner-s10-check-2026-11-03.
+  Lanes: RPCS3.
+
+- 📋 [RPSN-0182] **Do not show Installed when the install could not be checked.**
+  Same run: the log says "RPCS3 finished; the install was not checked",
+  yet the Patches and DLC page showed a green Installed pill and a Done
+  message. The update chain already words this case apart
+  (update-chain-unchecked). The content page should too, and say why it
+  could not check.
+  **Layman:** The app said Installed although it never checked, and the DLC had gone to the wrong place.
+  Kind: fix.
+  Source: owner-s10-check-2026-11-03.
+  Lanes: RPCS3.
 
 ## 8. Add Themes [P2]
 
