@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=183 -->
+<!-- ants-roadmap-id-high-water: RPSN=185 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -2721,6 +2721,34 @@ reviewer proposed; check both against the code before fixing.
   **Layman:** The weekly security check does not run, so a new alert waits until the next push.
   Kind: security.
   Source: session-message-858-2026-10-29.
+
+- ✅ [RPSN-0184] **Give every GitHub workflow a time limit, cancel superseded runs, and cache the lint and audit builds.**
+  From ~/.claude/tools/ci-gate (2026-11-09): no concurrency in any
+  workflow, no timeout-minutes on five jobs, no cache in audit.yml and
+  clippy.yml. Added concurrency per workflow and ref (cancel in
+  progress except on master, where main.yml may publish a release),
+  timeouts sized from the 2026-11-03 runs (cached builds took about two
+  minutes), and Swatinem/rust-cache v2.9.3 in audit.yml and
+  clippy.yml; main.yml's pin moved from v2.9.2 to v2.9.3. rustfmt.yml
+  and remove-old-artifacts.yml build nothing, so they get no cache.
+  ci_report on milnet01/rusty-psn (30 days): no problems, advice only.
+  **Layman:** The fork's online build checks stop sooner when stuck and waste less time on outdated pushes.
+  Kind: chore.
+  Source: claude-config-ci-tuning-2026-11-05.
+  Lanes: CI.
+
+- 📋 [RPSN-0185] **Pin the GitHub runner images instead of the -latest labels.**
+  ci_report advice 2026-11-09: rustfmt.yml and remove-old-artifacts.yml
+  run on ubuntu-latest; main.yml's matrix uses windows-latest and
+  macos-latest, and create_release runs on macos-latest. A -latest label
+  moves when GitHub says so (local-gate.md § 9). main.yml's step
+  conditions compare matrix.os to 'windows-latest' and 'macos-latest'
+  by name, so pinning must change those conditions too. Do it after the
+  1.0.0 release, so the release builds on the runners already proven.
+  **Layman:** Stop the online build machines changing under the fork without notice.
+  Kind: chore.
+  Source: claude-config-ci-tuning-2026-11-05.
+  Lanes: CI.
 
 ## 15. RPCS3 source review (2026-10-13)
 

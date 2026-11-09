@@ -7,6 +7,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # A newer push replaces an older run, except on master, where a run may publish a release.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   build_matrix:
     strategy:
@@ -15,13 +20,14 @@ jobs:
         feature: ["cli", "egui"]
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: ${{ matrix.feature }}-${{ matrix.os }}
           cache-on-failure: "true"
@@ -121,6 +127,7 @@ jobs:
   create_release:
     needs: build_matrix
     runs-on: macos-latest
+    timeout-minutes: 20
     if: github.ref == 'refs/heads/master'
     permissions:
       contents: write # creates the release and uploads its files
