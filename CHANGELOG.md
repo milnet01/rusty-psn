@@ -28,6 +28,8 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Fixed
 
+- **The Patches and DLC page no longer says Installed for a DLC it could not check; it says to look in RPCS3 instead** (RPSN-0182)
+
 - **Installs reach a portable RPCS3 AppImage's own setup, not a new empty one under ~/.config/rpcs3** (RPSN-0181)
 
 - **Tests no longer depend on where the build folder is** (RPSN-0172)

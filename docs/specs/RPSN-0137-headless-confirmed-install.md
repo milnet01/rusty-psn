@@ -15,7 +15,7 @@ RPCS3, and rusty-psn checks the new version went in or says it could not.
 An install started from rusty-psn finishes on its own, with no RPCS3 window.
 An update is reported installed only when the game's version shows it went
 in; where rusty-psn cannot look at an update, it says so instead of claiming
-success. A DLC is reported as today (§ 3).
+success. A DLC install is never checked, so it is reported as unchecked (§ 3, § 4.4).
 
 ## 2. Problem
 
@@ -156,8 +156,11 @@ package `version` and PARAM.SFO's APP_VER share the `XX.YY` form.
   `--rpcs3-config-dir`; not counted as a failure. `Err`: counted as a failure,
   as today.
 - **Content browser.** A patch is reported as in the window app. A DLC:
-  `Ok` of either outcome marks it installed, as today; `Err` shows the
-  error.
+  `Ok` is `Unconfirmed`, so a warning says rusty-psn cannot check a DLC
+  install and asks the user to look in RPCS3; no pill, so the Install
+  button stays. `Err` shows the error. **Amended 2026-11-09 (RPSN-0182):**
+  `Ok` used to mark a DLC installed, and on 2026-11-03 that showed
+  Installed for a DLC RPCS3 had put in the wrong folder.
 
 ## 5. Invariants
 
@@ -262,7 +265,7 @@ exists.
   Flatpak build, install with an RPCS3 path that does not exist on the
   host; the result is `InstallFailed` naming the path.
   *Breaks when:* a missing RPCS3 behind `flatpak` reaches INV-8, so a DLC
-  is marked installed.
+  install is reported as unchecked instead of failed.
 
 ## 6. Failure modes
 
@@ -288,8 +291,8 @@ exists.
   launch and reports `InstallFailed`.
 - **RPCS3 removed between INV-9's check and the launch.** The launcher's
   exit is not read (INV-8): `AppVersion` reports `NotInstalled`;
-  `Unconfirmed` reports an unchecked install, so the content browser marks
-  a DLC installed.
+  `Unconfirmed` reports an unchecked install, as the content browser does
+  for a DLC.
 - **dev_hdd0 moved after detection.** The check reads the wrong folder: a
   false `NotInstalled`, or, with `version: Some`, a false `Confirmed` where
   that folder already holds the version.

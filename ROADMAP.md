@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=185 -->
+<!-- ants-roadmap-id-high-water: RPSN=186 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -698,16 +698,40 @@ Integrate directly with the RPCS3 emulator to auto-detect games and install upda
   Source: owner-s10-check-2026-11-03.
   Lanes: RPCS3.
 
-- 📋 [RPSN-0182] **Do not show Installed when the install could not be checked.**
+- ✅ [RPSN-0182] **Do not show Installed when the install could not be checked.**
   Same run: the log says "RPCS3 finished; the install was not checked",
   yet the Patches and DLC page showed a green Installed pill and a Done
   message. The update chain already words this case apart
   (update-chain-unchecked). The content page should too, and say why it
   could not check.
+  Resolved 2026-11-09: the page set the pill on purpose.
+  content_browser.rs mapped a DLC's Ok to Confirmed, as RPSN-0137 § 4.4
+  said. Now a DLC's Ok is Unconfirmed: an amber warning says rusty-psn
+  cannot check a DLC install and asks the user to look in RPCS3, with no
+  pill, so Install stays. The decision moved into install_report
+  (content_browser.rs). Test
+  an_unchecked_dlc_install_is_not_shown_as_installed was red on the old
+  mapping ("marked installed: Installed: ep2.zip"). Spec RPSN-0137 §§ 1,
+  4.4, 6 amended. Real confirmation (checking the RAP reached exdata) is
+  RPSN-0186.
   **Layman:** The app said Installed although it never checked, and the DLC had gone to the wrong place.
   Kind: fix.
   Source: owner-s10-check-2026-11-03.
   Lanes: RPCS3.
+
+- 📋 [RPSN-0186] **Confirm a DLC install by finding its licence in RPCS3's folder.**
+  After RPSN-0182 a DLC install is always reported unchecked. When the
+  RPCS3 folder is set, the app could look for each RAP from the zip in
+  dev_hdd0/home/<user>/exdata and say Installed only when every one is
+  there. That would have caught the 2026-11-03 install that went into a
+  stray ~/.config/rpcs3 (RPSN-0181). Research first: which user folder
+  RPCS3 uses (00000001 is only the default), and RPCS3's own source for
+  where --installpkg puts a RAP. Changes RPSN-0137 § 9 (Confirming a DLC
+  is out of scope there) and docs/design.md's Content line.
+  **Layman:** The app checks that a DLC really went into RPCS3, instead of only saying it could not check.
+  Kind: enhancement.
+  Source: rpsn-0182-follow-up-2026-11-09.
+  Lanes: Content, RPCS3.
 
 ## 8. Add Themes [P2]
 

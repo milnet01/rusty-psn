@@ -64,7 +64,8 @@ impl UpdatesApp {
                                         ui.label(format!("  {} / {}", patch.serial, patch.pkg_filename));
                                         let patch_key = patch.pkg_path.to_string_lossy().to_string();
                                         let is_installed = self.v.content_installed_items.contains(&patch_key);
-                                        let is_installing = self.v.content_install_promises.iter().any(|(k, _)| *k == patch_key);
+                                        let is_installing =
+                                            self.v.content_install_promises.iter().any(|(k, _, _)| *k == patch_key);
 
                                         if is_installed {
                                             status_pill(ui, &tr!("content-browser-installed"), StatusKind::Done);
@@ -92,7 +93,7 @@ impl UpdatesApp {
                                                     .await
                                                     .map_err(|e| crate::content::ContentError::InstallFailed(e.to_string()))
                                             });
-                                            self.v.content_install_promises.push((key, promise));
+                                            self.v.content_install_promises.push((key, ContentKind::Patch, promise));
                                         }
                                     });
                                 }
@@ -110,7 +111,7 @@ impl UpdatesApp {
                                         ui.label(format!("  {} ({})", dlc_item.zip_filename, ByteSize::b(dlc_item.size)));
                                         let dlc_key = dlc_item.zip_path.to_string_lossy().to_string();
                                         let is_installed = self.v.content_installed_items.contains(&dlc_key);
-                                        let is_installing = self.v.content_install_promises.iter().any(|(k, _)| *k == dlc_key);
+                                        let is_installing = self.v.content_install_promises.iter().any(|(k, _, _)| *k == dlc_key);
 
                                         if is_installed {
                                             status_pill(ui, &tr!("content-browser-installed"), StatusKind::Done);
@@ -128,13 +129,13 @@ impl UpdatesApp {
                                                 .expect("rt_handle set in UpdatesApp::new before any UI code runs");
                                             let _guard = rt.enter();
                                             let promise = spawn_redrawing(Some(ui.ctx().clone()), async move {
-                                                // A DLC cannot be checked; it is marked installed once RPCS3 has run
-                                                // (docs/specs/RPSN-0137-headless-confirmed-install.md § 3).
+                                                // rusty-psn cannot check a DLC install, so it is never shown as installed
+                                                // (docs/specs/RPSN-0137-headless-confirmed-install.md § 4.4, RPSN-0182).
                                                 crate::content::install_dlc_zip(&exe, &zip)
                                                     .await
-                                                    .map(|()| crate::rpcs3::InstallOutcome::Confirmed)
+                                                    .map(|()| crate::rpcs3::InstallOutcome::Unconfirmed)
                                             });
-                                            self.v.content_install_promises.push((key, promise));
+                                            self.v.content_install_promises.push((key, ContentKind::Dlc, promise));
                                         }
                                     });
                                 }
@@ -186,32 +187,81 @@ impl UpdatesApp {
     pub(super) fn handle_content_install_promises(&mut self, messages: &mut Vec<(String, MessageLevel)>) {
         let mut i = 0;
         while i < self.v.content_install_promises.len() {
-            if self.v.content_install_promises[i].1.ready().is_some() {
-                let (key, promise) = self.v.content_install_promises.remove(i);
-                match promise.block_and_take() {
-                    Ok(outcome) => {
-                        // Extract a short display name from the key (file path)
-                        let display = Path::new(&key)
-                            .file_name()
-                            .map(|n| n.to_string_lossy().to_string())
-                            .unwrap_or_else(|| key.clone());
-                        if outcome == crate::rpcs3::InstallOutcome::Confirmed {
-                            messages.push((tr!("content-browser-install-done", name = display), MessageLevel::Success));
-                            self.v.content_installed_items.insert(key);
-                        } else {
-                            messages.push((tr!("common-install-unchecked", name = display), MessageLevel::Warning));
-                        }
-                    }
-                    Err(e) => {
-                        messages.push((
-                            tr!("content-browser-install-failed", reason = e.to_string()),
-                            MessageLevel::Error,
-                        ));
-                    }
+            if self.v.content_install_promises[i].2.ready().is_some() {
+                let (key, kind, promise) = self.v.content_install_promises.remove(i);
+                // A short display name from the key (file path)
+                let display = Path::new(&key)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| key.clone());
+                let (message, level, installed) = install_report(kind, &display, promise.block_and_take());
+                messages.push((message, level));
+                if installed {
+                    self.v.content_installed_items.insert(key);
                 }
             } else {
                 i += 1;
             }
         }
+    }
+}
+
+/// What the Patches and DLC page is installing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ContentKind {
+    Patch,
+    Dlc,
+}
+
+/// What the page says when an install ends, and whether it then shows the Installed pill.
+fn install_report(
+    kind: ContentKind,
+    name: &str,
+    result: Result<crate::rpcs3::InstallOutcome, crate::content::ContentError>,
+) -> (String, MessageLevel, bool) {
+    use crate::rpcs3::InstallOutcome;
+    match (kind, result) {
+        (_, Ok(InstallOutcome::Confirmed)) => (tr!("content-browser-install-done", name = name), MessageLevel::Success, true),
+        (ContentKind::Dlc, Ok(InstallOutcome::Unconfirmed)) => (
+            tr!("content-browser-dlc-unchecked", name = name),
+            MessageLevel::Warning,
+            false,
+        ),
+        (ContentKind::Patch, Ok(InstallOutcome::Unconfirmed)) => {
+            (tr!("common-install-unchecked", name = name), MessageLevel::Warning, false)
+        }
+        (_, Err(e)) => (
+            tr!("content-browser-install-failed", reason = e.to_string()),
+            MessageLevel::Error,
+            false,
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rpcs3::InstallOutcome;
+
+    // RPSN-0182: a DLC install is never checked, so it must not show the green Installed pill,
+    // and the warning must say why rusty-psn could not check it.
+    #[test]
+    fn an_unchecked_dlc_install_is_not_shown_as_installed() {
+        let (message, level, installed) = install_report(ContentKind::Dlc, "ep2.zip", Ok(InstallOutcome::Unconfirmed));
+        assert!(!installed, "marked installed: {message}");
+        assert_eq!(level, MessageLevel::Warning, "{message}");
+        assert!(message.contains("ep2.zip"), "{message}");
+        assert!(
+            message.contains("cannot check a DLC"),
+            "says why it could not check: {message}"
+        );
+    }
+
+    #[test]
+    fn a_patch_install_is_shown_as_installed_only_when_checked() {
+        assert!(install_report(ContentKind::Patch, "p.pkg", Ok(InstallOutcome::Confirmed)).2);
+        let (message, level, installed) = install_report(ContentKind::Patch, "p.pkg", Ok(InstallOutcome::Unconfirmed));
+        assert!(!installed, "{message}");
+        assert_eq!(level, MessageLevel::Warning);
     }
 }

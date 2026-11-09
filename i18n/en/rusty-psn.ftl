@@ -210,6 +210,7 @@ content-browser-install = Install
 content-browser-scan-stopped = The content folder scan stopped unexpectedly.
 content-browser-install-done = Installed: { $name }
 content-browser-install-failed = Install failed: { $reason }
+content-browser-dlc-unchecked = RPCS3 finished installing { $name }, but rusty-psn cannot check a DLC install. Start the game in RPCS3 to see whether it lists the DLC.
 
 ## Firmware page
 

@@ -462,6 +462,14 @@ impl AppSettings {
     }
 }
 
+/// A patch or DLC install the Patches and DLC page started: the file's path, what it is,
+/// and the install.
+type ContentInstall = (
+    String,
+    content_browser::ContentKind,
+    Promise<Result<crate::rpcs3::InstallOutcome, crate::content::ContentError>>,
+);
+
 // Values that shouldn't be persisted from run to run.
 struct VolatileData {
     rt_handle: Option<Handle>,
@@ -557,11 +565,8 @@ struct VolatileData {
     /// A content folder scan running in the background; `None` inside means it panicked.
     content_scan_promise: Option<Promise<Option<crate::content::ContentLibrary>>>,
     content_filter: String,
-    /// Tracks DLC installs in progress: zip filename → promise.
-    content_install_promises: Vec<(
-        String,
-        Promise<Result<crate::rpcs3::InstallOutcome, crate::content::ContentError>>,
-    )>,
+    /// Patch and DLC installs in progress.
+    content_install_promises: Vec<ContentInstall>,
     content_installed_items: HashSet<String>,
 
     /// Cached egui context for use in code paths without direct UI access (e.g., auto-retry).
