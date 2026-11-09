@@ -1696,6 +1696,17 @@ Work named by docs/design.md and its review on 2026-10-12.
   screenshots of its four screens (Search, Downloads, RPCS3 library,
   Settings) or a saved file. With them: compare each screen to the app
   (record-demo skill, private display) and file each difference here.
+  2026-11-09: the owner expects Claude to hold the mockups, not to send
+  screenshots. Recovered: the 2026-10-12 session that built the artifact
+  wrote its files to a /tmp scratchpad, since gone. Replaying that
+  session log's Write and Edit calls (all applied, none failed) rebuilt
+  Main.dc.html (Search), Downloads.dc.html, Library.dc.html,
+  Settings.dc.html and canvas.json in
+  /mnt/Games/flatpak-build/rpsn-mockups/ (scratch, not tracked). The
+  pages load ./support.js, the artifact viewer's runtime, which was
+  never saved, but their HTML and CSS are complete. Next: render each
+  page (or read its CSS), compare with the app under record-demo, and
+  file each difference here.
   **Layman:** Make the app look more like the design pictures you approved.
   Kind: ux.
   Source: owner-request-2026-11-03.
