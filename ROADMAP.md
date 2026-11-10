@@ -2084,6 +2084,19 @@ shipped items that built it.
   /mnt/Emulators/Sony_PlayStation_3/RPCS3/RPCS3.AppImage.home/.config/rpcs3/dev_hdd0/home/00000001/exdata
   holds UP0001-BLUS30991_00-SPAC3DLCSP000002.rap and that ~/.config/rpcs3
   was not recreated; then the owner checks in-game.
+  Owner attempt 2026-11-10: failed for an app fault. With the RPCS3
+  window open, Install started headless RPCS3, which stopped at "Another
+  instance of RPCS3 is running"; the app missed the open RPCS3 because
+  it looked for the lock file outside RPCS3.AppImage.home (RPSN-0202,
+  fixed in 0ef78e6). ~/.local/bin/rusty-psn replaced with a release
+  build of 0ef78e6 (previous kept as rusty-psn.old-2026-11-10). Checked
+  read-only before the attempt: the RAP was not in the owner's exdata
+  and ~/.config/rpcs3 did not exist. Next: owner restarts rusty-psn,
+  closes RPCS3, clicks Install; then check read-only for
+  UP0001-BLUS30991_00-SPAC3DLCSP000002.rap in
+  /mnt/Emulators/Sony_PlayStation_3/RPCS3/RPCS3.AppImage.home/.config/rpcs3/dev_hdd0/home/00000001/exdata
+  and that ~/.config/rpcs3 was not created; then the owner checks
+  in-game.
   **Layman:** Check that installing a DLC zip you own makes the DLC appear in the game.
   Kind: test.
   Source: check-queue-2026-10-12.
