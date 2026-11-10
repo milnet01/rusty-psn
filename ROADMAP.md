@@ -1724,7 +1724,7 @@ Work named by docs/design.md and its review on 2026-10-12.
   session log's Write and Edit calls (all applied, none failed) rebuilt
   Main.dc.html (Search), Downloads.dc.html, Library.dc.html,
   Settings.dc.html and canvas.json in
-  /mnt/Games/flatpak-build/rpsn-mockups/ (scratch, not tracked). The
+  /mnt/Emulators/.claude/Scratchpad/rusty-psn/rpsn-mockups/ (scratch, not tracked). The
   pages load ./support.js, the artifact viewer's runtime, which was
   never saved, but their HTML and CSS are complete. Next: render each
   page (or read its CSS), compare with the app under record-demo, and
@@ -2024,7 +2024,7 @@ shipped items that built it.
   settings, Scan RPCS3 library: "2 game(s) in library, 1 with updates
   available"; LittleBigPlanet 01.02 / 01.30 "Update available",
   Assassin's Creed III 01.07 / 01.07 "Up to date". RPCS3's TEST12345 was
-  not listed. Shots in /mnt/Games/flatpak-build/e2e/shots (scratch).
+  not listed. Shots in /mnt/Emulators/.claude/Scratchpad/rusty-psn/e2e/shots (scratch).
   **Layman:** Check that the library scan correctly shows which games need updates.
   Kind: test.
   Source: check-queue-2026-10-12.
