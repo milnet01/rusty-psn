@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=186 -->
+<!-- ants-roadmap-id-high-water: RPSN=201 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -1711,9 +1711,201 @@ Work named by docs/design.md and its review on 2026-10-12.
   never saved, but their HTML and CSS are complete. Next: render each
   page (or read its CSS), compare with the app under record-demo, and
   file each difference here.
+  2026-11-10: compared all four screens (mockups now kept in
+  docs/mockups/ with rendered pictures; app captured under demoreel at
+  1280x860). Differences filed as RPSN-0187 to RPSN-0201. Owner
+  decisions 2026-11-10: (1) the mockup look is a NEW theme; Dark stays
+  as it is. (2) Search follows the mockup layout but loses no function:
+  Download All, Download Missing, Export results and Clear results move
+  to the results toolbar beside Download all latest; Open Downloads
+  moves to the Downloads page. (3) Everything else the mockups leave out
+  stays and is only restyled: sort direction and Update count sort,
+  download-folder Reset, Restore defaults, RPCS3 Blue theme, both RPCS3
+  path fields. Not filed: the mockup's "Show messages inside the app"
+  checkbox, which conflicts with the fixed Messages panel (RPSN-0157).
   **Layman:** Make the app look more like the design pictures you approved.
   Kind: ux.
   Source: owner-request-2026-11-03.
+
+- 📋 [RPSN-0187] **Use the mockups' colours, text sizes, buttons, fields and cards.**
+  Today the Dark theme is stock egui::Visuals::dark() (AppTheme::apply in
+  src/egui/mod.rs) and nothing sets text styles or spacing. Mockups
+  (docs/mockups/, each page's <style>): page #0E1014, sidebar #14171D,
+  card #1A1E26 border #2E3542 radius 14, text #EEF0F4 / #B4BAC6, accent
+  #4C9BFF; buttons 44px tall radius 10, #222833 border #3A4250; a primary
+  button #2F6FDB for each card's main action; fields 44px radius 10 fill
+  #0E1014; body 16px, buttons 15px, page title 30px. Each page's content
+  sits in cards in place of separator lines. Must work with the percent
+  text size (zoom) and keep the other themes.
+  Owner 2026-11-10: build this as a new theme in Settings > Theme; Dark
+  stays stock. The sizes, buttons, fields and cards may apply to every
+  theme; decide at build, and keep High contrast readable.
+  **Layman:** The app takes on the dark blue-grey colours, bigger text, rounded buttons and boxed sections of the approved design.
+  Kind: ux.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0188] **Bundle the IBM Plex fonts the mockups use.**
+  Mockups use IBM Plex Sans (400 to 700) and IBM Plex Mono for game IDs
+  and paths. The app loads only NotoSans-Regular and NotoSansJP (UpdatesApp::new
+  in src/egui/mod.rs), so .strong() only brightens text. egui has no
+  weight axis: each weight is its own FontFamily::Name. SIL Open Font
+  Licence: ship its licence file. Keep NotoSansJP as fallback for
+  Japanese titles.
+  **Layman:** The app uses the clearer typeface from the approved design, with real bold text.
+  Kind: ux.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0189] **Give each page a title and a one-line subtitle, as in the mockups.**
+  App: ui.heading(page.label()) then a separator. Mockups: 30px title,
+  17px #B4BAC6 subtitle, e.g. Search is "Find game updates" / "Type a
+  game ID, such as BLUS31147, or add a whole list at once."; RPCS3
+  library is "My RPCS3 games". Pages the mockups lack (Patches and DLC,
+  Firmware, History) get the same pattern.
+  **Layman:** Each page opens with a big title and a short line saying what the page is for.
+  Kind: ux.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0190] **Restyle the sidebar: icons, brand row, current-page bar, Downloads count badge.**
+  draw_sidebar in src/egui/chrome.rs: today 170px Button::selectable
+  entries, teal selection, no icons. Mockups: about 220px, entries 44px
+  radius 10, 16px; current page #233149 with a 3px #4C9BFF left bar;
+  brand row with a ring logo and "rusty-psn"; Downloads carries a #2F6FDB
+  count badge (assumed: active downloads). Icons: drawn with the painter
+  or an icon font, to avoid adding an SVG dependency; decide at build.
+  **Layman:** The menu on the left gets a small picture beside each page name, the app's name at the top, and a count of active downloads.
+  Kind: ux.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0191] **Draw status labels as filled, rounded pills in the mockups' colours.**
+  status_pill in src/egui/mod.rs draws a glyph and coloured text with no
+  fill. Mockups: radius 999, 1px border, tinted fill, padding 4 12. done
+  #5BD192 on #142A20; active #7DB8FF on #16233A; attention #F2C94C on
+  #2A2414 (yellow, the app uses orange); failed #FF9A90 on #2A1717;
+  neutral #C9CED8 on #20252E. Keep icon plus words (RPSN-0144); Light and
+  High contrast keep their own tints.
+  **Layman:** Status labels such as Downloaded or Failed become small rounded tags, easier to spot.
+  Kind: ux.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0192] **Restyle progress bars and their speed line as in the mockups.**
+  Mockups: 10px rounded bar (8px in the status bar), track #0E1014,
+  fill #4C9BFF, no text on it; under it "64% · 8.4 MB/s · about 31
+  seconds left". App: default ProgressBar with text; results-speed-eta
+  reads "{speed} - ETA {m:ss}". Places: draw_status_bar (chrome.rs),
+  draw_entry_pkg (results.rs), draw_search_bar (search.rs). The status
+  bar text becomes "2 downloading · 5 done · 0 failed".
+  **Layman:** Progress bars become slimmer, with the speed and time left written plainly underneath.
+  Kind: ux.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0193] **Restyle the Search box and results as cards, as in the mockup.**
+  Search box (draw_search_bar, search.rs): a card with "Game ID" over a
+  mono 18px field and a primary Search button. Results (draw_result_entry,
+  draw_entry_pkg in results.rs): one card per game; rounded platform
+  badge (PS3 #2F6FDB, PS4 #0B4FA8, Vita #5B4BC4); title 20px with a
+  second line "BLUS31147 · 3 updates · 1.2 GB"; an overall pill, a
+  neutral "Not downloaded" one included; primary "Download latest" first.
+  Package rows inside the card, split by lines; "Not downloaded" text;
+  Details as a button. Button-row changes wait on the owner (RPSN-0183).
+  Owner 2026-11-10: no function is lost. Download All, Download Missing,
+  Export results and Clear results go in the results toolbar; Open
+  Downloads moves to the Downloads page (RPSN-0194).
+  **Layman:** The search box and each game in the results sit in their own boxes, with the main button in blue.
+  Kind: ux.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0194] **Restyle the Downloads page: folder line, count tiles, section cards.**
+  draw_downloads_page (downloads_page.rs). Mockup: subtitle "Files go to
+  <folder> · Change" (Change opens Settings); "Open download folder"
+  button; four tiles (downloading, waiting, done, failed - needs you; the
+  failed one red); sections as cards with a #1E232C header strip; rows
+  show "Game · v1.02" over "ID · size", bar and stats, a pill per state,
+  and primary Try again / Install to RPCS3. Folding stays (RPSN-0157).
+  **Layman:** The Downloads page shows where files go, four count boxes, and tidier sections.
+  Kind: ux.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0195] **Restyle the RPCS3 library: filter tabs with counts, a filter box, a table card.**
+  draw_rpcs3_library_page (rpcs3_library.rs). Mockup: tabs "All (6)",
+  "Needs update (3)", "Up to date (2)", "No updates exist (1)"; a
+  "Filter by title or ID" field; table in a card, header strip #1E232C,
+  no stripes, columns Game, Game ID (mono), You have, Newest, Status,
+  action; a primary Update button on each outdated row; subtitle with
+  counts; footnote on what Update does.
+  **Layman:** The library page gets clear filter tabs showing how many games are in each, a search box, and a tidier table.
+  Kind: ux.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0196] **Restyle Settings: card groups, a label column, choice chips for text size.**
+  draw_settings_fields (settings.rs). Mockup: each group a card with a
+  19px heading; each setting one row, a 220px label column, labels
+  without colons; text size as chips (keep the percent values, owner
+  2026-10-15); folder-name options show name and example; the downloads
+  slider shows its value in bold; the save bar a #172235 strip with the
+  icon kept. Feature removals wait on the owner (RPSN-0183).
+  Owner 2026-11-10: keep Reset, Restore defaults, RPCS3 Blue and both
+  RPCS3 path fields; restyle only.
+  **Layman:** Settings is laid out in boxes with labels on the left, and text size is picked from large buttons.
+  Kind: ux.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0197] **Say "Game ID" and drop trailing colons from labels, as in the mockups.**
+  i18n/en/rusty-psn.ftl: "Title Serial:", "Serial", "Serial or
+  title...", "Filter:", "Sort by:", "Theme:" and the like. Mockups say
+  "Game ID", "Filter by title or ID", "Sort", no colons. Sort options in
+  sentence case.
+  **Layman:** Labels use the same plain words as the approved design, like Game ID instead of Title Serial.
+  Kind: doc-fix.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0198] **Give the library's No updates and version unknown labels an icon.**
+  The comparison found that rpcs3_library.rs draws "No updates" and
+  "version unknown" as plain labels, while RPSN-0144 says every status
+  label pairs an icon with words. Mockup: "Sony lists no updates" as a
+  neutral pill. Check against the code before fixing.
+  **Layman:** Two library status labels show only words, against the rule that every status pairs an icon with words.
+  Kind: fix.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0199] **Add a Pause all button to the Downloads page.**
+  In the Downloads mockup (docs/mockups/Downloads.dc.html) beside "Open
+  download folder". The app has no pause-all today (no match in src or
+  i18n, 2026-11-10). Its pair, resuming all, needs deciding at build.
+  **Layman:** One button pauses every download at once.
+  Kind: feature.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0200] **Show a downloading state and an Update button on RPCS3 library rows.**
+  Library mockup: a row reads "Downloading 2 of 4" (blue pill) with a
+  "See progress" link to Downloads, and each outdated row has a primary
+  Update button. LibraryStatus (rpcs3_library.rs) has no downloading
+  state and rows have no action column today.
+  **Layman:** The library shows which games are downloading their updates, and lets you update one game with one click.
+  Kind: feature.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
+
+- 📋 [RPSN-0201] **Offer Check my RPCS3 games on the Search page.**
+  Search mockup puts "Check my RPCS3 games" beside Search and "Add a
+  list of IDs". Today that is the RPCS3 library page's "Scan RPCS3
+  library". The button can run that scan and open the library page.
+  **Layman:** The Search page gets a button that checks every game in RPCS3 for updates.
+  Kind: feature.
+  Source: rpsn-0183-compare-2026-11-10.
+  Lanes: Window app.
 
 ## 13. Confirm the signs of success
 
