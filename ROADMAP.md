@@ -1666,12 +1666,16 @@ Work named by docs/design.md and its review on 2026-10-12.
   Source: user-request-2026-10-14.
   Lanes: Window app.
 
-- 📋 [RPSN-0179] **Say why Install is missing when the RPCS3 program is not set.**
+- ✅ [RPSN-0179] **Say why Install is missing when the RPCS3 program is not set.**
   src/egui/content_browser.rs shows Install only when
   settings.rpcs3_executable is set, and shows nothing in its place.
   The owner found no Install button on 2026-11-03 and could not tell
   why. Show a line naming the missing setting, with a button to
   Settings, as the page already does for a missing content folder.
+  Resolved 2026-11-10: with no RPCS3 executable set, the page shows
+  "Install buttons appear once the RPCS3 executable is set..." with an
+  Open Settings button (test the_page_says_why_install_is_missing, red
+  before the fix).
   **Layman:** The Patches and DLC page hides its Install buttons without saying you need to set the RPCS3 program first.
   Kind: ux.
   Source: owner-s10-check-2026-11-03.

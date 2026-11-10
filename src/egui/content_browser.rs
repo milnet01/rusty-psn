@@ -14,6 +14,16 @@ impl UpdatesApp {
             }
 
             let has_rpcs3 = self.settings.rpcs3_executable.is_some();
+            // Without the RPCS3 program the Install buttons below are hidden; say why (RPSN-0179).
+            if !has_rpcs3 {
+                ui.horizontal(|ui| {
+                    ui.label(tr!("content-browser-no-rpcs3"));
+                    if ui.button(tr!("content-browser-open-settings")).clicked() {
+                        self.go_to(chrome::Page::Settings, &ui.ctx().clone());
+                    }
+                });
+                ui.separator();
+            }
 
             // Toolbar
             ui.horizontal(|ui| {
@@ -255,6 +265,42 @@ mod tests {
             message.contains("cannot check a DLC"),
             "says why it could not check: {message}"
         );
+    }
+
+    /// Draws the Patches and DLC page for one frame and returns every piece of text it drew.
+    fn page_text(app: &mut UpdatesApp) -> String {
+        fn collect(shape: &egui::Shape, out: &mut String) {
+            match shape {
+                egui::Shape::Text(text) => {
+                    out.push_str(text.galley.text());
+                    out.push('\n');
+                }
+                egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| collect(s, out)),
+                _ => {}
+            }
+        }
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| app.draw_content_browser_page(ui));
+        // Nothing draws these textures; epaint panics if they are dropped unapplied.
+        output.textures_delta.clear();
+        let mut text = String::new();
+        output.shapes.iter().for_each(|clipped| collect(&clipped.shape, &mut text));
+        text
+    }
+
+    // RPSN-0179: with no RPCS3 program set the Install buttons are hidden, so the page must say why.
+    #[test]
+    fn the_page_says_why_install_is_missing() {
+        let mut app = UpdatesApp::default();
+        app.settings.content_directory = Some(std::path::PathBuf::from("/content"));
+        app.settings.rpcs3_executable = None;
+        let text = page_text(&mut app);
+        assert!(text.contains("RPCS3 executable"), "no hint drawn:\n{text}");
+        assert!(text.contains("Open Settings"), "no way to Settings:\n{text}");
+
+        app.settings.rpcs3_executable = Some(std::path::PathBuf::from("/rpcs3/rpcs3"));
+        let text = page_text(&mut app);
+        assert!(!text.contains("RPCS3 executable"), "hint drawn with RPCS3 set:\n{text}");
     }
 
     #[test]

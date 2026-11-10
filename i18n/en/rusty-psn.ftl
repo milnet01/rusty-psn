@@ -200,6 +200,7 @@ update-chain-failed = Installing update { $version } of { $serial } failed, so l
 
 content-browser-no-dir = No content directory configured. Set it on the Settings page, under Content Library.
 content-browser-open-settings = Open Settings
+content-browser-no-rpcs3 = Install buttons appear once the RPCS3 executable is set. Set it on the Settings page, under RPCS3 Integration.
 content-browser-rescan = Rescan
 content-browser-loading = Loading...
 content-browser-shown = { $shown } game(s) shown (of { $total })
