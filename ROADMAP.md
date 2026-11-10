@@ -1,6 +1,6 @@
 <!-- ants-roadmap-format: 1 -->
 <!-- Generated from the Ants Terminal roadmap store. Edit it with roadmap_log; hand edits are discarded by the next write. -->
-<!-- ants-roadmap-id-high-water: RPSN=201 -->
+<!-- ants-roadmap-id-high-water: RPSN=202 -->
 # rusty-psn — Roadmap
 
 > **Format:** v1 — see roadmap-format.md.
@@ -732,6 +732,24 @@ Integrate directly with the RPCS3 emulator to auto-detect games and install upda
   Kind: enhancement.
   Source: rpsn-0182-follow-up-2026-11-09.
   Lanes: Content, RPCS3.
+
+- ✅ [RPSN-0202] **Notice an open portable RPCS3 AppImage before installing.**
+  Owner screenshot 2026-11-10: with the RPCS3 window open, Patches and DLC
+  > Install started headless RPCS3, which showed "Another instance of
+  RPCS3 is running ... RPCS3.AppImage.home/.cache/rpcs3/RPCS3.buf still
+  exists"; the page stayed on Installing. lock_path_from (src/rpcs3/mod.rs)
+  names the lock from the session's XDG_CACHE_HOME, XDG_CONFIG_HOME or
+  HOME, but a portable AppImage runs headless with those XDG folders
+  unset and HOME at <exe>.home (RPSN-0181), so its lock is
+  The lock path above, scrubbed by the roadmap tool, is
+  EXE.home/.cache/rpcs3/RPCS3.buf. Resolved 2026-11-10: lock_path_from
+  uses that path when the EXE.home folder exists (test
+  a_portable_appimage_locks_inside_its_home_folder, red before the fix);
+  has_portable_home became portable_home, shared by both callers.
+  **Layman:** With RPCS3 open, Install started a second RPCS3 that failed with an error box, instead of asking you to close RPCS3 first.
+  Kind: fix.
+  Source: owner-s10-check-2026-11-10.
+  Lanes: RPCS3.
 
 ## 8. Add Themes [P2]
 

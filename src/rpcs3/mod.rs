@@ -385,6 +385,10 @@ fn lock_path_from(rpcs3_executable: &Path, env: impl Fn(&str) -> Option<OsString
         }
     } else if cfg!(target_os = "macos") {
         home()?.join("Library/Caches/rpcs3")
+    } else if let Some(home) = portable_home(rpcs3_executable) {
+        // headless_command runs a portable AppImage with HOME at <exe>.home and the XDG
+        // folders unset, so that RPCS3 locks <exe>.home/.cache (RPSN-0202).
+        home.join(".cache/rpcs3")
     } else {
         // RPCS3 really does fall back to XDG_CONFIG_HOME here, not to a config folder.
         let base = env("XDG_CACHE_HOME")
@@ -566,7 +570,7 @@ fn headless_command(rpcs3_executable: &Path, flag: &str, path: &Path) -> std::pr
         let mut command = crate::sandbox::host_command("flatpak");
         command.args(["run", app_id]);
         command
-    } else if has_portable_home(rpcs3_executable) {
+    } else if portable_home(rpcs3_executable).is_some() {
         crate::sandbox::host_command_unsetting(rpcs3_executable, &PORTABLE_UNSET)
     } else {
         crate::sandbox::host_command(rpcs3_executable)
@@ -575,13 +579,14 @@ fn headless_command(rpcs3_executable: &Path, flag: &str, path: &Path) -> std::pr
     command
 }
 
-/// Whether `<executable>.home` is a folder. The AppImage runtime then points HOME at it, but
+/// `<executable>.home`, where it is a folder. The AppImage runtime then points HOME at it, but
 /// RPCS3 reads XDG_CONFIG_HOME before HOME, so a session that sets the XDG folders (KDE does)
 /// sends RPCS3 to ~/.config/rpcs3 instead (seen 2026-11-03, RPSN-0181).
-fn has_portable_home(rpcs3_executable: &Path) -> bool {
+fn portable_home(rpcs3_executable: &Path) -> Option<PathBuf> {
     let mut home = rpcs3_executable.as_os_str().to_owned();
     home.push(".home");
-    Path::new(&home).is_dir()
+    let home = PathBuf::from(home);
+    home.is_dir().then_some(home)
 }
 
 /// Whether `program` with `args`, run on the host, exits 0. A program that cannot be started
@@ -1297,6 +1302,26 @@ mod tests {
             Some(PathBuf::from("/h/.cache/rpcs3/RPCS3.buf"))
         );
         assert_eq!(lock_path_from(exe, env(&[])), None);
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn a_portable_appimage_locks_inside_its_home_folder() {
+        // RPSN-0202: headless installs run a portable AppImage with HOME at <exe>.home and the
+        // XDG folders unset, so an open RPCS3 holds the lock there, whatever the session says.
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("RPCS3.AppImage");
+        std::fs::create_dir(dir.path().join("RPCS3.AppImage.home")).unwrap();
+        let env = |key: &str| match key {
+            "XDG_CACHE_HOME" => Some(OsString::from("/c")),
+            "XDG_CONFIG_HOME" => Some(OsString::from("/f")),
+            "HOME" => Some(OsString::from("/h")),
+            _ => None,
+        };
+        assert_eq!(
+            lock_path_from(&exe, env),
+            Some(dir.path().join("RPCS3.AppImage.home/.cache/rpcs3/RPCS3.buf"))
+        );
     }
 
     #[test]

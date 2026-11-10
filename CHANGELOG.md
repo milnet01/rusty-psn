@@ -28,6 +28,9 @@ What changed in this fork of rusty-psn, newest first. The format follows
 
 ### Fixed
 
+- **Install notices an open portable RPCS3 AppImage and asks you to close it** (RPSN-0202)
+  Before, it started a second RPCS3, which stopped with an error box.
+
 - **The Patches and DLC page says why Install is missing when the RPCS3 program is not set** (RPSN-0179)
   It offers a button straight to Settings.
 
